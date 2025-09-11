@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ 최우선 원칙: 개인정보 보호
+
+**절대 규칙**: 어떤 상황에서도 로그에 개인정보를 남기지 않습니다.
+
 ## Project Overview
 
 **Odin-AI** is a public procurement platform that analyzes Korean government tender information (나라장터) using AI. The platform provides automated bid monitoring, AI-based success prediction, and customized project recommendations for businesses.
@@ -170,6 +174,7 @@ odin-ai/
 - **깊이 있는 사고**: 각 단계에서 충분한 검토와 분석
 - **체계적 진행**: 명확한 순서와 구조를 가지고 작업
 - **워크플로우**: 요구사항 분석 → 태스크 분할 → 개발 → 테스트 → 로깅 → 검토 → 배포
+- **현실적 접근**: 더미 데이터 최소화, 실제 데이터 기반 검증
 
 ### Task Management
 - **세부 단위로 분할**: 각 태스크는 2-4시간 내에 완료 가능한 크기
@@ -201,11 +206,31 @@ const secureLogger = {
 };
 ```
 
-**자동 개인정보 마스킹 패턴**:
-- Email: `[EMAIL_MASKED]`
-- Phone: `[PHONE_MASKED]`
-- Credit Card: `[CARD_MASKED]`
-- SSN/주민번호: `[ID_MASKED]`
+**자동 개인정보 마스킹 시스템 구현**:
+```javascript
+const personalDataPatterns = {
+  email: /[\w\.-]+@[\w\.-]+\.\w+/g,
+  phone: /\d{2,3}-\d{3,4}-\d{4}/g,
+  creditCard: /\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}/g,
+  koreanId: /\d{6}-\d{7}/g
+};
+
+// 모든 로그에 자동 적용
+const logSanitizer = {
+  sanitize: (data) => {
+    let sanitized = JSON.stringify(data);
+    Object.entries(personalDataPatterns).forEach(([type, pattern]) => {
+      sanitized = sanitized.replace(pattern, `[${type.toUpperCase()}_MASKED]`);
+    });
+    return JSON.parse(sanitized);
+  }
+};
+```
+
+**개인정보 대체 전략**:
+- 사용자 이메일 → SHA256 해시 기반 익명 ID (`usr_8자리해시`)
+- 전화번호 → 해시 기반 익명 ID (`ph_8자리해시`)
+- 신용카드 → 마지막 4자리 + 카드 타입만 저장
 
 ### Data Management
 
@@ -228,6 +253,20 @@ const secureLogger = {
 3. Phase 3 (베타): 프로덕션 데이터 서브셋 사용
 4. Phase 4 (프로덕션): 100% 실제 데이터
 
+**프로덕션 배포 전 체크**:
+```javascript
+// 자동화된 더미 데이터 검출
+const productionReadinessCheck = {
+  noDummyData: () => {
+    // 'dummy', 'mock', 'fake' 키워드 검색
+    // 테스트 파일 외에서 발견 시 배포 차단
+  },
+  realAPIIntegration: () => {
+    // 모든 외부 서비스 실제 연결 확인
+  }
+};
+```
+
 ### Security Considerations
 
 - **입력값 검증**: 모든 사용자 입력 유효성 검사
@@ -236,6 +275,24 @@ const secureLogger = {
 - **환경변수**: 민감 정보는 환경변수로 관리
 - **HTTPS 강제**: 모든 통신 암호화
 - **개인정보**: 로그 및 에러 메시지에서 완전 제거
+
+### Odin-AI 특화 가이드라인
+
+#### 나라장터 크롤링 윤리
+- **robots.txt 준수**: 항상 확인하고 준수
+- **요청 간격**: 최소 2-3초 딜레이
+- **User-Agent 명시**: 'Odin-AI/1.0 (contact@odin-ai.kr)'
+- **과도한 요청 금지**: 서버 부하 최소화
+
+#### HWP 문서 처리
+- **개인정보 스캔**: HWP 파일 내 개인정보 자동 감지
+- **안전한 저장**: 추출된 텍스트만 저장, 원본은 처리 후 삭제
+- **접근 제어**: 문서 접근 로그 기록 (익명 ID로)
+
+#### 기업 정보 보호
+- **사업자번호 암호화**: 저장 시 암호화
+- **기업명 로깅 금지**: 기업 ID만 사용
+- **매칭 결과 보안**: 타 기업에 노출 금지
 
 ### Code Quality Standards
 
@@ -252,3 +309,220 @@ const secureLogger = {
 - **페이지 로드**: < 1초
 - **데이터베이스 쿼리**: < 100ms
 - **문서 처리 성공률**: 95% 이상
+
+## Task Management and GitHub Workflow
+
+### 태스크 관리 체계
+
+#### 1. 태스크 구조
+```
+메인 태스크 (Epic)
+├── 서브 태스크 (Story)
+│   └── 상세 태스크 (Task)
+│       └── 체크리스트 항목
+```
+
+#### 2. 태스크 완료 프로세스
+1. **개발**: 코드 작성 및 기능 구현
+2. **테스트**: 단위 테스트 및 통합 테스트 작성/실행
+3. **문서화**: 코드 문서화 및 README 업데이트
+4. **리뷰**: 코드 리뷰 및 피드백 반영
+5. **컨펌**: 최종 확인 및 승인
+
+#### 3. 테스트 전략
+```python
+# 각 태스크 완료 시 필수 테스트
+def task_completion_tests():
+    """
+    1. 단위 테스트: 개별 함수/메서드 테스트
+    2. 통합 테스트: 모듈 간 상호작용 테스트
+    3. E2E 테스트: 전체 플로우 테스트 (주요 기능)
+    4. 성능 테스트: 응답시간, 처리량 측정
+    """
+    
+    # 테스트 실행 명령
+    pytest tests/unit/          # 단위 테스트
+    pytest tests/integration/   # 통합 테스트
+    pytest tests/e2e/           # E2E 테스트
+    pytest tests/performance/   # 성능 테스트
+```
+
+### GitHub 워크플로우
+
+#### 1. 브랜치 전략
+```bash
+main                    # 프로덕션 배포 브랜치
+├── develop            # 개발 통합 브랜치
+│   ├── feature/      # 기능 개발 브랜치
+│   ├── bugfix/       # 버그 수정 브랜치
+│   └── hotfix/       # 긴급 수정 브랜치
+
+# 브랜치 네이밍 규칙
+feature/phase1-data-collection   # Phase별 기능
+bugfix/api-response-error        # 버그 수정
+hotfix/critical-security-patch   # 긴급 패치
+```
+
+#### 2. 커밋 메시지 컨벤션
+```bash
+# 타입: 제목 (최대 50자)
+# |<----  최대 50자  ---->|
+
+# 본문 (선택사항, 최대 72자 줄바꿈)
+# |<----  최대 72자  --------------------------------->|
+
+# 꼬리말 (선택사항)
+# Issue: #123
+# Refs: #456
+
+# 타입 종류
+feat:     # 새로운 기능
+fix:      # 버그 수정
+docs:     # 문서 수정
+style:    # 코드 포맷팅
+refactor: # 코드 리팩토링
+test:     # 테스트 추가/수정
+chore:    # 빌드, 패키지 관련
+
+# 예시
+feat: 공공데이터포털 API 클라이언트 구현
+
+- API 키 관리 시스템 추가
+- Rate limiting 구현
+- 재시도 로직 추가
+
+Issue: #15
+```
+
+#### 3. Pull Request 프로세스
+```markdown
+## PR 템플릿
+
+### 📋 작업 내용
+- [ ] 구현한 기능 설명
+- [ ] 변경 사항 요약
+
+### 🧪 테스트
+- [ ] 단위 테스트 통과
+- [ ] 통합 테스트 통과
+- [ ] 수동 테스트 완료
+
+### 📝 체크리스트
+- [ ] 코드 스타일 가이드라인 준수
+- [ ] 문서 업데이트
+- [ ] 테스트 커버리지 80% 이상
+- [ ] PR 리뷰어 지정
+
+### 🔗 관련 이슈
+- Closes #번호
+```
+
+#### 4. 메인 태스크별 GitHub 업로드 규칙
+
+##### Phase 1 완료 시
+```bash
+# 브랜치 생성 및 병합
+git checkout -b feature/phase1-mvp
+git add .
+git commit -m "feat: Phase 1 MVP 완료
+
+- 데이터 수집 시스템 구현
+- 문서 처리 파이프라인 구축  
+- 사용자 인증 및 기본 기능 완성
+
+Closes #1, #2, #3"
+
+git push origin feature/phase1-mvp
+# PR 생성 → 리뷰 → develop 병합
+```
+
+##### Phase 2 완료 시
+```bash
+git checkout -b feature/phase2-alpha
+# ... 작업 ...
+git commit -m "feat: Phase 2 Alpha 기능 완료
+
+- AI 통합 (GPT-4)
+- 패턴 분석 시스템
+- 매칭 알고리즘 구현
+
+Closes #10, #11, #12"
+```
+
+#### 5. GitHub Actions CI/CD
+```yaml
+# .github/workflows/ci.yml
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      - name: Run tests
+        run: |
+          pytest tests/ --cov=backend --cov-report=xml
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./coverage.xml
+      
+      - name: Lint code
+        run: |
+          ruff check .
+          black --check .
+```
+
+#### 6. 릴리즈 관리
+```bash
+# 태그 생성 규칙
+v1.0.0-mvp      # Phase 1 MVP
+v1.1.0-alpha    # Phase 2 Alpha
+v1.2.0-beta     # Phase 3 Beta
+v2.0.0          # Phase 4 Launch
+
+# 릴리즈 노트 포함 사항
+- 새로운 기능
+- 버그 수정
+- 주요 변경사항
+- 알려진 이슈
+- 다음 릴리즈 계획
+```
+
+### 태스크 파일 관리
+
+태스크 관리 문서는 `docs/TASK_MANAGEMENT.md`에서 관리되며, 다음과 같이 활용됩니다:
+
+1. **체크박스 관리**: 각 태스크 완료 시 체크박스 업데이트
+2. **진행 상황 추적**: 대시보드에서 전체 진행률 확인
+3. **테스트 실행**: 각 태스크별 테스트 명령 실행
+4. **컨펌 프로세스**: 완료된 태스크 리뷰 및 승인
+
+```bash
+# 태스크 상태 확인
+cat docs/TASK_MANAGEMENT.md | grep "\- \["
+
+# 완료된 태스크 카운트
+cat docs/TASK_MANAGEMENT.md | grep "\- \[x\]" | wc -l
+
+# 미완료 태스크 확인
+cat docs/TASK_MANAGEMENT.md | grep "\- \[ \]"
+```
