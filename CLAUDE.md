@@ -6,6 +6,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **절대 규칙**: 어떤 상황에서도 로그에 개인정보를 남기지 않습니다.
 
+## Project Context Summary (2024-11-11)
+
+### 프로젝트 현황
+- **단계**: 문서화 및 기획 완료, 개발 준비 단계
+- **완료된 작업**:
+  - ✅ PRD (제품 요구사항 문서) 작성
+  - ✅ 기술 명세서 v2.0.0 확정
+  - ✅ 경쟁사 분석 완료
+  - ✅ 태스크 관리 시스템 구축
+  - ✅ GitHub 워크플로우 정의
+
+### 핵심 기술 결정사항
+1. **데이터 수집**: 공공데이터포털 API (70%) + 나라장터 크롤링 (30%)
+2. **데이터 저장**: PostgreSQL (메타데이터) + MD 파일 (전체 내용) + S3 (원본 파일)
+3. **HWP 처리**: 3단계 변환 전략 (olefile → LibreOffice → OCR+AI)
+4. **이메일 발송**: 사용자별 맞춤 시간 설정 가능
+5. **개발 일정**: 8개월 (MVP 3개월 → Alpha 2개월 → Beta 2개월 → Launch 1개월)
+
+### 주요 문서 위치
+- `PRD.md`: 비즈니스 요구사항 및 사용자 스토리
+- `TECHNICAL_SPEC.md`: 확정된 기술 사양 (v2.0.0)
+- `docs/TASK_MANAGEMENT.md`: 8개월 개발 태스크 체크리스트
+- `competitor_analysis.md`: 케이비드, 인포21C 등 경쟁사 분석
+
+### 다음 단계 (Phase 1 - MVP)
+1. 프로젝트 초기 설정 (가상환경, Git, 디렉토리 구조)
+2. 공공데이터포털 API 연동
+3. PostgreSQL 데이터베이스 설계
+4. 기본 크롤러 구현 (일일 100건)
+5. HWP 파서 개발
+
 ## Project Overview
 
 **Odin-AI** is a public procurement platform that analyzes Korean government tender information (나라장터) using AI. The platform provides automated bid monitoring, AI-based success prediction, and customized project recommendations for businesses.
