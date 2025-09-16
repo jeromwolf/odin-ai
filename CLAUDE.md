@@ -6,37 +6,68 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **절대 규칙**: 어떤 상황에서도 로그에 개인정보를 남기지 않습니다.
 
-## Project Context Summary (2025-09-11)
+## Project Context Summary (2025-09-17)
 
 ### 프로젝트 현황
-- **현재 날짜**: 2025년 9월 11일
-- **단계**: 문서화 및 기획 완료, 개발 준비 단계
+- **현재 날짜**: 2025년 9월 17일
+- **단계**: ✅ **핵심 기능 구현 가능성 100% 검증 완료**
 - **완료된 작업**:
   - ✅ PRD (제품 요구사항 문서) 작성
   - ✅ 기술 명세서 v2.0.0 확정
   - ✅ 경쟁사 분석 완료
   - ✅ 태스크 관리 시스템 구축
   - ✅ GitHub 워크플로우 정의
+  - ✅ **공공데이터포털 API 완전 연동 및 검증**
+  - ✅ **stdNtceDocUrl 필드 발견 - HWP 파일 다운로드 URL 확인**
+  - ✅ **API + Selenium 하이브리드 전략 검증**
+  - ✅ **실제 HWP/PDF 파일 다운로드 테스트 완료**
 
-### 핵심 기술 결정사항
-1. **데이터 수집**: 공공데이터포털 API (70%) + 나라장터 크롤링 (30%)
-2. **데이터 저장**: PostgreSQL (메타데이터) + MD 파일 (전체 내용) + S3 (원본 파일)
-3. **HWP 처리**: 3단계 변환 전략 (olefile → LibreOffice → OCR+AI)
-4. **이메일 발송**: 사용자별 맞춤 시간 설정 가능
-5. **개발 일정**: 8개월 (MVP 3개월 → Alpha 2개월 → Beta 2개월 → Launch 1개월)
+### 🎯 **2025-09-17 핵심 성과**
+
+#### **API 데이터 구조 완전 파악**
+- **stdNtceDocUrl**: HWP/PDF 파일 직접 다운로드 URL ✅
+- **bidNtceDtlUrl**: 상세 페이지 URL ✅
+- **ntceSpecFileNm1**: 실제 파일명 확인 ✅
+- **일일 수집량**: 475건 이상 확인 ✅
+
+#### **실제 API 응답 예시 (검증 완료)**
+```json
+{
+  "bidNtceNm": "어린이보호구역 (신안초등학교) 보행로 조성사업",
+  "stdNtceDocUrl": "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R25BK01060027&bidPbancOrd=000&fileType=&fileSeq=1",
+  "ntceSpecFileNm1": "수의계약안내공고[어린이보호구역(신안초등학교) 보행로 조성사업].hwp",
+  "bidNtceDtlUrl": "https://www.g2b.go.kr/link/PNPE027_01/single/?bidPbancNo=R25BK01060027&bidPbancOrd=000",
+  "total_count": 475
+}
+```
+
+#### **검증된 구현 전략**
+1. **메타데이터 수집**: 공공데이터포털 API (100% 활용)
+2. **파일 다운로드**: stdNtceDocUrl + Selenium (직접 다운로드)
+3. **키워드 검색**: 클라이언트 사이드 필터링
+4. **실시간 모니터링**: 일일 475건+ 수집 가능
+
+### 핵심 기술 결정사항 (업데이트)
+1. **데이터 수집**: 공공데이터포털 API (90%) + Selenium 파일 다운로드 (10%)
+2. **데이터 저장**: PostgreSQL (메타데이터) + 파일 시스템 (HWP/PDF 원본)
+3. **HWP 처리**: hwp5 + LibreOffice + AI 분석
+4. **문서 접근**: stdNtceDocUrl 필드 활용한 직접 다운로드
+5. **수집 성능**: 일일 475건+ 공고, 실시간 모니터링 가능
 
 ### 주요 문서 위치
 - `PRD.md`: 비즈니스 요구사항 및 사용자 스토리
 - `TECHNICAL_SPEC.md`: 확정된 기술 사양 (v2.0.0)
 - `docs/TASK_MANAGEMENT.md`: 8개월 개발 태스크 체크리스트
 - `competitor_analysis.md`: 케이비드, 인포21C 등 경쟁사 분석
+- **NEW**: `test_api_raw_response.py`: API 응답 구조 검증
+- **NEW**: `test_final_hwp_download.py`: HWP 다운로드 테스트
 
-### 다음 단계 (Phase 1 - MVP)
-1. 프로젝트 초기 설정 (가상환경, Git, 디렉토리 구조)
-2. 공공데이터포털 API 연동
-3. PostgreSQL 데이터베이스 설계
-4. 기본 크롤러 구현 (일일 100건)
-5. HWP 파서 개발
+### 다음 단계 (Phase 1 - MVP) - 업데이트
+1. ✅ 공공데이터포털 API 연동 (완료)
+2. 실제 HWP 파일 처리 파이프라인 구현
+3. PostgreSQL 데이터베이스 설계 및 구현
+4. stdNtceDocUrl 기반 자동 다운로드 시스템
+5. 키워드 검색 및 필터링 시스템
 
 ## Project Overview
 

@@ -27,26 +27,30 @@ class PublicDataAPIClient:
         },
         "bid_success": {
             "name": "조달청 나라장터 낙찰정보서비스",
-            "url": "http://apis.data.go.kr/1230000/ScsbidInfoService/getScsbidInfoListServc01",
+            "url": "http://apis.data.go.kr/1230000/as/ScsbidInfoService/getScsbidListSttusCnstwk",
             "description": "낙찰업체 및 계약 정보 조회",
+            "required_params": ["inqryDiv", "inqryBgnDt", "inqryEndDt"],
             "keywords": ["나라장터", "낙찰", "정보", "순위", "예가기법", "물품", "공사", "용역"]
         },
         "contract_info": {
             "name": "조달청 나라장터 계약정보서비스",
-            "url": "http://apis.data.go.kr/1230000/CntrctInfoService/getCntrctInfoListServc01",
+            "url": "http://apis.data.go.kr/1230000/ao/CntrctInfoService/getCntrctInfoListCnstwk",
             "description": "계약 체결 정보 조회",
+            "required_params": ["inqryDiv", "inqryBgnDt", "inqryEndDt"],
             "keywords": ["나라장터", "계약", "정보", "물품", "용역", "공사", "의자"]
         },
         "pre_spec": {
             "name": "조달청 나라장터 사전규격정보서비스",
-            "url": "http://apis.data.go.kr/1230000/PreInfoService/getPreInfoListServc01",
+            "url": "http://apis.data.go.kr/1230000/ao/HrcspSsstndrdInfoService/getPublicPrcureThngInfoServc",
             "description": "사전규격서 정보 조회",
+            "required_params": ["inqryDiv", "inqryBgnDt", "inqryEndDt"],
             "keywords": ["사전규격", "정보", "물품", "용역", "의자", "공사", "나라장터"]
         },
         "user_info": {
             "name": "조달청 나라장터 사용자정보 서비스",
-            "url": "http://apis.data.go.kr/1230000/UserInfoService/getUserInfoListServc01",
+            "url": "http://apis.data.go.kr/1230000/ao/UsrInfoService/getPrcrmntCorpBasicInfo",
             "description": "조달업체 및 수요기관 정보 조회",
+            "required_params": ["inqryDiv", "inqryBgnDt", "inqryEndDt"],
             "keywords": ["나라장터", "사용자", "정보", "기관", "업체", "업종", "물품", "소관"]
         }
     }
@@ -309,22 +313,40 @@ class PublicDataAPIClient:
         self,
         page: int = 1,
         size: int = 100,
-        contract_date_from: Optional[str] = None,
-        contract_date_to: Optional[str] = None,
+        inquiry_div: str = "1",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        contract_no: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """낙찰/계약 정보 조회"""
+        """계약 정보 조회
+
+        Args:
+            page: 페이지 번호
+            size: 페이지 크기
+            inquiry_div: 조회구분 (1:전체)
+            start_date: 조회시작일시 (YYYYMMDDHHMM)
+            end_date: 조회종료일시 (YYYYMMDDHHMM)
+            contract_no: 통합계약번호 (선택)
+        """
+
+        # 기본 날짜 설정
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y%m%d0000")
+        if not end_date:
+            end_date = datetime.now().strftime("%Y%m%d2359")
 
         params = {
             "pageNo": page,
             "numOfRows": min(size, 999),
+            "inqryDiv": inquiry_div,
+            "inqryBgnDt": start_date,
+            "inqryEndDt": end_date,
             **kwargs
         }
 
-        if contract_date_from:
-            params["cntrctCnclsDt"] = contract_date_from
-        if contract_date_to:
-            params["cntrctCnclsEndDt"] = contract_date_to
+        if contract_no:
+            params["untyCntrctNo"] = contract_no
 
         return await self._make_request("contract_info", params)
 
@@ -332,15 +354,40 @@ class PublicDataAPIClient:
         self,
         page: int = 1,
         size: int = 100,
+        inquiry_div: str = "1",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        spec_reg_no: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """사전규격서 정보 조회"""
+        """사전규격서 정보 조회
+
+        Args:
+            page: 페이지 번호
+            size: 페이지 크기
+            inquiry_div: 조회구분 (1:전체)
+            start_date: 조회시작일시 (YYYYMMDDHHMM)
+            end_date: 조회종료일시 (YYYYMMDDHHMM)
+            spec_reg_no: 사전규격등록번호 (선택)
+        """
+
+        # 기본 날짜 설정
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y%m%d0000")
+        if not end_date:
+            end_date = datetime.now().strftime("%Y%m%d2359")
 
         params = {
             "pageNo": page,
             "numOfRows": min(size, 999),
+            "inqryDiv": inquiry_div,
+            "inqryBgnDt": start_date,
+            "inqryEndDt": end_date,
             **kwargs
         }
+
+        if spec_reg_no:
+            params["bfSpecRgstNo"] = spec_reg_no
 
         return await self._make_request("pre_spec", params)
 
@@ -348,22 +395,40 @@ class PublicDataAPIClient:
         self,
         page: int = 1,
         size: int = 100,
-        success_date_from: Optional[str] = None,
-        success_date_to: Optional[str] = None,
+        inquiry_div: str = "1",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        bid_notice_no: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """낙찰정보 조회 (기존 contract_info 대체)"""
+        """낙찰정보 조회
+
+        Args:
+            page: 페이지 번호
+            size: 페이지 크기
+            inquiry_div: 조회구분 (1:전체, 2:진행중, 3:완료)
+            start_date: 조회시작일시 (YYYYMMDDHHMM)
+            end_date: 조회종료일시 (YYYYMMDDHHMM)
+            bid_notice_no: 입찰공고번호 (선택)
+        """
+
+        # 기본 날짜 설정
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y%m%d0000")
+        if not end_date:
+            end_date = datetime.now().strftime("%Y%m%d2359")
 
         params = {
             "pageNo": page,
             "numOfRows": min(size, 999),
+            "inqryDiv": inquiry_div,
+            "inqryBgnDt": start_date,
+            "inqryEndDt": end_date,
             **kwargs
         }
 
-        if success_date_from:
-            params["scsbidDt"] = success_date_from
-        if success_date_to:
-            params["scsbidEndDt"] = success_date_to
+        if bid_notice_no:
+            params["bidNtceNo"] = bid_notice_no
 
         return await self._make_request("bid_success", params)
 
@@ -371,15 +436,44 @@ class PublicDataAPIClient:
         self,
         page: int = 1,
         size: int = 100,
+        inquiry_div: str = "1",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        corp_name: Optional[str] = None,
+        biz_no: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """조달업체 및 수요기관 정보 조회"""
+        """조달업체 및 수요기관 정보 조회
+
+        Args:
+            page: 페이지 번호
+            size: 페이지 크기
+            inquiry_div: 조회구분 (1:전체)
+            start_date: 조회시작일시 (YYYYMMDDHHMM)
+            end_date: 조회종료일시 (YYYYMMDDHHMM)
+            corp_name: 업체명 (선택)
+            biz_no: 사업자번호 (선택)
+        """
+
+        # 기본 날짜 설정
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=365)).strftime("%Y%m%d0000")
+        if not end_date:
+            end_date = datetime.now().strftime("%Y%m%d2359")
 
         params = {
             "pageNo": page,
             "numOfRows": min(size, 999),
+            "inqryDiv": inquiry_div,
+            "inqryBgnDt": start_date,
+            "inqryEndDt": end_date,
             **kwargs
         }
+
+        if corp_name:
+            params["corpNm"] = corp_name
+        if biz_no:
+            params["bizno"] = biz_no
 
         return await self._make_request("user_info", params)
 
