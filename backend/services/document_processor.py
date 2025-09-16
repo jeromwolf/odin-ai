@@ -1,10 +1,11 @@
 """
-문서 다운로드 및 처리 서비스
-HWP, PDF 등 입찰 관련 문서를 다운로드하고 텍스트로 변환
+문서 다운로드 및 처리 서비스 - HWP Viewer 통합 버전
+HWP, PDF 등 입찰 관련 문서를 다운로드하고 고도화된 텍스트 추출 및 마크다운 변환
 """
 
 import asyncio
 import os
+import sys
 import hashlib
 import tempfile
 import subprocess
@@ -21,6 +22,18 @@ from backend.core.config import settings
 from backend.models.database import SessionLocal
 from backend.models.document_models import Document, DocumentProcessingQueue
 
+# HWP Viewer 도구들 통합
+sys.path.append('/Users/blockmeta/Desktop/blockmeta/project/odin-ai/tools/hwp-viewer')
+try:
+    from hwp_viewer.parser import HWPParser
+    from hwp_viewer.markdown_formatter import MarkdownFormatter
+    from hwp_viewer.models import HWPDocument, HWPMetadata
+    HWP_VIEWER_AVAILABLE = True
+    logger.info("HWP Viewer 도구 로드 완료")
+except ImportError as e:
+    HWP_VIEWER_AVAILABLE = False
+    logger.warning(f"HWP Viewer 도구 로드 실패: {e} - hwp5txt 명령어로 대체")
+
 
 class DocumentProcessor:
     """문서 다운로드 및 처리 서비스"""
@@ -30,9 +43,19 @@ class DocumentProcessor:
         self.base_path = Path("storage")
         self.downloads_path = self.base_path / "downloads"
         self.processed_path = self.base_path / "processed"
+        self.markdown_path = self.base_path / "markdown"
 
         # 디렉토리 생성
         self._ensure_directories()
+
+        # HWP Viewer 도구 초기화
+        if HWP_VIEWER_AVAILABLE:
+            self.hwp_parser = HWPParser()
+            self.markdown_formatter = MarkdownFormatter(use_emoji=True)
+            logger.info("HWP Viewer 파서 및 포맷터 초기화 완료")
+        else:
+            self.hwp_parser = None
+            self.markdown_formatter = None
 
         # 지원 파일 타입
         self.supported_types = {
@@ -41,7 +64,9 @@ class DocumentProcessor:
             ".doc": "doc",
             ".docx": "doc",
             ".xls": "excel",
-            ".xlsx": "excel"
+            ".xlsx": "excel",
+            ".zip": "archive",
+            ".rar": "archive"
         }
 
         # 처리 통계
@@ -49,10 +74,12 @@ class DocumentProcessor:
             "downloaded": 0,
             "processed": 0,
             "failed": 0,
-            "skipped": 0
+            "skipped": 0,
+            "hwp_viewer_processed": 0,
+            "hwp5txt_processed": 0
         }
 
-        logger.info("DocumentProcessor 초기화 완료")
+        logger.info("DocumentProcessor 초기화 완료 - HWP Viewer 통합 버전")
 
     def _ensure_directories(self):
         """필요한 디렉토리 생성"""
@@ -60,11 +87,14 @@ class DocumentProcessor:
             self.downloads_path / "hwp",
             self.downloads_path / "pdf",
             self.downloads_path / "doc",
+            self.downloads_path / "archive",
             self.downloads_path / "unknown",
             self.processed_path / "hwp",
             self.processed_path / "pdf",
             self.processed_path / "doc",
-            self.processed_path / "unknown"
+            self.processed_path / "archive",
+            self.processed_path / "unknown",
+            self.markdown_path
         ]
 
         for dir_path in dirs_to_create:
@@ -217,6 +247,8 @@ class DocumentProcessor:
                 return await self._process_pdf(file_path)
             elif file_type == "doc":
                 return await self._process_doc(file_path)
+            elif file_type == "archive":
+                return await self._process_archive(file_path)
             else:
                 logger.warning(f"지원하지 않는 파일 타입: {file_type}")
                 self.stats["skipped"] += 1
@@ -236,13 +268,94 @@ class DocumentProcessor:
             }
 
     async def _process_hwp(self, file_path: Path) -> Dict[str, Any]:
-        """HWP 파일 처리"""
+        """HWP 파일 처리 - HWP Viewer 통합 버전"""
         processed_dir = self.processed_path / "hwp"
         base_name = file_path.stem
 
         # 출력 파일 경로
         txt_file = processed_dir / f"{base_name}.txt"
-        md_file = processed_dir / f"{base_name}.md"
+        md_file = self.markdown_path / f"{base_name}.md"
+
+        # HWP Viewer 도구 우선 사용
+        if HWP_VIEWER_AVAILABLE and self.hwp_parser and self.markdown_formatter:
+            try:
+                logger.info(f"HWP Viewer로 파일 처리 시작: {file_path.name}")
+
+                # HWP 문서 파싱
+                hwp_document = self.hwp_parser.parse(str(file_path))
+                extracted_text = hwp_document.raw_text
+
+                if not extracted_text or len(extracted_text.strip()) < 10:
+                    logger.warning("HWP Viewer에서 충분한 텍스트를 추출하지 못함, hwp5txt로 대체")
+                    return await self._process_hwp_fallback(file_path)
+
+                # 메타데이터 생성
+                metadata = {
+                    "파일명": file_path.name,
+                    "파일크기": f"{file_path.stat().st_size:,} bytes",
+                    "처리일시": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "처리방법": "HWP Viewer 고도화 파서",
+                    "단락수": len(hwp_document.paragraphs),
+                    "테이블수": len(hwp_document.tables) if hwp_document.tables else 0
+                }
+
+                # 문서 메타데이터 추가
+                if hwp_document.metadata:
+                    if hwp_document.metadata.title:
+                        metadata["원본제목"] = hwp_document.metadata.title
+                    if hwp_document.metadata.author:
+                        metadata["작성자"] = hwp_document.metadata.author
+                    if hwp_document.metadata.created_date:
+                        metadata["작성일"] = str(hwp_document.metadata.created_date)
+
+                # 텍스트 파일 저장
+                with open(txt_file, 'w', encoding='utf-8') as f:
+                    f.write(extracted_text)
+
+                # 고도화된 마크다운 생성
+                title = hwp_document.metadata.title if hwp_document.metadata and hwp_document.metadata.title else base_name
+                markdown_content = self.markdown_formatter.format_document(
+                    title=title,
+                    content=extracted_text,
+                    metadata=metadata
+                )
+
+                with open(md_file, 'w', encoding='utf-8') as f:
+                    f.write(markdown_content)
+
+                self.stats["processed"] += 1
+                self.stats["hwp_viewer_processed"] += 1
+
+                logger.info(f"HWP Viewer 처리 완료: {len(extracted_text)} 문자 추출")
+
+                return {
+                    "success": True,
+                    "file_type": "hwp",
+                    "processing_method": "hwp_viewer",
+                    "original_file": str(file_path),
+                    "text_file": str(txt_file),
+                    "markdown_file": str(md_file),
+                    "text_length": len(extracted_text),
+                    "paragraph_count": len(hwp_document.paragraphs),
+                    "table_count": len(hwp_document.tables) if hwp_document.tables else 0,
+                    "metadata": metadata,
+                    "processed_at": datetime.now().isoformat()
+                }
+
+            except Exception as e:
+                logger.error(f"HWP Viewer 처리 실패: {e}, hwp5txt로 대체")
+                return await self._process_hwp_fallback(file_path)
+        else:
+            # HWP Viewer 사용 불가시 hwp5txt 사용
+            return await self._process_hwp_fallback(file_path)
+
+    async def _process_hwp_fallback(self, file_path: Path) -> Dict[str, Any]:
+        """HWP 파일 처리 - hwp5txt 대체 방법"""
+        processed_dir = self.processed_path / "hwp"
+        base_name = file_path.stem
+
+        txt_file = processed_dir / f"{base_name}.txt"
+        md_file = self.markdown_path / f"{base_name}.md"
 
         try:
             # hwp5txt 명령으로 텍스트 추출
@@ -263,16 +376,18 @@ class DocumentProcessor:
             with open(txt_file, 'w', encoding='utf-8') as f:
                 f.write(extracted_text)
 
-            # 마크다운 파일 생성
+            # 기본 마크다운 파일 생성
             markdown_content = self._convert_text_to_markdown(extracted_text, file_path.name)
             with open(md_file, 'w', encoding='utf-8') as f:
                 f.write(markdown_content)
 
             self.stats["processed"] += 1
+            self.stats["hwp5txt_processed"] += 1
 
             return {
                 "success": True,
                 "file_type": "hwp",
+                "processing_method": "hwp5txt",
                 "original_file": str(file_path),
                 "text_file": str(txt_file),
                 "markdown_file": str(md_file),
@@ -423,6 +538,101 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"DOC 텍스트 추출 실패: {e}")
             return ""
+
+    async def _process_archive(self, file_path: Path) -> Dict[str, Any]:
+        """압축 파일 처리 (ZIP, RAR)"""
+        processed_dir = self.processed_path / "archive"
+        base_name = file_path.stem
+
+        try:
+            logger.info(f"압축 파일 처리 시작: {file_path.name}")
+
+            # 임시 디렉토리에 압축 해제
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+
+                # 압축 해제
+                if file_path.suffix.lower() == '.zip':
+                    import zipfile
+                    try:
+                        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                            zip_ref.extractall(temp_path)
+                    except zipfile.BadZipFile:
+                        return {
+                            "success": False,
+                            "error": "손상된 ZIP 파일"
+                        }
+                elif file_path.suffix.lower() == '.rar':
+                    # RAR 처리는 별도 라이브러리 필요
+                    logger.warning("RAR 파일 처리는 아직 지원되지 않음")
+                    return {
+                        "success": False,
+                        "error": "RAR 파일 처리 미지원"
+                    }
+
+                # 해제된 파일 목록 확인
+                extracted_files = list(temp_path.rglob('*'))
+                processable_files = [
+                    f for f in extracted_files
+                    if f.is_file() and f.suffix.lower() in ['.hwp', '.pdf', '.docx', '.doc', '.txt']
+                ]
+
+                if not processable_files:
+                    return {
+                        "success": False,
+                        "error": "압축 파일 내에 처리 가능한 문서가 없음"
+                    }
+
+                # 첫 번째 처리 가능한 파일을 메인으로 처리
+                main_file = processable_files[0]
+                logger.info(f"압축 파일 내 메인 문서 처리: {main_file.name}")
+
+                # 임시 파일을 다운로드 디렉토리로 복사
+                temp_target = self.downloads_path / self.get_file_type(main_file.name) / main_file.name
+                temp_target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(main_file, temp_target)
+
+                # 재귀적으로 파일 처리
+                main_result = await self.process_document(str(temp_target))
+
+                # 임시 파일 정리
+                if temp_target.exists():
+                    temp_target.unlink()
+
+                # 압축 파일 정보와 처리 결과 결합
+                archive_result = {
+                    "success": main_result.get("success", False),
+                    "file_type": "archive",
+                    "processing_method": "archive_extraction",
+                    "original_file": str(file_path),
+                    "archive_contents": [f.name for f in processable_files],
+                    "processed_file": main_file.name,
+                    "extracted_count": len(processable_files),
+                    "processed_at": datetime.now().isoformat()
+                }
+
+                # 메인 파일 처리 결과 병합
+                if main_result.get("success"):
+                    archive_result.update({
+                        "text_file": main_result.get("text_file"),
+                        "markdown_file": main_result.get("markdown_file"),
+                        "text_length": main_result.get("text_length", 0),
+                        "metadata": main_result.get("metadata", {})
+                    })
+
+                    self.stats["processed"] += 1
+                else:
+                    archive_result["error"] = main_result.get("error", "처리 실패")
+
+                return archive_result
+
+        except Exception as e:
+            logger.error(f"압축 파일 처리 실패: {e}")
+            return {
+                "success": False,
+                "error": f"압축 파일 처리 실패: {str(e)}",
+                "file_type": "archive"
+            }
 
     def _convert_text_to_markdown(self, text: str, filename: str) -> str:
         """텍스트를 마크다운 형식으로 변환"""
