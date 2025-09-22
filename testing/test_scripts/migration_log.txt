@@ -1,0 +1,29 @@
+====== 테스트 파일 이동 로그 ======
+실행 시간: Wed Sep 17 08:00:23 KST 2025
+총 파일 수: 23개
+
+✅ 이동 완료: test_api_date_format.py -> test_scripts/test_api_date_format.py
+✅ 이동 완료: test_api_debug.py -> test_scripts/test_api_debug.py
+✅ 이동 완료: test_api_raw_response.py -> test_scripts/test_api_raw_response.py
+✅ 이동 완료: test_api_simple.py -> test_scripts/test_api_simple.py
+✅ 이동 완료: test_api_working.py -> test_scripts/test_api_working.py
+✅ 이동 완료: test_bidntcedtlurl.py -> test_scripts/test_bidntcedtlurl.py
+✅ 이동 완료: test_bidntceurl_download.py -> test_scripts/test_bidntceurl_download.py
+✅ 이동 완료: test_direct_api.py -> test_scripts/test_direct_api.py
+✅ 이동 완료: test_direct_hwp_download.py -> test_scripts/test_direct_hwp_download.py
+✅ 이동 완료: test_download.py -> test_scripts/test_download.py
+✅ 이동 완료: test_final_hwp_download.py -> test_scripts/test_final_hwp_download.py
+✅ 이동 완료: test_g2b_browser_check.py -> test_scripts/test_g2b_browser_check.py
+✅ 이동 완료: test_g2b_direct_search.py -> test_scripts/test_g2b_direct_search.py
+✅ 이동 완료: test_g2b_menu_search.py -> test_scripts/test_g2b_menu_search.py
+✅ 이동 완료: test_g2b_page_analysis.py -> test_scripts/test_g2b_page_analysis.py
+✅ 이동 완료: test_g2b_popup_close.py -> test_scripts/test_g2b_popup_close.py
+✅ 이동 완료: test_g2b_real_search.py -> test_scripts/test_g2b_real_search.py
+✅ 이동 완료: test_g2b_search.py -> test_scripts/test_g2b_search.py
+✅ 이동 완료: test_g2b_web.py -> test_scripts/test_g2b_web.py
+✅ 이동 완료: test_integrated_hwp_processor.py -> test_scripts/test_integrated_hwp_processor.py
+✅ 이동 완료: test_public_api.py -> test_scripts/test_public_api.py
+✅ 이동 완료: test_selenium_crawler.py -> test_scripts/test_selenium_crawler.py
+✅ 이동 완료: test_simple_selenium.py -> test_scripts/test_simple_selenium.py
+
+====== 이동 완료 ======

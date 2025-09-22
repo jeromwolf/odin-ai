@@ -40,10 +40,12 @@ venv.bak/
 *.sqlite3
 data/
 postgres_data/
+odin_db/
 
 # Logs
 *.log
 logs/
+*.log.*
 
 # IDE
 .vscode/
@@ -51,36 +53,58 @@ logs/
 *.swp
 *.swo
 *~
+.cursor/
 
 # OS
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # Jupyter
 .ipynb_checkpoints/
+*.ipynb_checkpoints
 
 # Testing
 .coverage
+.coverage.*
 htmlcov/
 .pytest_cache/
 .tox/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
 
 # ML Models & Data
 models/
 *.pkl
 *.joblib
+*.h5
+*.model
 data/raw/
 data/processed/
 
-# Document Processing
+# Document Processing & Storage
 temp_files/
 uploaded_files/
 processed_docs/
+storage/
+downloads/
+markdown/
+odin_ai_data/
+*.hwp
+*.pdf
+*.docx
+*.xlsx
 
 # Crawler Data
 crawler_cache/
 screenshots/
 cookies/
+selenium/
 
 # Redis
 dump.rdb
@@ -100,10 +124,45 @@ credentials.json
 tmp/
 temp/
 *.tmp
+*.temp
+*.cache
+*.pid
 
 # Backup files
 *.bak
 *.backup
+*.old
+*.orig
 
-# Mac
-.DS_Store
+# Test scripts & outputs
+test_*.py
+!test_scripts/
+test_outputs/
+test_results/
+
+# Background processes
+nohup.out
+*.out
+
+# Python tools
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+*.pyc
+
+# Package managers
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Tools directory (keeping only source)
+tools/pdf-viewer/venv/
+tools/hwp-viewer/venv/
+tools/**/__pycache__/
+tools/**/*.pyc
+
+# ChromeDriver
+chromedriver
+chromedriver.exe
+*.crdownload

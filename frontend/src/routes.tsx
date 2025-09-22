@@ -1,0 +1,69 @@
+import React, { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { CircularProgress, Box } from '@mui/material';
+
+import MainLayout from './components/layout/MainLayout';
+import AuthLayout from './components/layout/AuthLayout';
+import PrivateRoute from './components/auth/PrivateRoute';
+
+// Lazy load pages
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const BidList = lazy(() => import('./pages/BidList'));
+const BidDetail = lazy(() => import('./pages/BidDetail'));
+const Search = lazy(() => import('./pages/Search'));
+const Bookmarks = lazy(() => import('./pages/Bookmarks'));
+const Subscription = lazy(() => import('./pages/Subscription'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+const LoadingScreen = () => (
+  <Box
+    sx={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+    }}
+  >
+    <CircularProgress />
+  </Box>
+);
+
+const AppRoutes = () => {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        {/* Auth Routes */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+        </Route>
+
+        {/* Private Routes */}
+        <Route element={<PrivateRoute />}>
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/bids" element={<BidList />} />
+            <Route path="/bids/:id" element={<BidDetail />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/bookmarks" element={<Bookmarks />} />
+            <Route path="/subscription" element={<Subscription />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
+        </Route>
+
+        {/* 404 Page */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  );
+};
+
+export default AppRoutes;

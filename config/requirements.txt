@@ -1,0 +1,91 @@
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database Viewer
+flask==3.0.0
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.13.1
+psycopg2-binary==2.9.9
+redis==5.0.1
+
+# Async & Task Queue
+celery==5.3.4
+asyncpg==0.29.0
+httpx==0.25.2
+aiohttp==3.9.1
+aiofiles==23.2.1
+
+# Scheduler
+apscheduler==3.10.4
+
+# Web Scraping & Crawling
+selenium==4.15.2
+beautifulsoup4==4.12.2
+requests==2.31.0
+lxml==4.9.3
+
+# Document Processing
+# HWP Processing (compatible versions)
+pyhwp==0.1b15
+olefile==0.47
+cryptography==45.0.7
+
+# PDF Processing
+PyPDF2==3.0.1
+pdfplumber==0.10.3
+pymupdf==1.23.8
+tabula-py==2.8.2
+
+# OCR (Optional)
+pytesseract==0.3.10
+Pillow==10.1.0
+
+# AI/ML Stack
+openai==1.3.7
+langchain==0.0.350
+langchain-openai==0.0.2
+pinecone-client==2.2.4
+sentence-transformers==2.2.2
+scikit-learn==1.3.2
+
+# Text Processing
+regex==2023.10.3
+python-multipart==0.0.6
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Configuration & Environment
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Utilities
+click==8.1.7
+rich==13.7.0
+loguru==0.7.2
+python-dateutil==2.8.2
+pathlib==1.0.1
+
+# Email
+fastapi-mail==1.4.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.25.2
+
+# Development
+black==23.11.0
+ruff==0.1.6
+pre-commit==3.6.0
+
+# Monitoring (Optional)
+prometheus-client==0.19.0

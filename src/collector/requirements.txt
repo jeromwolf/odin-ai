@@ -1,0 +1,48 @@
+# 데이터 수집기 전용 의존성
+
+# 데이터베이스 및 ORM
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# HTTP 요청 및 크롤링
+requests==2.31.0
+httpx==0.25.2
+selenium==4.15.2
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# 비동기 처리
+aiohttp==3.9.1
+aiofiles==23.2.1
+
+# 데이터 처리
+pandas==2.1.4
+numpy==1.24.4
+
+# 문서 처리
+hwp5==0.0.1b4
+python-docx==1.1.0
+PyPDF2==3.0.1
+pdfplumber==0.9.0
+
+# 스케줄링
+apscheduler==3.10.4
+celery==5.3.4
+redis==5.0.1
+
+# 설정 관리
+pydantic==2.5.2
+pydantic-settings==2.1.0
+
+# 로깅
+loguru==0.7.2
+
+# 유틸리티
+python-dateutil==2.8.2
+click==8.1.7
+rich==13.7.0
+
+# 파일 처리
+chardet==5.2.0
+magic==0.4.27
