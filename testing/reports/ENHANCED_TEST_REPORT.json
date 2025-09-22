@@ -1,0 +1,175 @@
+{
+  "test_metadata": {
+    "execution_time": "2025-09-23T01:09:55.500396",
+    "total_test_time": 0.126,
+    "test_version": "FULL_TEST_TASKS_V2",
+    "phases_completed": [
+      "Phase 0",
+      "Phase 1",
+      "Phase 2",
+      "Phase 3",
+      "Phase 4",
+      "Phase 5",
+      "Phase 6",
+      "Phase 7"
+    ]
+  },
+  "pipeline_results": {
+    "database_test": {
+      "success": true,
+      "processing_time": 0.021,
+      "table_counts": {
+        "bid_announcements": 95,
+        "bid_documents": 85,
+        "bid_extracted_info": 42
+      }
+    },
+    "search_test": {
+      "success": true,
+      "processing_time": 0.028,
+      "average_response_time": 0.007,
+      "detailed_results": {
+        "price_range": {
+          "count": 0,
+          "processing_time": 0.016,
+          "response_time_ok": true
+        },
+        "deadline": {
+          "count": 0,
+          "processing_time": 0.001,
+          "response_time_ok": true
+        },
+        "industry": {
+          "count": 10,
+          "processing_time": 0.006,
+          "response_time_ok": true
+        },
+        "complex": {
+          "count": 10,
+          "processing_time": 0.004,
+          "response_time_ok": true
+        }
+      }
+    },
+    "quality_test": {
+      "success": true,
+      "processing_time": 0.056,
+      "quality_score": 64.2
+    },
+    "overall": {
+      "success": true,
+      "total_processing_time": 0.106,
+      "memory_usage_mb": 6.83,
+      "tests_passed": 3,
+      "total_tests": 3
+    }
+  },
+  "performance_metrics": {
+    "database": {
+      "total_size": "10153 kB",
+      "total_size_bytes": 10396451,
+      "table_sizes": [
+        {
+          "table": "bid_announcements",
+          "size": "144 kB",
+          "size_bytes": 147456
+        },
+        {
+          "table": "bid_documents",
+          "size": "104 kB",
+          "size_bytes": 106496
+        },
+        {
+          "table": "bid_extracted_info",
+          "size": "80 kB",
+          "size_bytes": 81920
+        },
+        {
+          "table": "bid_schedule",
+          "size": "40 kB",
+          "size_bytes": 40960
+        },
+        {
+          "table": "bid_tag_relations",
+          "size": "32 kB",
+          "size_bytes": 32768
+        },
+        {
+          "table": "bid_tags",
+          "size": "32 kB",
+          "size_bytes": 32768
+        },
+        {
+          "table": "bid_attachments",
+          "size": "24 kB",
+          "size_bytes": 24576
+        },
+        {
+          "table": "bid_search_index",
+          "size": "24 kB",
+          "size_bytes": 24576
+        }
+      ],
+      "index_count": 29
+    },
+    "processing": {
+      "document_processing": [],
+      "extraction_performance": [
+        {
+          "category": "contract_details",
+          "count": 23,
+          "avg_confidence": 0.8000000000000003
+        },
+        {
+          "category": "prices",
+          "count": 19,
+          "avg_confidence": 0.8000000000000003
+        }
+      ]
+    },
+    "system": {
+      "cpu_count": 14,
+      "memory_total_gb": 48.0,
+      "memory_available_gb": 17.43,
+      "disk_usage_percent": 1.4
+    },
+    "collection_time": 0.02
+  },
+  "success_criteria_evaluation": {
+    "pipeline_integration": {
+      "target": "End-to-End 성공률 75% 이상",
+      "actual": "3/3 (100.0%)",
+      "passed": true
+    },
+    "search_performance": {
+      "target": "복합 쿼리 500ms 이내 응답",
+      "actual": "0.007초",
+      "passed": true
+    },
+    "data_quality": {
+      "target": "데이터 품질 80점 이상",
+      "actual": "64.2점",
+      "passed": false
+    },
+    "table_parsing": {
+      "target": "핵심 정보 80% 이상 추출",
+      "actual": "가격정보: 100%, 계약정보: 100%",
+      "passed": true
+    }
+  },
+  "final_evaluation": {
+    "criteria_passed": 3,
+    "total_criteria": 4,
+    "success_rate": 75.0,
+    "final_score": 76.8,
+    "grade": "C",
+    "overall_success": true
+  },
+  "recommendations": [
+    "데이터 품질 향상: 날짜 정보 추출 로직 개선 필요",
+    "표 파싱 정확도 개선: 더 많은 문서 처리 및 패턴 학습 필요",
+    "더 많은 문서 샘플로 표 파싱 정확도 검증",
+    "실시간 모니터링 시스템 구축",
+    "사용자 피드백 기반 품질 개선 시스템 구축"
+  ]
+}

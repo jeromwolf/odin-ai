@@ -1,0 +1,194 @@
+{
+  "generation_time": "2025-09-23T01:08:21.307292",
+  "overall_score": 64.2,
+  "accuracy_analysis": {
+    "category_analysis": {
+      "contract_details": {
+        "total_extractions": 23,
+        "average_confidence": 0.8,
+        "high_confidence_count": 23,
+        "accuracy_rate": 100.0
+      },
+      "prices": {
+        "total_extractions": 19,
+        "average_confidence": 0.8,
+        "high_confidence_count": 19,
+        "accuracy_rate": 100.0
+      }
+    },
+    "method_analysis": {
+      "table_parsing": {
+        "count": 42,
+        "average_confidence": 0.8
+      }
+    },
+    "field_analysis": {
+      "contract_details": {
+        "industry_type": {
+          "count": 8,
+          "average_confidence": 0.8
+        },
+        "qualification": {
+          "count": 5,
+          "average_confidence": 0.8
+        },
+        "region_restriction": {
+          "count": 4,
+          "average_confidence": 0.8
+        },
+        "duration": {
+          "count": 4,
+          "average_confidence": 0.8
+        },
+        "project_name": {
+          "count": 1,
+          "average_confidence": 0.8
+        },
+        "joint_venture": {
+          "count": 1,
+          "average_confidence": 0.8
+        }
+      },
+      "prices": {
+        "min_price": {
+          "count": 9,
+          "average_confidence": 0.8
+        },
+        "max_price": {
+          "count": 9,
+          "average_confidence": 0.8
+        },
+        "estimated_price": {
+          "count": 1,
+          "average_confidence": 0.8
+        }
+      }
+    },
+    "processing_time": 0.027711153030395508
+  },
+  "completeness_analysis": {
+    "field_completeness": {
+      "title": {
+        "korean_name": "공고명",
+        "filled_count": 95,
+        "total_count": 95,
+        "completeness_rate": 100.0
+      },
+      "organization_name": {
+        "korean_name": "발주기관",
+        "filled_count": 95,
+        "total_count": 95,
+        "completeness_rate": 100.0
+      },
+      "estimated_price": {
+        "korean_name": "추정가격",
+        "filled_count": 0,
+        "total_count": 95,
+        "completeness_rate": 0.0
+      },
+      "announcement_date": {
+        "korean_name": "공고일",
+        "filled_count": 0,
+        "total_count": 95,
+        "completeness_rate": 0.0
+      },
+      "bid_end_date": {
+        "korean_name": "입찰마감일",
+        "filled_count": 0,
+        "total_count": 95,
+        "completeness_rate": 0.0
+      },
+      "opening_date": {
+        "korean_name": "개찰일",
+        "filled_count": 0,
+        "total_count": 95,
+        "completeness_rate": 0.0
+      }
+    },
+    "document_completeness": {
+      "completed": {
+        "count": 9,
+        "rate": 10.6
+      },
+      "pending": {
+        "count": 76,
+        "rate": 89.4
+      }
+    },
+    "extraction_coverage": 9.5,
+    "empty_data_analysis": {
+      "total_extractions": 42,
+      "empty_extractions": 0,
+      "empty_rate": 0.0
+    },
+    "processing_time": 0.014525890350341797
+  },
+  "usability_analysis": {
+    "scenario_results": {
+      "고액 공사 (1억원 이상)": {
+        "count": 0,
+        "description": "대형 건설업체 타겟팅",
+        "usability": "low"
+      },
+      "중소기업 적합 (1천만원~5천만원)": {
+        "count": 0,
+        "description": "중소기업 입찰 기회",
+        "usability": "low"
+      },
+      "IT 관련 공고": {
+        "count": 1,
+        "description": "IT 기업 타겟팅",
+        "usability": "low"
+      },
+      "건설 관련 공고": {
+        "count": 81,
+        "description": "건설업체 타겟팅",
+        "usability": "high"
+      }
+    },
+    "business_info_quality": {
+      "prices": {
+        "extracted_count": 19,
+        "quality_score": 100,
+        "business_value": "critical"
+      },
+      "dates": {
+        "extracted_count": 0,
+        "quality_score": 0.0,
+        "business_value": "high"
+      },
+      "contract_details": {
+        "extracted_count": 23,
+        "quality_score": 100,
+        "business_value": "medium"
+      }
+    },
+    "user_perspective": {
+      "searchability": 100,
+      "readability": 100.0,
+      "actionability": 65.0
+    },
+    "improvement_priorities": [
+      {
+        "area": "dates 정보 추출",
+        "issue": "품질 점수 0.0점으로 낮음",
+        "impact": "high",
+        "urgency": "medium"
+      },
+      {
+        "area": "시스템 actionability",
+        "issue": "65.0점으로 개선 필요",
+        "impact": "medium",
+        "urgency": "medium"
+      },
+      {
+        "area": "비즈니스 시나리오 커버리지",
+        "issue": "3개 시나리오에서 데이터 부족",
+        "impact": "medium",
+        "urgency": "medium"
+      }
+    ],
+    "processing_time": 0.024532079696655273
+  },
+  "total_processing_time": 0.067
+}

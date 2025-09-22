@@ -55,6 +55,15 @@ class BidAnnouncement(Base):
     status = Column(String(20), default='active')
     collection_status = Column(String(20), default='pending')
 
+    # 추출된 핵심 정보 (HWP 문서에서 파싱)
+    duration_days = Column(Integer)  # 공사기간(일)
+    duration_text = Column(String(255))  # 공사기간 텍스트
+    region_restriction = Column(String(100))  # 지역제한
+    subcontract_allowed = Column(Boolean)  # 하도급 허용 여부
+    subcontract_ratio = Column(Integer)  # 하도급 비율(%)
+    qualification_summary = Column(Text)  # 자격요건 요약
+    special_conditions = Column(Text)  # 특수조건
+
     # 메타데이터
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
@@ -221,4 +230,81 @@ class BidTagRelation(Base):
         UniqueConstraint('bid_notice_no', 'tag_id', name='unique_bid_tag'),
         Index('idx_bid_tags', 'bid_notice_no'),
         Index('idx_tag_bids', 'tag_id'),
+    )
+
+
+class BidExtractedInfo(Base):
+    """표 파싱으로 추출한 상세 정보 저장소"""
+    __tablename__ = 'bid_extracted_info'
+
+    info_id = Column(Integer, primary_key=True, autoincrement=True)
+    bid_notice_no = Column(String(100), nullable=False)
+    document_id = Column(Integer, ForeignKey('bid_documents.document_id'))
+
+    # 분류 정보
+    info_category = Column(String(50), nullable=False)  # 'price', 'schedule', 'qualification', 'contract'
+    field_name = Column(String(100), nullable=False)    # 구체적 필드명
+    field_value = Column(Text)                          # 추출된 값
+    field_type = Column(String(20))                     # 'text', 'number', 'date', 'boolean'
+
+    # 품질 정보
+    confidence_score = Column(Float, default=0.0)       # 추출 신뢰도 (0-1)
+    verification_status = Column(String(20), default='unverified')  # 'verified', 'unverified', 'invalid'
+
+    # 추출 메타데이터
+    extraction_method = Column(String(50))              # 'regex', 'table_parsing', 'gpt4', 'manual'
+    source_location = Column(Text)                      # 원본에서의 위치 정보
+    raw_text_sample = Column(Text)                      # 원본 텍스트 샘플
+
+    # 시간 정보
+    extracted_at = Column(DateTime, default=datetime.utcnow)
+    verified_at = Column(DateTime)
+
+    # 추가 정보
+    notes = Column(Text)                                # 추가 설명
+    tags = Column(String(200))                          # 태그 (쉼표 구분)
+
+    # 인덱스
+    __table_args__ = (
+        Index('idx_extracted_info_notice_no', 'bid_notice_no'),
+        Index('idx_extracted_info_category', 'info_category', 'field_name'),
+        Index('idx_extracted_info_confidence', 'confidence_score'),
+    )
+
+
+class BidSchedule(Base):
+    """입찰 관련 모든 일정 정보"""
+    __tablename__ = 'bid_schedule'
+
+    schedule_id = Column(Integer, primary_key=True, autoincrement=True)
+    bid_notice_no = Column(String(100), nullable=False)
+
+    # 일정 정보
+    event_type = Column(String(50), nullable=False)     # 'announcement', 'registration_start', 'registration_end', 'submission_start', 'submission_end', 'opening', 'contract'
+    event_date = Column(DateTime)
+    event_time = Column(String(10))                     # TIME 형식 문자열
+    event_description = Column(Text)
+
+    # 장소 정보
+    location = Column(String(255))
+    online_url = Column(Text)
+
+    # 상태 정보
+    is_confirmed = Column(Boolean, default=False)
+    is_postponed = Column(Boolean, default=False)
+    postponed_reason = Column(Text)
+    original_date = Column(DateTime)                    # 연기된 경우 원래 날짜
+
+    # 알림 정보
+    notification_sent = Column(Boolean, default=False)
+    reminder_sent = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.utcnow)
+
+    # 인덱스
+    __table_args__ = (
+        Index('idx_schedule_notice_no', 'bid_notice_no'),
+        Index('idx_schedule_event_type', 'event_type', 'event_date'),
+        Index('idx_schedule_upcoming', 'event_date'),
     )
