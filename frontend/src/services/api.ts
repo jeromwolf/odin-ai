@@ -162,22 +162,6 @@ class ApiClient {
     return response.data;
   }
 
-  // Bookmarks API
-  async getBookmarks() {
-    const response = await this.client.get('/bookmarks');
-    return response.data;
-  }
-
-  async addBookmark(bidId: string) {
-    const response = await this.client.post(`/bookmarks/${bidId}`);
-    return response.data;
-  }
-
-  async removeBookmark(bidId: string) {
-    const response = await this.client.delete(`/bookmarks/${bidId}`);
-    return response.data;
-  }
-
   // Subscription API
   async getSubscriptionPlans() {
     const response = await this.client.get('/subscription/plans');
@@ -297,6 +281,22 @@ class ApiClient {
 
   async markAllNotificationsAsRead() {
     const response = await this.client.put('/notifications/read-all');
+    return response.data;
+  }
+
+  // Bookmarks API
+  async addBookmark(bidId: string) {
+    const response = await this.client.post(`/bookmarks/${bidId}`);
+    return response.data;
+  }
+
+  async removeBookmark(bidId: string) {
+    const response = await this.client.delete(`/bookmarks/${bidId}`);
+    return response.data;
+  }
+
+  async getBookmarks() {
+    const response = await this.client.get('/bookmarks');
     return response.data;
   }
 }

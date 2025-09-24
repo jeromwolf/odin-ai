@@ -1,53 +1,102 @@
-# Odin-AI 🚀
+# 🏛️ ODIN-AI: 공공입찰 정보 분석 플랫폼
 
-> AI 기반 공공조달 입찰정보 분석 플랫폼
+<div align="center">
+  <img src="https://img.shields.io/badge/version-2.0.0-blue.svg" />
+  <img src="https://img.shields.io/badge/python-3.11+-green.svg" />
+  <img src="https://img.shields.io/badge/react-18.0-61dafb.svg" />
+  <img src="https://img.shields.io/badge/postgresql-15.0-336791.svg" />
+  <img src="https://img.shields.io/badge/status-production-success.svg" />
+</div>
 
 ## 📋 프로젝트 개요
 
-Odin-AI는 나라장터(g2b.go.kr) 입찰정보를 AI로 분석하여 기업에게 맞춤형 프로젝트를 추천하는 B2B SaaS 플랫폼입니다.
+ODIN-AI는 나라장터(g2b.go.kr) 입찰정보를 AI로 분석하여 기업에게 맞춤형 프로젝트를 추천하는 B2B SaaS 플랫폼입니다.
 
-**프로젝트 상태**: ✅ Phase 1 MVP 완료 및 배치 시스템 검증 (2025-09-24)
+**프로젝트 상태**: ✅ Phase 2 검색 및 대시보드 완성 (2025-09-25)
 
-### 핵심 기능
-- 🔍 **자동 RFP 모니터링**: 나라장터 입찰공고 실시간 수집 ✅
+### ✨ 핵심 기능
+- 🔍 **통합 검색**: 실시간 DB 연동, 필터링, 정렬, 자동완성 ✅
+- 📊 **대시보드**: 실시간 통계, 마감임박, AI 추천 ✅
 - 🤖 **문서 처리**: HWP/PDF/XLSX 자동 파싱 및 정보 추출 ✅
 - 📄 **표 파싱**: 입찰 정보 테이블 100% 추출 성공 ✅
-- 📊 **고도화 분석**: 공사기간, 지역제한, 하도급 정보 추출 ✅
+- 🎨 **모던 UI**: React + Material-UI 반응형 디자인 ✅
 - 🔄 **배치 시스템**: 자동화된 수집-처리-분석 파이프라인 ✅
 - 📧 **이메일 리포트**: HTML/JSON 형식 자동 보고서 ✅
 
-## 📊 최신 성능 지표 (2025-09-24)
+## 🚀 빠른 시작
 
-### 배치 실행 결과
-- **API 수집**: 69개 공고 (오늘 날짜)
-- **파일 다운로드**: 67개 (100% 성공)
-- **문서 처리**: 63개 성공, 3개 실패, 1개 스킵 (94% 성공률)
-- **정보 추출**: 63개 문서에서 335개 정보 추출
-- **처리 시간**: 90.3초
+```bash
+# 1. 저장소 클론
+git clone https://github.com/yourusername/odin-ai.git
+cd odin-ai
 
-### 지원 파일 형식
-| 형식 | 지원 | 처리 개수 | 성공률 |
-|------|------|-----------|--------|
-| HWP  | ✅   | 52        | 100%   |
-| PDF  | ✅   | 6         | 100%   |
-| HWPX | ✅   | 4         | 25%    |
-| XLSX | ✅   | 2         | 100%   |
-| XLS  | ✅   | 2         | 100%   |
-| ZIP  | ❌   | 1         | -      |
+# 2. 가장 간단한 실행
+./start-simple.sh
+
+# 또는 새 터미널로 실행
+./quick-start.sh
+```
+
+### 접속 URL
+- 🌐 **프론트엔드**: http://localhost:3000
+- 🔧 **백엔드 API**: http://localhost:8000
+- 📚 **API 문서**: http://localhost:8000/docs
+
+## 📊 최신 성능 지표 (2025-09-25)
+
+### 시스템 현황
+- **DB 저장 공고**: 69개 (실시간 검색 가능)
+- **활성 입찰**: 63개
+- **총 예정가격**: 385억원
+- **문서 처리 성공률**: 94% (63/67)
+- **검색 응답 시간**: ~100ms (캐시)
+
+## 🔍 검색 기능
+
+### API 엔드포인트
+```http
+GET /api/search?q=검색어&min_price=100000000&organization=서울
+```
+
+### 지원 필터
+| 파라미터 | 설명 | 예시 |
+|---------|------|------|
+| `q` | 검색어 | 건설, 소프트웨어 |
+| `start_date` | 시작일 | 2025-09-01 |
+| `end_date` | 종료일 | 2025-09-30 |
+| `min_price` | 최소 가격 | 100000000 |
+| `max_price` | 최대 가격 | 1000000000 |
+| `organization` | 기관명 | 서울, 경기 |
+| `sort` | 정렬 | price_desc, date_asc |
+
+## 🏗️ 프로젝트 구조
+
+```
+odin-ai/
+├── 📦 batch/              # 배치 처리 시스템
+│   └── modules/          # 수집/다운로드/처리/보고
+├── 🚀 backend/            # FastAPI 백엔드 (DB 연동)
+├── 💻 frontend/           # React 프론트엔드
+│   └── src/
+│       ├── pages/        # Search, Dashboard
+│       └── components/   # 검색바, 필터, 결과
+├── 📊 src/                # 핵심 비즈니스 로직
+└── 🛠️ tools/              # HWP/PDF 처리 도구
+```
 
 ## 🛠 기술 스택
 
 ### Backend
 - **Framework**: FastAPI (Python 3.11+)
-- **Database**: PostgreSQL + Redis
-- **Queue**: Celery + Redis
-- **AI/ML**: OpenAI GPT-4, LangChain
+- **Database**: PostgreSQL 15 + SQLAlchemy
+- **Cache**: Redis (예정)
+- **문서 처리**: hwp5txt, PDFPlumber
 
-### Document Processing
-- **HWP**: hwp5txt (100% 성공률)
-- **PDF**: PyPDF2, pdfplumber
-- **표 파싱**: regex 기반 패턴 매칭
-- **정보 추출**: EnhancedInfoExtractor
+### Frontend
+- **Framework**: React 18 + TypeScript
+- **UI**: Material-UI v5
+- **상태관리**: React Query v5 + Redux
+- **스타일**: Styled Components
 
 ### Infrastructure
 - **Container**: Docker + Kubernetes

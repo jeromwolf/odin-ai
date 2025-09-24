@@ -27,7 +27,7 @@ import {
   Business,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   LineChart,
   Line,
@@ -60,31 +60,29 @@ const Dashboard: React.FC = () => {
   const [bookmarkedBids, setBookmarkedBids] = useState<Set<string>>(new Set());
 
   // 대시보드 개요 데이터
-  const { data: overview, isLoading: overviewLoading } = useQuery(
-    'dashboardOverview',
-    () => apiClient.getDashboardOverview(),
-    {
-      refetchInterval: 60000, // 1분마다 새로고침
-    }
-  );
+  const { data: overview, isLoading: overviewLoading } = useQuery({
+    queryKey: ['dashboardOverview'],
+    queryFn: () => apiClient.getDashboardOverview(),
+    refetchInterval: 60000, // 1분마다 새로고침
+  });
 
   // 입찰 통계 데이터
-  const { data: statistics, isLoading: statsLoading } = useQuery(
-    'bidStatistics',
-    () => apiClient.getBidStatistics('7d')
-  );
+  const { data: statistics, isLoading: statsLoading } = useQuery({
+    queryKey: ['bidStatistics'],
+    queryFn: () => apiClient.getBidStatistics('7d'),
+  });
 
   // 마감 임박 입찰
-  const { data: deadlines, isLoading: deadlinesLoading } = useQuery(
-    'upcomingDeadlines',
-    () => apiClient.getUpcomingDeadlines(7)
-  );
+  const { data: deadlines, isLoading: deadlinesLoading } = useQuery({
+    queryKey: ['upcomingDeadlines'],
+    queryFn: () => apiClient.getUpcomingDeadlines(7),
+  });
 
   // AI 추천 입찰
-  const { data: recommendations, isLoading: recommendationsLoading } = useQuery(
-    'recommendations',
-    () => apiClient.getRecommendedBids(5)
-  );
+  const { data: recommendations, isLoading: recommendationsLoading } = useQuery({
+    queryKey: ['recommendations'],
+    queryFn: () => apiClient.getRecommendedBids(5),
+  });
 
   const handleBookmarkToggle = async (bidId: string) => {
     try {
@@ -279,11 +277,11 @@ const Dashboard: React.FC = () => {
               <CircularProgress />
             ) : (
               <List>
-                {deadlines?.slice(0, 5).map((bid: any) => (
+                {(deadlines?.deadlines || []).slice(0, 5).map((bid: any) => (
                   <ListItem
-                    key={bid.bid_id}
+                    key={bid.id || bid.bid_id}
                     button
-                    onClick={() => navigate(`/bids/${bid.bid_id}`)}
+                    onClick={() => navigate(`/bids/${bid.id || bid.bid_id}`)}
                   >
                     <ListItemText
                       primary={bid.title}
@@ -334,11 +332,11 @@ const Dashboard: React.FC = () => {
               <CircularProgress />
             ) : (
               <List>
-                {recommendations?.map((bid: any) => (
+                {(recommendations?.recommendations || []).map((bid: any) => (
                   <ListItem
-                    key={bid.bid_id}
+                    key={bid.id || bid.bid_id}
                     button
-                    onClick={() => navigate(`/bids/${bid.bid_id}`)}
+                    onClick={() => navigate(`/bids/${bid.id || bid.bid_id}`)}
                   >
                     <ListItemText
                       primary={
