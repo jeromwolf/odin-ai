@@ -2,6 +2,7 @@
 문서 처리 모듈 (텍스트 추출 및 마크다운 변환)
 """
 
+import os
 import subprocess
 import re
 import json
@@ -11,6 +12,14 @@ from pathlib import Path
 from typing import Optional, Dict, Tuple, List
 from datetime import datetime
 from loguru import logger
+
+# HWP 직접 추출 모듈
+try:
+    from .hwp_direct_extractor import extract_hwp_safe
+    HWP_DIRECT_AVAILABLE = True
+except ImportError:
+    HWP_DIRECT_AVAILABLE = False
+    logger.warning("HWP direct extractor not available")
 
 # 문서 처리 라이브러리
 try:
@@ -182,91 +191,38 @@ class DocumentProcessor:
             logger.error(f"문서 처리 오류: {e}")
 
     async def _extract_hwp(self, file_path: Path) -> Tuple[Optional[str], str]:
-        """HWP 파일 텍스트 추출 (표, OLE 객체 지원 강화)"""
+        """HWP 파일 텍스트 추출 (hwp_safe_extractor 사용)"""
         try:
-            # 1단계: pyhwp로 표 구조 포함 파싱 시도
-            text_with_tables = await self._extract_hwp_with_tables(file_path)
-            if text_with_tables:
-                return text_with_tables, 'pyhwp-advanced'
+            # hwp_safe_extractor 사용하여 안전하게 처리
+            from src.services.hwp_safe_extractor import extract_hwp_safe
 
-            # HWPX 파일 처리
-            if file_path.suffix.lower() == '.hwpx':
-                # HWPX는 zip 형식이므로 hwp5txt가 처리 가능
-                logger.info(f"HWPX 파일 처리: {file_path.name}")
+            text, method = extract_hwp_safe(file_path)
 
-            # ZIP 파일 처리 - 압축 해제된 폴더가 있는 경우
-            if file_path.is_dir():
-                logger.info(f"폴더 내 HWP 파일 처리: {file_path}")
-                text_parts = []
-                hwp_files = list(file_path.glob("*.hwp")) + list(file_path.glob("*.hwpx"))
+            if text and not text.startswith("[HWP 문서]"):
+                logger.info(f"HWP 처리 성공: {file_path.name} - {len(text)}자 추출 (방법: {method})")
+                return text, method
+            else:
+                # 추출 실패 시 기본 정보만 반환
+                file_size = file_path.stat().st_size
+                fallback_text = f"""
+[HWP 문서 정보]
+파일명: {file_path.name}
+파일 크기: {file_size:,} bytes
+생성일: {datetime.fromtimestamp(file_path.stat().st_ctime).strftime('%Y-%m-%d %H:%M:%S')}
 
-                for hwp_file in hwp_files:
-                    result = subprocess.run(
-                        ['hwp5txt', str(hwp_file)],
-                        capture_output=True,
-                        text=True,
-                        encoding='utf-8',
-                        timeout=30
-                    )
-                    if result.returncode == 0 and result.stdout:
-                        text_parts.append(f"=== {hwp_file.name} ===\n{result.stdout}")
+[문서 내용]
+(HWP 텍스트 추출 실패. 방법: {method})
+"""
+                logger.warning(f"HWP 추출 실패, 기본 정보 반환: {file_path.name} (방법: {method})")
+                return fallback_text, f"fallback-{method}"
 
-                if text_parts:
-                    return '\n\n'.join(text_parts), 'hwp5txt-multi'
-
-            # 일반 HWP/HWPX 파일 처리
-            result = subprocess.run(
-                ['hwp5txt', str(file_path)],
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                timeout=30
-            )
-
-            if result.returncode == 0 and result.stdout:
-                return result.stdout, 'hwp5txt'
-
-            logger.warning(f"HWP 텍스트 추출 실패: {file_path.name}")
-            return None, None
-
-        except subprocess.TimeoutExpired:
-            logger.error(f"HWP 처리 타임아웃: {file_path.name}")
-            return None, None
         except Exception as e:
             logger.error(f"HWP 처리 오류: {e}")
-            return None, None
+            return None, f"error-{str(e)[:50]}"
 
     async def _extract_hwp_with_tables(self, file_path: Path) -> Optional[str]:
         """HWP 파일에서 표 구조를 포함한 텍스트 추출"""
-        try:
-            # 방법 1: hwp5html로 HTML 변환 후 파싱
-            html_result = subprocess.run(
-                ['hwp5html', str(file_path)],
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                timeout=30
-            )
-
-            if html_result.returncode == 0 and html_result.stdout:
-                # HTML에서 표 구조 추출
-                from bs4 import BeautifulSoup
-                soup = BeautifulSoup(html_result.stdout, 'html.parser')
-
-                text_parts = []
-                for element in soup.find_all(['p', 'table', 'div']):
-                    if element.name == 'table':
-                        # 표를 마크다운 테이블로 변환
-                        table_md = self._html_table_to_markdown(element)
-                        text_parts.append(table_md)
-                    else:
-                        text_parts.append(element.get_text(strip=True))
-
-                if text_parts:
-                    return '\n\n'.join(text_parts)
-        except Exception as e:
-            logger.debug(f"표 추출 실패: {e}")
-
+        # HWP 처리 일시적으로 비활성화
         return None
 
     def _html_table_to_markdown(self, table_element) -> str:
@@ -314,27 +270,23 @@ class DocumentProcessor:
             return await self._extract_hwpx_fallback(file_path)
 
     async def _extract_hwpx_fallback(self, file_path: Path) -> Tuple[Optional[str], str]:
-        """HWPX 백업 처리 방법 (hwp5txt)"""
+        """HWPX 백업 처리 방법 (hwp_safe_extractor 사용)"""
         try:
-            # hwp5txt로 HWPX 처리
-            result = subprocess.run(
-                ['hwp5txt', str(file_path)],
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                timeout=30
-            )
+            # HWPX도 HWP와 동일한 방법으로 처리
+            from src.services.hwp_safe_extractor import extract_hwp_safe
 
-            if result.returncode == 0 and result.stdout:
-                logger.info(f"HWPX 백업 처리 완료: {file_path.name}")
-                return result.stdout, 'hwp5txt-hwpx'
+            text, method = extract_hwp_safe(file_path)
+
+            if text and not text.startswith("[HWP 문서]"):
+                logger.info(f"HWPX 백업 처리 성공: {file_path.name} - {len(text)}자 추출 (방법: {method})")
+                return text, f"hwpx-{method}"
             else:
-                logger.error(f"HWPX 백업 처리도 실패: {file_path.name}")
-                return None, None
+                logger.warning(f"HWPX 백업 처리 실패: {file_path.name} (방법: {method})")
+                return None, f"hwpx-failed-{method}"
 
         except Exception as e:
             logger.error(f"HWPX 백업 처리 오류: {e}")
-            return None, None
+            return None, f"hwpx-error-{str(e)[:50]}"
 
     async def _extract_pdf(self, file_path: Path) -> Tuple[Optional[str], str]:
         """PDF 파일 텍스트 추출 (tools/pdf-viewer 통합)"""
