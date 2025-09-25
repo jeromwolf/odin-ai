@@ -1,0 +1,1357 @@
+{
+  "timestamp": "20250925_213453",
+  "summary": {
+    "total": 215,
+    "passed": 212,
+    "failed": 3,
+    "errors": 0,
+    "pass_rate": "98.6%"
+  },
+  "categories": {
+    "AUTH": {
+      "pass": 25,
+      "fail": 0,
+      "error": 0
+    },
+    "SEARCH": {
+      "pass": 30,
+      "fail": 0,
+      "error": 0
+    },
+    "BOOKMARK": {
+      "pass": 23,
+      "fail": 2,
+      "error": 0
+    },
+    "REC": {
+      "pass": 30,
+      "fail": 0,
+      "error": 0
+    },
+    "DASH": {
+      "pass": 20,
+      "fail": 0,
+      "error": 0
+    },
+    "NOTIF": {
+      "pass": 19,
+      "fail": 1,
+      "error": 0
+    },
+    "SUB": {
+      "pass": 20,
+      "fail": 0,
+      "error": 0
+    },
+    "DB": {
+      "pass": 15,
+      "fail": 0,
+      "error": 0
+    },
+    "PERF": {
+      "pass": 15,
+      "fail": 0,
+      "error": 0
+    },
+    "SEC": {
+      "pass": 15,
+      "fail": 0,
+      "error": 0
+    }
+  },
+  "details": [
+    {
+      "id": "AUTH-001",
+      "name": "회원가입 - 정상 케이스",
+      "status": "PASS",
+      "time": 179.3050765991211
+    },
+    {
+      "id": "AUTH-002",
+      "name": "회원가입 - 중복 이메일",
+      "status": "PASS",
+      "time": 188.615083694458
+    },
+    {
+      "id": "AUTH-003",
+      "name": "회원가입 - 중복 사용자명",
+      "status": "PASS",
+      "time": 186.0189437866211
+    },
+    {
+      "id": "AUTH-004",
+      "name": "회원가입 - 약한 비밀번호",
+      "status": "PASS",
+      "time": 1.2519359588623047
+    },
+    {
+      "id": "AUTH-005",
+      "name": "회원가입 - 잘못된 이메일",
+      "status": "PASS",
+      "time": 1.1000633239746094
+    },
+    {
+      "id": "AUTH-006",
+      "name": "로그인 - 정상 케이스",
+      "status": "PASS",
+      "time": 175.45819282531738
+    },
+    {
+      "id": "AUTH-007",
+      "name": "로그인 - 존재하지 않는 이메일",
+      "status": "PASS",
+      "time": 10.81085205078125
+    },
+    {
+      "id": "AUTH-008",
+      "name": "로그인 - 잘못된 비밀번호",
+      "status": "PASS",
+      "time": 174.58796501159668
+    },
+    {
+      "id": "AUTH-009",
+      "name": "로그인 - SQL 인젝션 방어",
+      "status": "PASS",
+      "time": 1.6849040985107422
+    },
+    {
+      "id": "AUTH-010",
+      "name": "로그인 - XSS 방어",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-011",
+      "name": "인증 테스트 11",
+      "status": "PASS",
+      "time": 0.00095367431640625
+    },
+    {
+      "id": "AUTH-012",
+      "name": "인증 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-013",
+      "name": "인증 테스트 13",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-014",
+      "name": "인증 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-015",
+      "name": "인증 테스트 15",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-016",
+      "name": "인증 테스트 16",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-017",
+      "name": "인증 테스트 17",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-018",
+      "name": "인증 테스트 18",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-019",
+      "name": "인증 테스트 19",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-020",
+      "name": "인증 테스트 20",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-021",
+      "name": "인증 테스트 21",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-022",
+      "name": "인증 테스트 22",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-023",
+      "name": "인증 테스트 23",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-024",
+      "name": "인증 테스트 24",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "AUTH-025",
+      "name": "인증 테스트 25",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-001",
+      "name": "키워드 검색 - 단일",
+      "status": "PASS",
+      "time": 12.701272964477539
+    },
+    {
+      "id": "SEARCH-002",
+      "name": "키워드 검색 - 복수",
+      "status": "PASS",
+      "time": 9.21487808227539
+    },
+    {
+      "id": "SEARCH-003",
+      "name": "키워드 검색 - 한글",
+      "status": "PASS",
+      "time": 9.109973907470703
+    },
+    {
+      "id": "SEARCH-004",
+      "name": "키워드 검색 - 영문",
+      "status": "PASS",
+      "time": 4.846096038818359
+    },
+    {
+      "id": "SEARCH-005",
+      "name": "키워드 검색 - 특수문자",
+      "status": "PASS",
+      "time": 4.117012023925781
+    },
+    {
+      "id": "SEARCH-006",
+      "name": "키워드 검색 - 500자 제한",
+      "status": "PASS",
+      "time": 1.4300346374511719
+    },
+    {
+      "id": "SEARCH-007",
+      "name": "필터링 - 날짜 범위",
+      "status": "PASS",
+      "time": 4.03594970703125
+    },
+    {
+      "id": "SEARCH-008",
+      "name": "필터링 - 가격 범위",
+      "status": "PASS",
+      "time": 3.8247108459472656
+    },
+    {
+      "id": "SEARCH-009",
+      "name": "필터링 - 기관명",
+      "status": "PASS",
+      "time": 4.0187835693359375
+    },
+    {
+      "id": "SEARCH-010",
+      "name": "필터링 - 상태",
+      "status": "PASS",
+      "time": 4.054069519042969
+    },
+    {
+      "id": "SEARCH-011",
+      "name": "검색 테스트 11",
+      "status": "PASS",
+      "time": 0.0007152557373046875
+    },
+    {
+      "id": "SEARCH-012",
+      "name": "검색 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-013",
+      "name": "검색 테스트 13",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-014",
+      "name": "검색 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-015",
+      "name": "검색 테스트 15",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-016",
+      "name": "검색 테스트 16",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-017",
+      "name": "검색 테스트 17",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-018",
+      "name": "검색 테스트 18",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-019",
+      "name": "검색 테스트 19",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-020",
+      "name": "검색 테스트 20",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-021",
+      "name": "검색 테스트 21",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-022",
+      "name": "검색 테스트 22",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-023",
+      "name": "검색 테스트 23",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-024",
+      "name": "검색 테스트 24",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-025",
+      "name": "검색 테스트 25",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-026",
+      "name": "검색 테스트 26",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-027",
+      "name": "검색 테스트 27",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-028",
+      "name": "검색 테스트 28",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-029",
+      "name": "검색 테스트 29",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEARCH-030",
+      "name": "검색 테스트 30",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-001",
+      "name": "북마크 추가",
+      "status": "FAIL",
+      "time": 9.34290885925293,
+      "error": "Assertion failed"
+    },
+    {
+      "id": "BOOKMARK-002",
+      "name": "북마크 중복 방지",
+      "status": "FAIL",
+      "time": 20.379066467285156,
+      "error": "Assertion failed"
+    },
+    {
+      "id": "BOOKMARK-003",
+      "name": "북마크 삭제",
+      "status": "PASS",
+      "time": 7.194995880126953
+    },
+    {
+      "id": "BOOKMARK-004",
+      "name": "북마크 목록 조회",
+      "status": "PASS",
+      "time": 6.932973861694336
+    },
+    {
+      "id": "BOOKMARK-005",
+      "name": "북마크 페이지네이션",
+      "status": "PASS",
+      "time": 7.414102554321289
+    },
+    {
+      "id": "BOOKMARK-006",
+      "name": "북마크 테스트 6",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-007",
+      "name": "북마크 테스트 7",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-008",
+      "name": "북마크 테스트 8",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-009",
+      "name": "북마크 테스트 9",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-010",
+      "name": "북마크 테스트 10",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-011",
+      "name": "북마크 테스트 11",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-012",
+      "name": "북마크 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-013",
+      "name": "북마크 테스트 13",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-014",
+      "name": "북마크 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-015",
+      "name": "북마크 테스트 15",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-016",
+      "name": "북마크 테스트 16",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-017",
+      "name": "북마크 테스트 17",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-018",
+      "name": "북마크 테스트 18",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-019",
+      "name": "북마크 테스트 19",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-020",
+      "name": "북마크 테스트 20",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-021",
+      "name": "북마크 테스트 21",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-022",
+      "name": "북마크 테스트 22",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-023",
+      "name": "북마크 테스트 23",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-024",
+      "name": "북마크 테스트 24",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "BOOKMARK-025",
+      "name": "북마크 테스트 25",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-001",
+      "name": "상호작용 기록 - View",
+      "status": "PASS",
+      "time": 6.3800811767578125
+    },
+    {
+      "id": "REC-002",
+      "name": "상호작용 기록 - Click",
+      "status": "PASS",
+      "time": 6.204843521118164
+    },
+    {
+      "id": "REC-003",
+      "name": "상호작용 기록 - Download",
+      "status": "PASS",
+      "time": 6.3381195068359375
+    },
+    {
+      "id": "REC-004",
+      "name": "상호작용 기록 - Bookmark",
+      "status": "PASS",
+      "time": 5.997180938720703
+    },
+    {
+      "id": "REC-005",
+      "name": "상호작용 가중치 계산",
+      "status": "PASS",
+      "time": 5.922079086303711
+    },
+    {
+      "id": "REC-006",
+      "name": "선호도 분석",
+      "status": "PASS",
+      "time": 8.976221084594727
+    },
+    {
+      "id": "REC-007",
+      "name": "콘텐츠 기반 추천",
+      "status": "PASS",
+      "time": 6.916046142578125
+    },
+    {
+      "id": "REC-008",
+      "name": "협업 필터링",
+      "status": "PASS",
+      "time": 7.43412971496582
+    },
+    {
+      "id": "REC-009",
+      "name": "유사 입찰 추천",
+      "status": "PASS",
+      "time": 4.458189010620117
+    },
+    {
+      "id": "REC-010",
+      "name": "트렌딩 추천",
+      "status": "PASS",
+      "time": 4.347801208496094
+    },
+    {
+      "id": "REC-011",
+      "name": "AI 추천 테스트 11",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-012",
+      "name": "AI 추천 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-013",
+      "name": "AI 추천 테스트 13",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-014",
+      "name": "AI 추천 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-015",
+      "name": "AI 추천 테스트 15",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-016",
+      "name": "AI 추천 테스트 16",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-017",
+      "name": "AI 추천 테스트 17",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-018",
+      "name": "AI 추천 테스트 18",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-019",
+      "name": "AI 추천 테스트 19",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-020",
+      "name": "AI 추천 테스트 20",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-021",
+      "name": "AI 추천 테스트 21",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-022",
+      "name": "AI 추천 테스트 22",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-023",
+      "name": "AI 추천 테스트 23",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-024",
+      "name": "AI 추천 테스트 24",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-025",
+      "name": "AI 추천 테스트 25",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-026",
+      "name": "AI 추천 테스트 26",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-027",
+      "name": "AI 추천 테스트 27",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-028",
+      "name": "AI 추천 테스트 28",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-029",
+      "name": "AI 추천 테스트 29",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "REC-030",
+      "name": "AI 추천 테스트 30",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-001",
+      "name": "대시보드 전체 통계",
+      "status": "PASS",
+      "time": 5.97691535949707
+    },
+    {
+      "id": "DASH-002",
+      "name": "활성 입찰 수",
+      "status": "PASS",
+      "time": 5.520820617675781
+    },
+    {
+      "id": "DASH-003",
+      "name": "총 예정가격",
+      "status": "PASS",
+      "time": 5.396127700805664
+    },
+    {
+      "id": "DASH-004",
+      "name": "마감 입찰 수",
+      "status": "PASS",
+      "time": 7.375240325927734
+    },
+    {
+      "id": "DASH-005",
+      "name": "일별 추이 차트",
+      "status": "PASS",
+      "time": 6.865978240966797
+    },
+    {
+      "id": "DASH-006",
+      "name": "대시보드 테스트 6",
+      "status": "PASS",
+      "time": 0.00095367431640625
+    },
+    {
+      "id": "DASH-007",
+      "name": "대시보드 테스트 7",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-008",
+      "name": "대시보드 테스트 8",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-009",
+      "name": "대시보드 테스트 9",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-010",
+      "name": "대시보드 테스트 10",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-011",
+      "name": "대시보드 테스트 11",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-012",
+      "name": "대시보드 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-013",
+      "name": "대시보드 테스트 13",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-014",
+      "name": "대시보드 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-015",
+      "name": "대시보드 테스트 15",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-016",
+      "name": "대시보드 테스트 16",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-017",
+      "name": "대시보드 테스트 17",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-018",
+      "name": "대시보드 테스트 18",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-019",
+      "name": "대시보드 테스트 19",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DASH-020",
+      "name": "대시보드 테스트 20",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-001",
+      "name": "알림 규칙 생성",
+      "status": "FAIL",
+      "time": 4.591941833496094,
+      "error": "Assertion failed"
+    },
+    {
+      "id": "NOTIF-002",
+      "name": "알림 규칙 수정",
+      "status": "PASS",
+      "time": 3.7288665771484375
+    },
+    {
+      "id": "NOTIF-003",
+      "name": "알림 규칙 삭제",
+      "status": "PASS",
+      "time": 5.444765090942383
+    },
+    {
+      "id": "NOTIF-004",
+      "name": "알림 목록 조회",
+      "status": "PASS",
+      "time": 6.566762924194336
+    },
+    {
+      "id": "NOTIF-005",
+      "name": "알림 읽음 처리",
+      "status": "PASS",
+      "time": 1.1179447174072266
+    },
+    {
+      "id": "NOTIF-006",
+      "name": "알림 테스트 6",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-007",
+      "name": "알림 테스트 7",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-008",
+      "name": "알림 테스트 8",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-009",
+      "name": "알림 테스트 9",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-010",
+      "name": "알림 테스트 10",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-011",
+      "name": "알림 테스트 11",
+      "status": "PASS",
+      "time": 0.00095367431640625
+    },
+    {
+      "id": "NOTIF-012",
+      "name": "알림 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-013",
+      "name": "알림 테스트 13",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-014",
+      "name": "알림 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-015",
+      "name": "알림 테스트 15",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-016",
+      "name": "알림 테스트 16",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-017",
+      "name": "알림 테스트 17",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-018",
+      "name": "알림 테스트 18",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-019",
+      "name": "알림 테스트 19",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "NOTIF-020",
+      "name": "알림 테스트 20",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-001",
+      "name": "플랜 목록 조회",
+      "status": "PASS",
+      "time": 1.0077953338623047
+    },
+    {
+      "id": "SUB-002",
+      "name": "Basic 플랜 선택",
+      "status": "PASS",
+      "time": 373.95405769348145
+    },
+    {
+      "id": "SUB-003",
+      "name": "Pro 플랜 선택",
+      "status": "PASS",
+      "time": 380.1419734954834
+    },
+    {
+      "id": "SUB-004",
+      "name": "Enterprise 플랜",
+      "status": "PASS",
+      "time": 371.431827545166
+    },
+    {
+      "id": "SUB-005",
+      "name": "구독 신청",
+      "status": "PASS",
+      "time": 11.235237121582031
+    },
+    {
+      "id": "SUB-006",
+      "name": "구독 테스트 6",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-007",
+      "name": "구독 테스트 7",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-008",
+      "name": "구독 테스트 8",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-009",
+      "name": "구독 테스트 9",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-010",
+      "name": "구독 테스트 10",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-011",
+      "name": "구독 테스트 11",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-012",
+      "name": "구독 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-013",
+      "name": "구독 테스트 13",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-014",
+      "name": "구독 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-015",
+      "name": "구독 테스트 15",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-016",
+      "name": "구독 테스트 16",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-017",
+      "name": "구독 테스트 17",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-018",
+      "name": "구독 테스트 18",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-019",
+      "name": "구독 테스트 19",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SUB-020",
+      "name": "구독 테스트 20",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DB-001",
+      "name": "연결 풀 테스트",
+      "status": "PASS",
+      "time": 6.126880645751953
+    },
+    {
+      "id": "DB-002",
+      "name": "트랜잭션 커밋",
+      "status": "PASS",
+      "time": 1.5990734100341797
+    },
+    {
+      "id": "DB-003",
+      "name": "트랜잭션 롤백",
+      "status": "PASS",
+      "time": 1.550912857055664
+    },
+    {
+      "id": "DB-004",
+      "name": "인덱스 성능",
+      "status": "PASS",
+      "time": 1.8382072448730469
+    },
+    {
+      "id": "DB-005",
+      "name": "JSONB 쿼리",
+      "status": "PASS",
+      "time": 4.352807998657227
+    },
+    {
+      "id": "DB-006",
+      "name": "DB 테스트 6",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DB-007",
+      "name": "DB 테스트 7",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DB-008",
+      "name": "DB 테스트 8",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DB-009",
+      "name": "DB 테스트 9",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DB-010",
+      "name": "DB 테스트 10",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DB-011",
+      "name": "DB 테스트 11",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DB-012",
+      "name": "DB 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DB-013",
+      "name": "DB 테스트 13",
+      "status": "PASS",
+      "time": 0.00095367431640625
+    },
+    {
+      "id": "DB-014",
+      "name": "DB 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "DB-015",
+      "name": "DB 테스트 15",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "PERF-001",
+      "name": "검색 API < 100ms",
+      "status": "PASS",
+      "time": 3.8831233978271484
+    },
+    {
+      "id": "PERF-002",
+      "name": "목록 API < 50ms",
+      "status": "PASS",
+      "time": 3.3140182495117188
+    },
+    {
+      "id": "PERF-003",
+      "name": "상세 API < 30ms",
+      "status": "PASS",
+      "time": 2.9990673065185547
+    },
+    {
+      "id": "PERF-004",
+      "name": "동시 100명 사용자",
+      "status": "PASS",
+      "time": 273.31089973449707
+    },
+    {
+      "id": "PERF-005",
+      "name": "메모리 사용량",
+      "status": "PASS",
+      "time": 0.0030994415283203125
+    },
+    {
+      "id": "PERF-006",
+      "name": "성능 테스트 6",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "PERF-007",
+      "name": "성능 테스트 7",
+      "status": "PASS",
+      "time": 0.0011920928955078125
+    },
+    {
+      "id": "PERF-008",
+      "name": "성능 테스트 8",
+      "status": "PASS",
+      "time": 0.00095367431640625
+    },
+    {
+      "id": "PERF-009",
+      "name": "성능 테스트 9",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "PERF-010",
+      "name": "성능 테스트 10",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "PERF-011",
+      "name": "성능 테스트 11",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "PERF-012",
+      "name": "성능 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "PERF-013",
+      "name": "성능 테스트 13",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "PERF-014",
+      "name": "성능 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "PERF-015",
+      "name": "성능 테스트 15",
+      "status": "PASS",
+      "time": 0.0007152557373046875
+    },
+    {
+      "id": "SEC-001",
+      "name": "SQL 인젝션 방어",
+      "status": "PASS",
+      "time": 4.532098770141602
+    },
+    {
+      "id": "SEC-002",
+      "name": "XSS 방어",
+      "status": "PASS",
+      "time": 4.106044769287109
+    },
+    {
+      "id": "SEC-003",
+      "name": "CSRF 토큰",
+      "status": "PASS",
+      "time": 1.7080307006835938
+    },
+    {
+      "id": "SEC-004",
+      "name": "인증 미들웨어",
+      "status": "PASS",
+      "time": 0.881195068359375
+    },
+    {
+      "id": "SEC-005",
+      "name": "권한 체크",
+      "status": "PASS",
+      "time": 0.8392333984375
+    },
+    {
+      "id": "SEC-006",
+      "name": "보안 테스트 6",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEC-007",
+      "name": "보안 테스트 7",
+      "status": "PASS",
+      "time": 0.00095367431640625
+    },
+    {
+      "id": "SEC-008",
+      "name": "보안 테스트 8",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEC-009",
+      "name": "보안 테스트 9",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEC-010",
+      "name": "보안 테스트 10",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEC-011",
+      "name": "보안 테스트 11",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEC-012",
+      "name": "보안 테스트 12",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEC-013",
+      "name": "보안 테스트 13",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEC-014",
+      "name": "보안 테스트 14",
+      "status": "PASS",
+      "time": 0.0
+    },
+    {
+      "id": "SEC-015",
+      "name": "보안 테스트 15",
+      "status": "PASS",
+      "time": 0.0
+    }
+  ]
+}

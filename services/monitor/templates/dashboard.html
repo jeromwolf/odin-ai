@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ODIN-AI 모니터링 대시보드</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .status-item {
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            text-align: center;
+        }
+
+        .status-item .label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .status-item .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-running { background: #28a745; }
+        .status-active { background: #28a745; }
+        .status-idle { background: #ffc107; }
+        .status-down { background: #dc3545; }
+        .status-error { background: #dc3545; }
+        .status-inactive { background: #6c757d; }
+
+        .service-list {
+            list-style: none;
+        }
+
+        .service-list li {
+            padding: 10px;
+            margin-bottom: 5px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric .label {
+            color: #666;
+        }
+
+        .metric .value {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .log-item {
+            padding: 10px;
+            margin-bottom: 5px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 11px;
+        }
+
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            float: right;
+        }
+
+        .refresh-btn:hover {
+            background: #5a67d8;
+        }
+
+        .chart-container {
+            height: 200px;
+            margin-top: 15px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="refresh-btn" onclick="refreshAll()">🔄 새로고침</button>
+            <h1>🎯 ODIN-AI 모니터링 대시보드</h1>
+            <div class="subtitle">
+                <span id="current-time"></span>
+                <span style="margin-left: 20px;">자동 새로고침: <span id="auto-refresh">ON</span></span>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <!-- 시스템 상태 -->
+            <div class="card">
+                <h3>🖥️ 시스템 상태</h3>
+                <ul class="service-list" id="service-status">
+                    <li class="loading">데이터 로딩 중...</li>
+                </ul>
+            </div>
+
+            <!-- 오늘의 통계 -->
+            <div class="card">
+                <h3>📊 오늘의 통계</h3>
+                <div class="status-grid" id="today-stats">
+                    <div class="status-item loading">
+                        <div class="label">로딩 중...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 배치 현황 -->
+            <div class="card">
+                <h3>📦 배치 프로세스</h3>
+                <div id="batch-status">
+                    <div class="metric loading">
+                        <span class="label">로딩 중...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 알림 큐 현황 -->
+            <div class="card">
+                <h3>🔔 알림 큐</h3>
+                <div id="alert-queue">
+                    <div class="metric loading">
+                        <span class="label">로딩 중...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 최근 이벤트 -->
+            <div class="card" style="grid-column: span 2;">
+                <h3>📜 최근 이벤트</h3>
+                <div id="recent-events">
+                    <div class="log-item loading">로딩 중...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 전역 변수
+        let autoRefresh = true;
+        let refreshInterval;
+
+        // 시간 업데이트
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent =
+                now.toLocaleString('ko-KR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+        }
+
+        // 서비스 상태 업데이트
+        async function updateServiceStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                const statusHtml = Object.entries(data.services).map(([service, status]) => {
+                    const statusClass = `status-${status}`;
+                    const serviceName = {
+                        'postgres': 'PostgreSQL',
+                        'redis': 'Redis',
+                        'batch': '배치 프로세스',
+                        'alert': '알림 서비스',
+                        'web': '웹 서비스'
+                    }[service] || service;
+
+                    return `
+                        <li>
+                            <span>${serviceName}</span>
+                            <span>
+                                <span class="status-indicator ${statusClass}"></span>
+                                ${status}
+                            </span>
+                        </li>
+                    `;
+                }).join('');
+
+                document.getElementById('service-status').innerHTML = statusHtml;
+            } catch (error) {
+                console.error('서비스 상태 업데이트 실패:', error);
+            }
+        }
+
+        // 통계 업데이트
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/stats/overview');
+                const data = await response.json();
+
+                // 오늘의 통계
+                const todayStatsHtml = `
+                    <div class="status-item">
+                        <div class="label">오늘 수집</div>
+                        <div class="value" style="color: #28a745;">${data.announcements?.today || 0}</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">주간 수집</div>
+                        <div class="value" style="color: #007bff;">${data.announcements?.week || 0}</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">오늘 매칭</div>
+                        <div class="value" style="color: #ffc107;">${data.matches?.today || 0}</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="label">발송 완료</div>
+                        <div class="value" style="color: #17a2b8;">${data.matches?.sent || 0}</div>
+                    </div>
+                `;
+                document.getElementById('today-stats').innerHTML = todayStatsHtml;
+
+                // 배치 현황
+                const batchHtml = `
+                    <div class="metric">
+                        <span class="label">전체 공고</span>
+                        <span class="value">${data.announcements?.total || 0}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">문서 다운로드</span>
+                        <span class="value">${data.documents?.completed || 0} / ${data.documents?.pending || 0}</span>
+                    </div>
+                `;
+                document.getElementById('batch-status').innerHTML = batchHtml;
+
+            } catch (error) {
+                console.error('통계 업데이트 실패:', error);
+            }
+        }
+
+        // 알림 큐 업데이트
+        async function updateAlertQueue() {
+            try {
+                const response = await fetch('/api/alerts/queue');
+                const data = await response.json();
+
+                let queueHtml = '';
+                if (data.by_status) {
+                    Object.entries(data.by_status).forEach(([status, channels]) => {
+                        const total = Object.values(channels).reduce((a, b) => a + b, 0);
+                        const statusLabel = {
+                            'pending': '대기',
+                            'processing': '처리중',
+                            'sent': '발송완료',
+                            'failed': '실패'
+                        }[status] || status;
+
+                        queueHtml += `
+                            <div class="metric">
+                                <span class="label">${statusLabel}</span>
+                                <span class="value">${total}</span>
+                            </div>
+                        `;
+                    });
+                }
+
+                document.getElementById('alert-queue').innerHTML = queueHtml || '<div class="metric"><span class="label">큐 비어있음</span></div>';
+            } catch (error) {
+                console.error('알림 큐 업데이트 실패:', error);
+            }
+        }
+
+        // 최근 이벤트 업데이트
+        async function updateRecentEvents() {
+            try {
+                const response = await fetch('/api/batch/history');
+                const data = await response.json();
+
+                const eventsHtml = data.slice(0, 5).map(item => {
+                    const duration = item.duration ? `${Math.round(item.duration / 60)}분` : '-';
+                    return `
+                        <div class="log-item">
+                            <div class="timestamp">${item.date}</div>
+                            <div>수집: ${item.count}개 | 소요시간: ${duration}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                document.getElementById('recent-events').innerHTML = eventsHtml || '<div class="log-item">이벤트 없음</div>';
+            } catch (error) {
+                console.error('이벤트 업데이트 실패:', error);
+            }
+        }
+
+        // 전체 새로고침
+        async function refreshAll() {
+            updateTime();
+            await Promise.all([
+                updateServiceStatus(),
+                updateStats(),
+                updateAlertQueue(),
+                updateRecentEvents()
+            ]);
+        }
+
+        // 자동 새로고침 토글
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            document.getElementById('auto-refresh').textContent = autoRefresh ? 'ON' : 'OFF';
+
+            if (autoRefresh) {
+                refreshInterval = setInterval(refreshAll, 10000);
+            } else {
+                clearInterval(refreshInterval);
+            }
+        }
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTime();
+            setInterval(updateTime, 1000);
+
+            refreshAll();
+            refreshInterval = setInterval(refreshAll, 10000); // 10초마다 새로고침
+        });
+    </script>
+</body>
+</html>

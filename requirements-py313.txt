@@ -1,0 +1,52 @@
+# ====================================================
+# ODIN-AI Python 3.13 Compatible Dependencies
+# Python 3.13과 호환되는 패키지만 포함
+# ====================================================
+
+# Core Framework
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+
+# Database
+sqlalchemy
+psycopg2-binary
+# asyncpg  # Python 3.13 빌드 이슈 있을 수 있음
+
+# HTTP
+httpx
+requests
+beautifulsoup4
+
+# Document Processing (Python 3.13 호환)
+openpyxl
+# pandas는 Python 3.13에서 빌드 이슈가 있을 수 있음
+# 대신 polars 사용 가능
+html2text
+
+# Logging
+loguru
+
+# Date & Time
+python-dateutil
+
+# Basic Utilities
+pyyaml
+tqdm
+click
+
+# Testing
+pytest
+pytest-asyncio
+
+# Development
+black
+flake8
+
+# Security
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Email validation
+python-email-validator

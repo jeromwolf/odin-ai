@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: odin-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-blockmeta}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-odin2025}
+      POSTGRES_DB: ${DB_NAME:-odin_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./sql/search_indexes.sql:/docker-entrypoint-initdb.d/02-indexes.sql
+    networks:
+      - odin-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-blockmeta}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: odin-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - odin-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: odin-backend
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-blockmeta}:${DB_PASSWORD:-odin2025}@postgres:5432/${DB_NAME:-odin_db}
+      REDIS_URL: redis://redis:6379
+      API_KEY: ${API_KEY}
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-here}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+    networks:
+      - odin-network
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: odin-frontend
+    environment:
+      REACT_APP_API_URL: http://backend:8000
+      REACT_APP_WS_URL: ws://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - odin-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: odin-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./frontend/build:/usr/share/nginx/html
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - odin-network
+
+  # Batch Processing Worker
+  batch-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: odin-batch
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-blockmeta}:${DB_PASSWORD:-odin2025}@postgres:5432/${DB_NAME:-odin_db}
+      REDIS_URL: redis://redis:6379
+      API_KEY: ${API_KEY}
+      DB_FILE_INIT: ${DB_FILE_INIT:-true}
+      TEST_MODE: ${TEST_MODE:-false}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./storage:/app/storage
+      - ./reports:/app/reports
+    networks:
+      - odin-network
+    command: python batch/production_batch.py
+
+networks:
+  odin-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

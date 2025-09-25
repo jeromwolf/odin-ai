@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import random
+import hashlib
+import json
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
@@ -16,6 +18,14 @@ try:
 except ImportError:
     HAS_PSYCOPG2 = False
 import os
+
+# Redis 캐싱 시스템 임포트
+try:
+    from backend.cache import cache, get_cached_or_fetch, CACHE_TTL
+    CACHE_ENABLED = cache.enabled
+except ImportError:
+    CACHE_ENABLED = False
+    print("⚠️ 캐싱 시스템 비활성화 (cache.py 없음)")
 
 app = FastAPI(title="ODIN-AI Search API", version="1.0.0")
 
@@ -27,6 +37,70 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 검색 라우터 추가
+try:
+    from api.search import router as search_router
+    app.include_router(search_router)
+    print("✅ 검색 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 검색 API 라우터 로드 실패: {e}")
+
+# 인증 라우터 추가
+try:
+    from api.auth import router as auth_router
+    app.include_router(auth_router)
+    print("✅ 인증 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 인증 API 라우터 로드 실패: {e}")
+
+# 북마크 라우터 임포트 및 추가
+try:
+    from api.bookmarks import router as bookmarks_router
+    app.include_router(bookmarks_router)
+    print("✅ 북마크 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 북마크 API 라우터 로드 실패: {e}")
+
+# 대시보드 라우터 추가
+try:
+    from api.dashboard import router as dashboard_router
+    app.include_router(dashboard_router)
+    print("✅ 대시보드 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 대시보드 API 라우터 로드 실패: {e}")
+
+# 구독 라우터 추가
+try:
+    from api.subscription import router as subscription_router
+    app.include_router(subscription_router)
+    print("✅ 구독 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 구독 API 라우터 로드 실패: {e}")
+
+# 결제 라우터 추가
+try:
+    from api.payments import router as payments_router
+    app.include_router(payments_router)
+    print("✅ 결제 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 결제 API 라우터 로드 실패: {e}")
+
+# 알림 라우터 추가
+try:
+    from api.notifications import router as notifications_router
+    app.include_router(notifications_router)
+    print("✅ 알림 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 알림 API 라우터 로드 실패: {e}")
+
+# AI 추천 라우터 추가
+try:
+    from api.recommendations import router as recommendations_router
+    app.include_router(recommendations_router, prefix="/api/recommendations", tags=["recommendations"])
+    print("✅ AI 추천 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ AI 추천 API 라우터 로드 실패: {e}")
 
 # 샘플 데이터
 SAMPLE_BIDS = [
@@ -352,19 +426,80 @@ def get_db_connection():
 
 @app.get("/api/search")
 async def search(
-    q: str = Query(None, alias="query", description="검색어"),
+    q: str = Query(None, alias="query", description="검색어", max_length=500),
     type: str = Query("all", description="검색 타입"),
     sort: str = Query("relevance", description="정렬 방식"),
-    page: int = Query(1, ge=1, description="페이지 번호"),
+    page: int = Query(1, ge=1, le=1000, description="페이지 번호 (최대 1000)"),
     size: int = Query(20, ge=1, le=100, description="페이지 크기"),
     start_date: Optional[str] = Query(None, description="시작일 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="종료일 (YYYY-MM-DD)"),
-    min_price: Optional[int] = Query(None, description="최소 가격"),
-    max_price: Optional[int] = Query(None, description="최대 가격"),
-    organization: Optional[str] = Query(None, description="기관명"),
+    min_price: Optional[int] = Query(None, ge=0, description="최소 가격 (0 이상)"),
+    max_price: Optional[int] = Query(None, ge=0, description="최대 가격 (0 이상)"),
+    organization: Optional[str] = Query(None, description="기관명", max_length=100),
     status: Optional[str] = Query(None, description="상태")
 ):
     """통합 검색 API - 실제 DB 연동"""
+
+    # Query의 max_length가 작동하지 않으므로 수동 검증
+    if q and len(q) > 500:
+        raise HTTPException(status_code=422, detail="검색어는 500자를 초과할 수 없습니다.")
+
+    # 날짜 형식 및 범위 검증
+    parsed_start_date = None
+    parsed_end_date = None
+
+    if start_date:
+        try:
+            parsed_start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="잘못된 시작일 형식입니다. YYYY-MM-DD 형식을 사용하세요.")
+
+    if end_date:
+        try:
+            parsed_end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="잘못된 종료일 형식입니다. YYYY-MM-DD 형식을 사용하세요.")
+
+    # 날짜 범위 논리 검증
+    if parsed_start_date and parsed_end_date:
+        if parsed_start_date > parsed_end_date:
+            raise HTTPException(status_code=400, detail="시작일이 종료일보다 늦을 수 없습니다.")
+
+        # 날짜 범위가 너무 큰 경우 제한 (예: 1년)
+        date_diff = (parsed_end_date - parsed_start_date).days
+        if date_diff > 365:
+            raise HTTPException(status_code=400, detail="날짜 범위는 최대 1년까지만 조회 가능합니다.")
+
+    # 가격 검증
+    if min_price is not None and max_price is not None:
+        if min_price > max_price:
+            raise HTTPException(status_code=400, detail="최소 가격이 최대 가격보다 클 수 없습니다.")
+
+    # 정렬 옵션 검증
+    valid_sorts = ["relevance", "price_desc", "price_asc", "date_desc", "date_asc", "deadline_asc"]
+    if sort not in valid_sorts:
+        sort = "relevance"  # 기본값으로 설정
+
+    # 캐시 키를 위한 파라미터 딕셔너리
+    cache_params = {
+        "q": q or "",
+        "type": type,
+        "sort": sort,
+        "page": page,
+        "size": size,
+        "start_date": start_date or "",
+        "end_date": end_date or "",
+        "min_price": min_price or 0,
+        "max_price": max_price or 0,
+        "organization": organization or "",
+        "status": status or ""
+    }
+
+    # 캐싱 체크
+    if CACHE_ENABLED:
+        cached_result = cache.get("search", cache_params)
+        if cached_result:
+            return cached_result
 
     # DB 연결
     conn = get_db_connection()
@@ -489,10 +624,12 @@ async def search(
     # 페이지네이션 정보 계산
     total_pages = (total_count + size - 1) // size if total_count > 0 else 0
 
-    return {
+    # 응답 데이터 구성
+    response_data = {
         "query": q or "",
         "searchType": type,
         "results": results,
+        "total": total_count,  # 테스트 스크립트가 기대하는 필드명
         "totalCount": total_count,
         "pageInfo": {
             "currentPage": page,
@@ -514,6 +651,12 @@ async def search(
             ]
         }
     }
+
+    # 결과 캐싱
+    if CACHE_ENABLED and total_count > 0:
+        cache.set("search", cache_params, response_data, CACHE_TTL.get("search", 300))
+
+    return response_data
 
 @app.get("/api/search/suggest")
 async def get_suggestions(
@@ -607,6 +750,111 @@ async def get_metrics():
             {"query": "SI사업", "count": 156}
         ],
         "errorRate": 0.002
+    }
+
+# Auth Endpoints (for login state management)
+@app.post("/api/auth/login")
+async def login(data: dict):
+    """로그인 엔드포인트 (개발용 - 비밀번호 체크 안함)"""
+    email = data.get("email", "user@example.com")
+    # 개발 모드에서는 모든 로그인 허용
+    return {
+        "access_token": "dummy-token-12345",
+        "refresh_token": "dummy-refresh-token",
+        "user": {
+            "id": "user-001",
+            "email": email,
+            "name": "켈리",
+            "company": "ODIN-AI",
+            "role": "관리자"
+        }
+    }
+
+@app.post("/api/auth/logout")
+async def logout():
+    """로그아웃"""
+    return {"message": "Logged out successfully"}
+
+@app.post("/api/auth/refresh")
+async def refresh_token(data: dict):
+    """토큰 갱신"""
+    return {
+        "access_token": "dummy-token-renewed-12345",
+        "refresh_token": "dummy-refresh-token-renewed"
+    }
+
+# Profile Endpoints
+@app.get("/api/profile")
+async def get_profile():
+    """프로필 정보 조회"""
+    return {
+        "id": "user-001",
+        "email": "jeromwolf@gmail.com",
+        "name": "켈리",
+        "company": "ODIN-AI",
+        "role": "관리자",
+        "phone": "010-1234-5678",
+        "department": "개발팀",
+        "created_at": "2025-01-01T00:00:00",
+        "last_login": datetime.now().isoformat(),
+        "subscription": {
+            "plan": "Premium",
+            "status": "active",
+            "expires_at": "2026-01-01T00:00:00"
+        },
+        "preferences": {
+            "notifications": True,
+            "email_alerts": True,
+            "language": "ko"
+        }
+    }
+
+@app.put("/api/profile")
+async def update_profile(data: dict):
+    """프로필 정보 수정"""
+    return {
+        "message": "Profile updated successfully",
+        "profile": {
+            "id": "user-001",
+            "email": data.get("email", "jeromwolf@gmail.com"),
+            "name": data.get("name", "켈리"),
+            "company": data.get("company", "ODIN-AI"),
+            "role": data.get("role", "관리자"),
+            "phone": data.get("phone", "010-1234-5678"),
+            "department": data.get("department", "개발팀")
+        }
+    }
+
+@app.post("/api/profile/change-password")
+async def change_password(data: dict):
+    """비밀번호 변경"""
+    return {"message": "Password changed successfully"}
+
+# Settings Endpoints
+@app.get("/api/settings")
+async def get_settings():
+    """설정 조회"""
+    return {
+        "notifications": {
+            "email": True,
+            "push": False,
+            "sms": False
+        },
+        "search": {
+            "resultsPerPage": 20,
+            "autoComplete": True,
+            "saveHistory": True
+        },
+        "theme": "light",
+        "language": "ko"
+    }
+
+@app.put("/api/settings")
+async def update_settings(data: dict):
+    """설정 업데이트"""
+    return {
+        "message": "Settings updated successfully",
+        "settings": data
     }
 
 if __name__ == "__main__":

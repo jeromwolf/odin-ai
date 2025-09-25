@@ -1,0 +1,38 @@
+FROM python:3.11-slim
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 시스템 패키지 설치
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 의존성 복사 및 설치
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 애플리케이션 코드 복사
+COPY backend/ ./backend/
+COPY src/ ./src/
+COPY batch/ ./batch/
+COPY tools/ ./tools/
+
+# 스토리지 디렉토리 생성
+RUN mkdir -p /app/storage/downloads /app/storage/markdown /app/logs /app/reports
+
+# 실행 권한 설정
+RUN chmod +x batch/production_batch.py
+
+# 헬스체크
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# 포트 노출
+EXPOSE 8000
+
+# 기본 실행 명령
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

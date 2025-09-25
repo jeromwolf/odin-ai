@@ -1,0 +1,182 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 데이터베이스
+  postgres:
+    image: postgres:15-alpine
+    container_name: odin-postgres
+    environment:
+      POSTGRES_DB: odin_db
+      POSTGRES_USER: blockmeta
+      POSTGRES_PASSWORD: odin2024
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - odin-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blockmeta -d odin_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (이벤트 버스 + 캐시)
+  redis:
+    image: redis:7-alpine
+    container_name: odin-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - odin-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 배치 프로세스 (크론으로 실행)
+  batch:
+    build:
+      context: .
+      dockerfile: Dockerfile.batch
+    container_name: odin-batch
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://blockmeta:odin2024@postgres:5432/odin_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BID_API_KEY: ${BID_API_KEY}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USERNAME: ${EMAIL_USERNAME}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
+      EMAIL_TO: ${EMAIL_TO}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+    volumes:
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+    networks:
+      - odin-network
+    command: >
+      sh -c "
+      echo '0 9,18 * * * python /app/batch/production_batch.py >> /app/logs/cron.log 2>&1' | crontab -
+      && crond -f
+      "
+
+  # 알림 서비스 (상시 실행)
+  alert:
+    build:
+      context: .
+      dockerfile: Dockerfile.alert
+    container_name: odin-alert
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://blockmeta:odin2024@postgres:5432/odin_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USERNAME: ${EMAIL_USERNAME}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      SMS_API_KEY: ${SMS_API_KEY}
+      DAEMON_MODE: true
+    volumes:
+      - ./logs/alert:/app/logs/alert
+    networks:
+      - odin-network
+    restart: unless-stopped
+    command: python /app/services/alert/main.py --daemon
+
+  # 웹 서비스 (API + Frontend)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: odin-web
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://blockmeta:odin2024@postgres:5432/odin_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8000:8000"
+      - "3000:3000"
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./storage:/app/storage
+    networks:
+      - odin-network
+    restart: unless-stopped
+    command: >
+      sh -c "
+      cd /app/backend && uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
+      cd /app/frontend && npm start
+      "
+
+  # 모니터링 서비스 (선택적)
+  monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    container_name: odin-monitor
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DATABASE_URL: postgresql://blockmeta:odin2024@postgres:5432/odin_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8080:8080"
+    networks:
+      - odin-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # pgAdmin (선택적)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: odin-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@odin.ai
+      PGADMIN_DEFAULT_PASSWORD: admin2024
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    networks:
+      - odin-network
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+networks:
+  odin-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

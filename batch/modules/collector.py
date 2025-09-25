@@ -68,6 +68,7 @@ class APICollector:
         total_saved = 0
         page_no = 1
         total_count = 0
+        new_bid_ids = []  # 새로 수집된 공고 ID 리스트
 
         try:
             while True:
@@ -101,9 +102,10 @@ class APICollector:
                     logger.info(f"📊 페이지 {page_no}: {len(items)}개 조회 (전체 {total_count}개)")
 
                     # DB 저장
-                    saved_count = self._save_to_database(items)
+                    saved_count, saved_ids = self._save_to_database(items)
                     total_fetched += len(items)
                     total_saved += saved_count
+                    new_bid_ids.extend(saved_ids)
 
                     # 다음 페이지 확인
                     if total_fetched >= total_count:
@@ -129,7 +131,8 @@ class APICollector:
                 'fetched': total_fetched,
                 'saved': total_saved,
                 'pages': page_no,
-                'status': 'success'
+                'status': 'success',
+                'new_bid_ids': new_bid_ids  # 새로 수집된 공고 ID 리스트 반환
             }
 
         except Exception as e:
@@ -140,7 +143,8 @@ class APICollector:
                 'saved': total_saved,
                 'pages': page_no - 1,
                 'status': 'error',
-                'message': str(e)
+                'message': str(e),
+                'new_bid_ids': new_bid_ids  # 에러 발생시에도 수집된 ID 반환
             }
         finally:
             self.session.close()
@@ -152,9 +156,10 @@ class APICollector:
             items: API 응답 아이템 리스트
 
         Returns:
-            int: 저장된 건수
+            tuple: (저장된 건수, 새로 저장된 공고 ID 리스트)
         """
         saved_count = 0
+        saved_ids = []
 
         for item in items:
             try:
@@ -209,6 +214,7 @@ class APICollector:
                         self.session.add(document)
 
                     saved_count += 1
+                    saved_ids.append(bid_notice_no)  # 새로 저장된 ID 추가
                     logger.debug(f"  ✅ 신규 저장: {bid_notice_no}")
                 else:
                     logger.debug(f"  ⏭️ 이미 존재: {bid_notice_no}")
@@ -220,7 +226,7 @@ class APICollector:
         self.session.commit()
         logger.info(f"💾 DB 저장 완료: {saved_count}건")
 
-        return saved_count
+        return saved_count, saved_ids
 
     def _parse_date(self, date_str):
         """날짜 문자열 파싱

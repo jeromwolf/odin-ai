@@ -38,9 +38,9 @@ const Login: React.FC = () => {
     formState: { errors },
   } = useForm<LoginFormData>({
     defaultValues: {
-      email: '',
-      password: '',
-      rememberMe: false,
+      email: 'jeromwolf@gmail.com',
+      password: 'password123',
+      rememberMe: true,
     },
   });
 

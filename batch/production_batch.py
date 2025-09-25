@@ -11,6 +11,8 @@ ODIN-AI Production Batch System
 import os
 import sys
 import time
+import json
+import redis
 from datetime import datetime
 from pathlib import Path
 from loguru import logger
@@ -56,6 +58,9 @@ class ProductionBatch:
             'attachments': 0
         }
 
+        # 새로 수집된 공고 ID 저장
+        self.new_bid_ids = []
+
     def run(self):
         """배치 실행 메인 함수"""
         logger.info("="*60)
@@ -100,7 +105,13 @@ class ProductionBatch:
             logger.info("="*40)
             self._send_report()
 
-            # 6. 최종 통계
+            # 6. 이벤트 발행 (Redis Pub/Sub)
+            logger.info("\n" + "="*40)
+            logger.info("📢 Phase 5: 이벤트 발행")
+            logger.info("="*40)
+            self._publish_event()
+
+            # 7. 최종 통계
             self._print_final_stats()
 
         except Exception as e:
@@ -225,28 +236,43 @@ class ProductionBatch:
         try:
             collector = APICollector(self.db_url)
 
-            # 항상 오늘 날짜만 수집하도록 수정
+            # 날짜 설정 (환경변수 또는 오늘 날짜)
             from datetime import datetime
-            today = datetime.now()
+            start_str = os.getenv('BATCH_START_DATE')
+            end_str = os.getenv('BATCH_END_DATE')
+
+            if start_str:
+                start_date = datetime.strptime(start_str, '%Y-%m-%d')
+            else:
+                start_date = datetime.now()
+
+            if end_str:
+                end_date = datetime.strptime(end_str, '%Y-%m-%d')
+            else:
+                end_date = start_date
+
+            logger.info(f"📅 수집 기간: {start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
 
             if self.test_mode:
                 result = collector.collect_by_date_range(
-                    start_date=today,   # 오늘 날짜
-                    end_date=today,     # 오늘 날짜
+                    start_date=start_date,
+                    end_date=end_date,
                     num_of_rows=50,     # 페이지당 50개
                     max_pages=2         # 최대 2페이지 (100건)
                 )
             else:
                 result = collector.collect_by_date_range(
-                    start_date=today,   # 오늘 날짜만
-                    end_date=today,     # 오늘 날짜만
+                    start_date=start_date,
+                    end_date=end_date,
                     num_of_rows=100,    # 페이지당 100개
                     max_pages=None      # 모든 페이지 수집
                 )
 
             if result['status'] == 'success':
                 self.stats['collected'] = result.get('saved', 0)
-                logger.info(f"✅ 수집 완료: {self.stats['collected']}건")
+                # 새로 수집된 공고 ID 저장
+                self.new_bid_ids = result.get('new_bid_ids', [])
+                logger.info(f"✅ 수집 완료: {self.stats['collected']}건 (신규: {len(self.new_bid_ids)}건)")
             else:
                 logger.error(f"❌ 수집 실패: {result.get('message')}")
 
@@ -339,6 +365,48 @@ class ProductionBatch:
         except Exception as e:
             logger.error(f"❌ 보고서 발송 오류: {e}")
 
+    def _publish_event(self):
+        """배치 완료 이벤트 발행 (Redis Pub/Sub)"""
+        try:
+            # Redis 연결
+            redis_client = redis.Redis(
+                host=os.getenv('REDIS_HOST', 'localhost'),
+                port=int(os.getenv('REDIS_PORT', 6379)),
+                decode_responses=True
+            )
+
+            # 이벤트 데이터 생성
+            event_data = {
+                "type": "BATCH_COMPLETED",
+                "timestamp": datetime.now().isoformat(),
+                "stats": {
+                    "collected": self.stats['collected'],
+                    "downloaded": self.stats['downloaded'],
+                    "processed": self.stats['processed'],
+                    "failed": self.stats['failed'],
+                    "new_bids": len(self.new_bid_ids),
+                    "extracted_info": self.stats['extracted_info'],
+                    "tags_created": self.stats['tags_created']
+                },
+                "new_bid_ids": self.new_bid_ids[:100],  # 최대 100개만 전송
+                "execution_time_minutes": round((time.time() - self.start_time) / 60, 1)
+            }
+
+            # 이벤트 발행
+            channel = 'batch:completed'
+            redis_client.publish(channel, json.dumps(event_data, ensure_ascii=False))
+            logger.info(f"✅ 이벤트 발행 성공: {channel}")
+            logger.info(f"   - 신규 공고: {len(self.new_bid_ids)}건")
+            logger.info(f"   - 처리 완료: {self.stats['processed']}건")
+
+            # 이벤트를 큐에도 저장 (백업용)
+            redis_client.lpush('event_queue', json.dumps(event_data, ensure_ascii=False))
+            redis_client.expire('event_queue', 86400)  # 24시간 유지
+
+        except Exception as e:
+            logger.warning(f"⚠️ 이벤트 발행 실패 (배치는 정상 완료): {str(e)}")
+            logger.warning("   알림 서비스가 실행 중이지 않을 수 있습니다.")
+
     def _print_final_stats(self):
         """최종 통계 출력"""
         logger.info("\n" + "="*60)
@@ -360,7 +428,53 @@ class ProductionBatch:
 
 
 def main():
-    """메인 함수"""
+    """메인 함수
+
+    사용법:
+        python batch/production_batch.py                    # 오늘 날짜
+        python batch/production_batch.py 2025-09-25        # 특정 날짜
+        python batch/production_batch.py 2025-09-20 2025-09-25  # 날짜 범위
+    """
+    import argparse
+    from datetime import datetime
+
+    parser = argparse.ArgumentParser(description='ODIN-AI 배치 프로세스')
+    parser.add_argument('start_date', nargs='?', help='시작 날짜 (YYYY-MM-DD)', default=None)
+    parser.add_argument('end_date', nargs='?', help='종료 날짜 (YYYY-MM-DD)', default=None)
+    parser.add_argument('--test', action='store_true', help='테스트 모드')
+    parser.add_argument('--init', action='store_true', help='DB/파일 초기화')
+
+    args = parser.parse_args()
+
+    # 환경변수 설정
+    if args.test:
+        os.environ['TEST_MODE'] = 'true'
+    if args.init:
+        os.environ['DB_FILE_INIT'] = 'true'
+
+    # 날짜 파싱
+    if args.start_date:
+        try:
+            start_date = datetime.strptime(args.start_date, '%Y-%m-%d')
+            os.environ['BATCH_START_DATE'] = args.start_date
+        except ValueError:
+            print(f"❌ 잘못된 날짜 형식: {args.start_date} (YYYY-MM-DD 형식 필요)")
+            sys.exit(1)
+    else:
+        start_date = datetime.now()
+
+    if args.end_date:
+        try:
+            end_date = datetime.strptime(args.end_date, '%Y-%m-%d')
+            os.environ['BATCH_END_DATE'] = args.end_date
+        except ValueError:
+            print(f"❌ 잘못된 날짜 형식: {args.end_date} (YYYY-MM-DD 형식 필요)")
+            sys.exit(1)
+    else:
+        end_date = start_date
+
+    print(f"📅 배치 실행 날짜: {start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
+
     batch = ProductionBatch()
     batch.run()
 
