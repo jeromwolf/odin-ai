@@ -35,60 +35,79 @@ async def search_bids(
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # 기본 쿼리
+            # 기본 쿼리 - DISTINCT 추가하여 중복 제거
             query = """
-                SELECT
-                    bid_notice_no,
-                    title,
-                    organization_name,
-                    department_name,
-                    estimated_price,
-                    bid_start_date,
-                    bid_end_date,
-                    status
-                FROM bid_announcements
-                WHERE 1=1
+                SELECT DISTINCT
+                    b.bid_notice_no,
+                    b.title,
+                    b.organization_name,
+                    b.department_name,
+                    b.estimated_price,
+                    b.bid_start_date,
+                    b.bid_end_date,
+                    b.status
+                FROM bid_announcements b
             """
 
             params = []
+            needs_join = False
 
-            # 키워드 검색
+            # 키워드 검색 (제목, 기관명, 태그)
             if q:
-                query += " AND (title ILIKE %s OR organization_name ILIKE %s)"
-                params.extend([f"%{q}%", f"%{q}%"])
+                # 태그 테이블 JOIN 필요 여부 확인
+                needs_join = True
+                query = """
+                    SELECT DISTINCT
+                        b.bid_notice_no,
+                        b.title,
+                        b.organization_name,
+                        b.department_name,
+                        b.estimated_price,
+                        b.bid_start_date,
+                        b.bid_end_date,
+                        b.status,
+                        b.created_at
+                    FROM bid_announcements b
+                    LEFT JOIN bid_tag_relations btr ON b.bid_notice_no = btr.bid_notice_no
+                    LEFT JOIN bid_tags t ON btr.tag_id = t.tag_id
+                    WHERE (b.title ILIKE %s OR b.organization_name ILIKE %s OR t.tag_name ILIKE %s)
+                """
+                params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
+            else:
+                query += " WHERE 1=1"
 
             # 날짜 범위
             if start_date:
-                query += " AND bid_start_date >= %s"
+                query += " AND b.bid_start_date >= %s"
                 params.append(start_date)
 
             if end_date:
-                query += " AND bid_end_date <= %s"
+                query += " AND b.bid_end_date <= %s"
                 params.append(end_date)
 
             # 가격 범위
             if min_price is not None:
-                query += " AND estimated_price >= %s"
+                query += " AND b.estimated_price >= %s"
                 params.append(min_price)
 
             if max_price is not None:
-                query += " AND estimated_price <= %s"
+                query += " AND b.estimated_price <= %s"
                 params.append(max_price)
 
             # 기관명
             if organization:
-                query += " AND organization_name ILIKE %s"
+                query += " AND b.organization_name ILIKE %s"
                 params.append(f"%{organization}%")
 
             # 상태
             if status:
                 if status == "active":
-                    query += " AND bid_end_date >= NOW()"
+                    query += " AND b.bid_end_date >= NOW()"
                 elif status == "closed":
-                    query += " AND bid_end_date < NOW()"
+                    query += " AND b.bid_end_date < NOW()"
 
             # 정렬 및 페이지네이션
-            query += " ORDER BY created_at DESC"
+            query += " ORDER BY b.created_at DESC"
             query += " LIMIT %s OFFSET %s"
             params.extend([limit, (page - 1) * limit])
 
@@ -108,40 +127,46 @@ async def search_bids(
                 })
 
             # 전체 개수 조회
-            count_query = """
-                SELECT COUNT(*) FROM bid_announcements WHERE 1=1
-            """
-            count_params = []
-
             if q:
-                count_query += " AND (title ILIKE %s OR organization_name ILIKE %s)"
-                count_params.extend([f"%{q}%", f"%{q}%"])
+                count_query = """
+                    SELECT COUNT(DISTINCT b.bid_notice_no)
+                    FROM bid_announcements b
+                    LEFT JOIN bid_tag_relations btr ON b.bid_notice_no = btr.bid_notice_no
+                    LEFT JOIN bid_tags t ON btr.tag_id = t.tag_id
+                    WHERE (b.title ILIKE %s OR b.organization_name ILIKE %s OR t.tag_name ILIKE %s)
+                """
+                count_params = [f"%{q}%", f"%{q}%", f"%{q}%"]
+            else:
+                count_query = """
+                    SELECT COUNT(*) FROM bid_announcements b WHERE 1=1
+                """
+                count_params = []
 
             if start_date:
-                count_query += " AND bid_start_date >= %s"
+                count_query += " AND b.bid_start_date >= %s"
                 count_params.append(start_date)
 
             if end_date:
-                count_query += " AND bid_end_date <= %s"
+                count_query += " AND b.bid_end_date <= %s"
                 count_params.append(end_date)
 
             if min_price is not None:
-                count_query += " AND estimated_price >= %s"
+                count_query += " AND b.estimated_price >= %s"
                 count_params.append(min_price)
 
             if max_price is not None:
-                count_query += " AND estimated_price <= %s"
+                count_query += " AND b.estimated_price <= %s"
                 count_params.append(max_price)
 
             if organization:
-                count_query += " AND organization_name ILIKE %s"
+                count_query += " AND b.organization_name ILIKE %s"
                 count_params.append(f"%{organization}%")
 
             if status:
                 if status == "active":
-                    count_query += " AND bid_end_date >= NOW()"
+                    count_query += " AND b.bid_end_date >= NOW()"
                 elif status == "closed":
-                    count_query += " AND bid_end_date < NOW()"
+                    count_query += " AND b.bid_end_date < NOW()"
 
             cursor.execute(count_query, count_params)
             total = cursor.fetchone()[0]

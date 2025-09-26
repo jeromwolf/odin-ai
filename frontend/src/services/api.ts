@@ -200,8 +200,8 @@ class ApiClient {
   }
 
   async getBidStatistics(period: string = '7d') {
-    const response = await this.client.get('/dashboard/bid-statistics', {
-      params: { period },
+    const response = await this.client.get('/dashboard/statistics', {
+      params: { days: period === '7d' ? 7 : 30 },
     });
     return response.data;
   }

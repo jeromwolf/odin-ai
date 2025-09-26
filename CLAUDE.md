@@ -6,6 +6,103 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **절대 규칙**: 어떤 상황에서도 로그에 개인정보를 남기지 않습니다.
 
+## 🔧 모듈형 개발 방법론 (2025-09-26 추가) - 매우 중요!
+
+### 🎯 핵심 원칙: "한 번에 하나씩, 독립적으로"
+
+#### ❌ 실제 발생한 문제 (2025-09-26)
+- **상황**: 북마크 기능 추가 작업
+- **결과**: 검색 기능까지 작동 불능
+- **원인**: 공통 모듈(api.ts) 수정으로 연쇄 오류 발생
+
+### ✅ 올바른 개발 방법론
+
+#### 1. **기능 추가 시 체크리스트**
+```bash
+□ 1. 현재 작동 중인 기능 목록 작성
+□ 2. Git 브랜치 생성 (feature/bookmark-add)
+□ 3. 영향 범위 분석
+□ 4. 독립 모듈로 개발
+□ 5. 기존 기능 테스트
+□ 6. 문제 없을 시에만 병합
+```
+
+#### 2. **모듈 분리 원칙**
+```
+frontend/
+├── services/
+│   ├── api.ts           # ⚠️ 절대 직접 수정 금지
+│   ├── searchService.ts # 검색 전용
+│   └── bookmarkService.ts # 북마크 전용 (새로 생성)
+```
+
+#### 3. **공통 파일 수정 규칙**
+- **api.ts, App.tsx, types/**: 직접 수정 금지
+- **필요시**: 별도 파일 생성 후 import
+```typescript
+// ❌ 잘못된 방법
+// api.ts 직접 수정
+async getBookmarks() { ... }
+
+// ✅ 올바른 방법
+// bookmarkService.ts 생성
+import apiClient from './api';
+export const bookmarkService = {
+  getBookmarks: () => apiClient.get('/bookmarks')
+}
+```
+
+#### 4. **단계별 개발 프로세스**
+```
+1단계: 백엔드 API 독립 파일로 생성
+2단계: 프론트엔드 서비스 독립 파일로 생성
+3단계: 컴포넌트 독립 생성
+4단계: 라우팅 추가 (App.tsx는 최소 수정)
+5단계: 각 단계마다 기존 기능 테스트
+```
+
+#### 5. **롤백 전략**
+```bash
+# 문제 발생 시 즉시
+git status           # 변경 파일 확인
+git diff            # 변경 내용 확인
+git stash           # 임시 저장
+git checkout -- .   # 전체 되돌리기
+```
+
+#### 6. **의존성 관리**
+```typescript
+// 각 모듈의 의존성을 명확히 표시
+/**
+ * Dependencies:
+ * - apiClient (read-only)
+ * - types/bookmark.types
+ *
+ * Used by:
+ * - pages/Bookmarks.tsx
+ * - components/BookmarkButton.tsx
+ */
+```
+
+### 🚨 절대 하지 말아야 할 것
+1. **여러 기능 동시 작업** - 북마크 + 검색 동시 수정 ❌
+2. **공통 모듈 직접 수정** - api.ts, types/index.ts ❌
+3. **테스트 없이 병합** - 기존 기능 확인 필수 ❌
+4. **큰 단위로 커밋** - 작은 단위로 자주 커밋 ✅
+
+### 📝 개발 전 체크리스트 템플릿
+```markdown
+## 작업: [기능명]
+- [ ] 현재 정상 작동 기능: 검색 ✅, 대시보드 ✅
+- [ ] Git 브랜치 생성: feature/[기능명]
+- [ ] 영향받을 파일 목록:
+- [ ] 독립 모듈 생성 계획:
+- [ ] 테스트 계획:
+- [ ] 롤백 계획:
+```
+
+---
+
 ## ⚠️ 중요한 실수 기록 (2025-09-23)
 
 ### 🚨 **반복되는 치명적 실수: 날짜 설정 오류**
@@ -501,11 +598,19 @@ batch/
 
 #### 🚀 실행 방법
 ```bash
-# 프로덕션 실행
-python batch/production_batch.py
+# ⚠️ 중요: 반드시 가상환경 활성화 필요 (PDF, Excel, DOCX 처리 라이브러리 때문)
+source venv/bin/activate
 
-# 테스트 모드 (DB 초기화 포함)
-TEST_MODE=true python batch/production_batch.py
+# 1. 프로덕션 실행 (기존 데이터 유지하며 신규 데이터만 수집)
+DATABASE_URL="postgresql://blockmeta@localhost:5432/odin_db" python batch/production_batch.py
+
+# 2. DB 초기화 + 전체 재실행 (테이블 데이터 삭제 후 처음부터 수집)
+DB_FILE_INIT=true TEST_MODE=false DATABASE_URL="postgresql://blockmeta@localhost:5432/odin_db" python batch/production_batch.py
+
+# 3. 완전 초기화 (파일 + DB 모두 삭제 후 재실행)
+rm -rf storage/documents/* storage/markdown/*
+source venv/bin/activate
+DB_FILE_INIT=true TEST_MODE=false DATABASE_URL="postgresql://blockmeta@localhost:5432/odin_db" python batch/production_batch.py
 
 # 이메일 설정 (환경변수)
 EMAIL_ENABLED=true
@@ -522,3 +627,41 @@ EMAIL_TO=recipient@example.com
 - **데이터 갱신**: downloader.py, processor.py
 - **읽기 전용**: email_reporter.py
 - **조정 역할**: production_batch.py
+
+## 📝 최근 작업 기록 (2025-09-26)
+
+### ✅ 완료된 작업
+
+#### 🔧 가상환경 활성화 문제 해결
+- **문제**: PDF/Excel/DOCX 파일 처리 실패 (39개 → 23개)
+- **원인**: 배치 실행 시 가상환경 미활성화로 라이브러리 없음
+- **해결**: `source venv/bin/activate` 후 배치 실행
+- **결과**: PDF 처리 100% 성공 (14개 실패 → 0개)
+
+#### 🎨 대시보드 UI 개선
+- **문제**: 카테고리 분포 차트의 레이블 겹침 현상
+- **해결**: 파이차트에 범례 추가, 퍼센트만 차트 내 표시
+- **변경사항**:
+  - 차트 높이 300px → 350px
+  - 범례를 통한 카테고리명과 건수 표시
+  - Tooltip 문법 오류 수정
+
+#### 📊 최종 배치 처리 결과
+- **총 입찰공고**: 469개 수집
+- **문서 처리 성공률**: 93.9% (355/380)
+- **주요 카테고리 분포**:
+  - 건설: 32.8% (349건)
+  - 유지보수: 15.5% (165건)
+  - 물품: 13.8% (147건)
+  - 기계: 9.9% (105건)
+  - 조경: 6.1% (65건)
+
+#### 🔄 배치 프로그램 실행 방법 표준화
+- **중요**: 반드시 가상환경 활성화 필요
+- **완전 초기화**: `rm -rf storage/documents/* storage/markdown/*`
+- **표준 실행**: `source venv/bin/activate && DB_FILE_INIT=true TEST_MODE=false DATABASE_URL="postgresql://blockmeta@localhost:5432/odin_db" python batch/production_batch.py`
+
+### 🎯 다음 작업 예정
+- Excel 파일 처리 개선 (22개 실패)
+- 검색 기능 고도화
+- AI 분석 기능 추가

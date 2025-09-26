@@ -19,7 +19,7 @@ import zipfile
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.database.models import (
-    BidDocument, BidExtractedInfo, BidSchedule,
+    BidAnnouncement, BidDocument, BidExtractedInfo, BidSchedule,
     BidTag, BidTagRelation, BidAttachment
 )
 from src.services.document_processor import DocumentProcessor
@@ -239,21 +239,52 @@ class DocumentProcessorModule:
         text = document.extracted_text.lower()
         tag_count = 0
 
-        # 태그 후보 추출
+        # 태그 후보 추출 - 우선순위와 정확도 개선
         tag_keywords = {
-            '건설': ['건설', '공사', '시공', '건축'],
-            '토목': ['토목', '도로', '교량', '터널'],
-            '전기': ['전기', '전력', '배전', '변압'],
-            '통신': ['통신', '네트워크', 'IT', '정보시스템'],
-            '용역': ['용역', '서비스', '컨설팅', '연구'],
-            '물품': ['물품', '구매', '납품', '조달'],
-            '긴급': ['긴급', '재난', '재해', '응급'],
-            '소프트웨어': ['소프트웨어', 'SW', '프로그램', '시스템']
+            '소프트웨어': ['소프트웨어', 'sw', '프로그램개발', '시스템개발', '앱개발', '웹개발', 'it개발'],
+            '건설': ['건설', '공사', '시공', '건축', '신축', '증축', '개축', '리모델링'],
+            '토목': ['토목', '도로', '교량', '터널', '하천', '항만', '철도', '지하철'],
+            '조경': ['조경', '조성', '공원', '녹지', '수목', '식재', '정원', '환경개선'],
+            '전기': ['전기', '전력', '배전', '변압', '발전', '송전', '수전', '전기설비'],
+            '통신': ['통신', '네트워크', '인터넷', '광케이블', '무선', '유선', '정보통신'],
+            '기계': ['기계', '설비', '장비', '기기', '냉난방', '공조', '승강기', '엘리베이터'],
+            '용역': ['용역', '서비스', '컨설팅', '연구', '조사', '분석', '평가', '감리'],
+            '물품': ['물품', '구매', '납품', '조달', '구입', '제품', '자재', '장비구매'],
+            '유지보수': ['유지보수', '유지관리', '보수', '정비', '점검', '운영', '관리'],
+            '긴급': ['긴급', '재난', '재해', '응급', '복구', '긴급복구', '재해복구']
         }
 
+        # 제목과 본문을 분리하여 가중치 적용
+        title = ""
+        if hasattr(document, 'bid_notice_no'):
+            # 제목 가져오기 (announcement 테이블에서)
+            announcement = self.session.query(BidAnnouncement).filter_by(
+                bid_notice_no=document.bid_notice_no
+            ).first()
+            if announcement and announcement.title:
+                title = announcement.title.lower()
+
+        assigned_tags = []
+
         for tag_name, keywords in tag_keywords.items():
-            # 키워드 존재 확인
-            if any(keyword in text for keyword in keywords):
+            score = 0
+
+            # 제목에서 키워드 확인 (가중치 높음)
+            for keyword in keywords:
+                if keyword in title:
+                    score += 3
+                if keyword in text:
+                    score += 1
+
+            if score > 0:
+                assigned_tags.append((tag_name, score))
+
+        # 점수 기준으로 정렬하고 상위 3개만 선택
+        assigned_tags.sort(key=lambda x: x[1], reverse=True)
+        assigned_tags = assigned_tags[:3]
+
+        tag_count = 0
+        for tag_name, _ in assigned_tags:
                 # 태그 조회 또는 생성
                 tag = self.session.query(BidTag).filter_by(tag_name=tag_name).first()
                 if not tag:

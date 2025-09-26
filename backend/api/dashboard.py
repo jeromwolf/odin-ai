@@ -188,6 +188,13 @@ async def get_dashboard_overview(user: Optional[User] = Depends(get_current_user
             """)
             week_new = cursor.fetchone()[0]
 
+            # 마감 임박 (3일 이내)
+            cursor.execute("""
+                SELECT COUNT(*) FROM bid_announcements
+                WHERE bid_end_date BETWEEN NOW() AND NOW() + INTERVAL '3 days'
+            """)
+            deadline_soon = cursor.fetchone()[0]
+
             # 사용자별 통계 (로그인한 경우)
             user_stats = None
             if user:
@@ -214,6 +221,7 @@ async def get_dashboard_overview(user: Optional[User] = Depends(get_current_user
                 "average_competition_rate": avg_competition_rate,
                 "today_new": today_new,
                 "week_new": week_new,
+                "deadline_soon": deadline_soon,
                 "user_stats": user_stats,
                 "last_updated": datetime.now().isoformat()
             }
@@ -266,10 +274,20 @@ async def get_bid_statistics(
             """)
 
             category_distribution = []
-            for row in cursor.fetchall():
+            total_count = 0
+            rows = cursor.fetchall()
+
+            # 전체 개수 계산
+            for row in rows:
+                total_count += row[1]
+
+            # 퍼센트 계산하여 추가
+            for row in rows:
+                percentage = round((row[1] / total_count * 100), 1) if total_count > 0 else 0
                 category_distribution.append({
                     "category": row[0],
-                    "count": row[1]
+                    "count": row[1],
+                    "percentage": percentage
                 })
 
             # 기관별 TOP 10

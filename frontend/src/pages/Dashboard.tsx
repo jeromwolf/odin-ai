@@ -41,6 +41,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  Legend,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import apiClient from '../services/api';
@@ -108,17 +109,27 @@ const Dashboard: React.FC = () => {
     return 'info';
   };
 
+  const formatTimeRemaining = (hours: number) => {
+    const days = Math.floor(hours / 24);
+    const remainingHours = Math.floor(hours % 24);
+
+    if (days > 0) {
+      return `${days}일 ${remainingHours}시간 남음`;
+    }
+    return `${remainingHours}시간 남음`;
+  };
+
   const statCards: StatCard[] = [
     {
       title: '오늘의 신규 입찰',
-      value: overview?.today_stats?.new_bids || 0,
+      value: overview?.today_new || 0,
       trend: overview?.weekly_trend?.trend_percentage,
       icon: <TrendingUp />,
       color: '#4caf50',
     },
     {
       title: '마감 임박',
-      value: overview?.today_stats?.upcoming_deadlines || 0,
+      value: overview?.deadline_soon || 0,
       icon: <AccessTime />,
       color: '#ff9800',
     },
@@ -238,23 +249,40 @@ const Dashboard: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 2 }}>
               카테고리별 분포
             </Typography>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={350}>
               <PieChart>
                 <Pie
                   data={statistics?.category_distribution?.slice(0, 5) || []}
                   cx="50%"
-                  cy="50%"
+                  cy="45%"
                   labelLine={false}
-                  outerRadius={80}
+                  outerRadius={70}
                   fill="#8884d8"
                   dataKey="count"
-                  label={({ category, percentage }) => `${category} (${percentage}%)`}
+                  label={({ percentage }) => `${percentage}%`}
+                  onClick={(data: any, index: number) => {
+                    // 클릭한 데이터의 카테고리 이름 가져오기
+                    if (data && data.category) {
+                      console.log('Clicked category:', data.category);
+                      // 카테고리 클릭 시 검색 페이지로 이동
+                      navigate(`/search?q=${encodeURIComponent(data.category)}`);
+                    }
+                  }}
                 >
                   {statistics?.category_distribution?.slice(0, 5).map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                      style={{ cursor: 'pointer' }}
+                    />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value: any, name: any, props: any) => [`${value}건`, props.payload.category]} />
+                <Legend
+                  verticalAlign="bottom"
+                  height={36}
+                  formatter={(value, entry: any) => `${entry.payload.category} (${entry.payload.count}건)`}
+                />
               </PieChart>
             </ResponsiveContainer>
           </Paper>
@@ -291,7 +319,7 @@ const Dashboard: React.FC = () => {
                             {bid.organization}
                           </Typography>
                           <Chip
-                            label={`${bid.hours_remaining}시간 남음`}
+                            label={formatTimeRemaining(bid.hours_remaining)}
                             size="small"
                             color={getUrgencyColor(bid.hours_remaining)}
                             sx={{ mt: 0.5 }}

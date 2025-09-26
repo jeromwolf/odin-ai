@@ -11,7 +11,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const BidList = lazy(() => import('./pages/BidList'));
 const BidDetail = lazy(() => import('./pages/BidDetail'));
 const Search = lazy(() => import('./pages/Search'));
-const Bookmarks = lazy(() => import('./pages/Bookmarks'));
+// const Bookmarks = lazy(() => import('./pages/Bookmarks')); // 북마크 페이지 임시 제거
 const Subscription = lazy(() => import('./pages/Subscription'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -52,7 +52,7 @@ const AppRoutes = () => {
             <Route path="/bids" element={<BidList />} />
             <Route path="/bids/:id" element={<BidDetail />} />
             <Route path="/search" element={<Search />} />
-            <Route path="/bookmarks" element={<Bookmarks />} />
+            {/* <Route path="/bookmarks" element={<Bookmarks />} /> 북마크 페이지 임시 제거 */}
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
