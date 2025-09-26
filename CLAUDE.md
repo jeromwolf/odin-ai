@@ -34,6 +34,47 @@ f"inqryEndDt=202510232359&"    # ✅ 2025년 10월 (미래)
 
 ---
 
+## 🔄 배치 프로그램 운영 가이드 (2025-09-26 추가)
+
+### 📊 왜 정기적인 배치가 필요한가?
+- 공공기관들이 **하루 중 언제든** 새 입찰공고를 등록
+- 오전 9시에 39개 → 오전 9시 20분에 42개 (20분만에 3개 추가)
+- API는 실시간으로 새 공고를 반영
+
+### 🚀 권장 배치 스케줄 (하루 3회)
+
+#### 1. **운영 환경 (Production)**
+```bash
+# crontab -e 로 설정
+0 7 * * * cd /path/to/odin-ai && python3 batch/production_batch.py
+0 12 * * * cd /path/to/odin-ai && python3 batch/production_batch.py
+0 18 * * * cd /path/to/odin-ai && python3 batch/production_batch.py
+
+# 또는 환경변수 명시
+0 7,12,18 * * * cd /path/to/odin-ai && DATABASE_URL="postgresql://user@host/db" python3 batch/production_batch.py
+```
+
+#### 2. **테스트 환경 (Development)**
+```bash
+# 스키마 변경, 필드 추가 등 테스트 시에만 사용
+DB_FILE_INIT=true TEST_MODE=false python3 batch/production_batch.py
+
+# 일반 테스트 (증분 업데이트)
+python3 batch/production_batch.py
+```
+
+### ⚠️ DB_FILE_INIT 사용 주의
+- **DB_FILE_INIT=true**: 모든 데이터 삭제 후 재수집 (테스트용)
+- **DB_FILE_INIT=false** 또는 **생략**: 증분 업데이트 (운영용)
+- 운영 환경에서는 **절대 DB_FILE_INIT=true 사용 금지**
+
+### 📈 배치 실행 통계
+- 평균 수집: 40~50개/일 (신규 공고)
+- 처리 시간: 약 5~10분
+- 성공률: HWP 95%, HWPX 90%, PDF 0% (PyPDF2 미설치)
+
+---
+
 ## 📌 개선사항 TODO (2025-09-24)
 
 ### 배치 시스템 개선 필요사항
@@ -55,7 +96,156 @@ f"inqryEndDt=202510232359&"    # ✅ 2025년 10월 (미래)
 
 ---
 
-## Project Context Summary (2025-09-25 업데이트)
+## ⚠️ 데이터 정확성 개선 필요 (2025-09-26 추가)
+
+### 카테고리 및 지역 정보 검증 필요
+- **문제점**: "일반공사"와 "전국"이 기본값으로 너무 자주 나타남
+- **원인**:
+  - 문서 파싱 시 정확한 카테고리 추출 실패
+  - 지역제한 정보가 명시되지 않은 경우 "전국"으로 기본 설정
+- **개선 필요사항**:
+  - 더 정교한 패턴 매칭 알고리즘 개발
+  - 문서 내 실제 카테고리 정보 위치 파악
+  - 지역제한 정보 추출 로직 개선
+  - 신뢰도 점수 시스템 도입 고려
+
+---
+
+## 🏷️ 태그 알고리즘 개선 계획 (2025-09-26 추가)
+
+### 발견된 문제점 (2025-09-26)
+- **현상**: 건설공사에 "소프트웨어" 태그가 잘못 붙음
+- **원인**: 오래된/다른 태그 생성 시스템에서 잘못된 매핑
+- **대응**: 20개 잘못된 태그 자동 제거 완료 ✅
+
+### 태그 알고리즘 고도화 필요사항
+
+#### 🔴 우선순위 1: 컨텍스트 기반 태그 생성
+```python
+# 현재 문제점: 단순 키워드 매칭
+'IT': ['시스템', '소프트웨어', 'SW', '개발', '구축', '프로그램']
+
+# 개선안: 컨텍스트 고려한 매칭
+def smart_tag_matching(title, content):
+    if "시스템" in title:
+        if any(word in title for word in ["공사", "건설", "시공"]):
+            return "건설"  # "시설관리시스템 공사" → 건설
+        elif any(word in title for word in ["개발", "구축", "SW"]):
+            return "IT"    # "정보시스템 개발" → IT
+```
+
+#### 🟡 우선순위 2: 신뢰도 점수 시스템
+- 태그별 매칭 확신도 점수 (0.0-1.0)
+- 여러 카테고리 후보 중 가장 높은 점수 선택
+- 불확실한 경우 수동 검토 플래그 설정
+
+#### 🟡 우선순위 3: 학습 기반 태그 개선
+- 사용자 피드백 수집 (태그 수정/삭제)
+- 잘못된 태그 패턴 학습 및 방지
+- 정기적인 태그 품질 검증
+
+#### 🟢 우선순위 4: 고급 태그 기능
+- 계층형 태그 (건설 > 토목 > 도로)
+- 동의어 태그 처리 (SW = 소프트웨어)
+- 시간에 따른 태그 트렌드 분석
+
+### 개선 작업 계획
+1. **Phase 1**: 컨텍스트 기반 매칭 로직 개발
+2. **Phase 2**: 신뢰도 점수 시스템 구현
+3. **Phase 3**: 사용자 피드백 기반 학습 시스템
+4. **Phase 4**: 태그 품질 모니터링 대시보드
+
+### 기술적 구현 방안
+```python
+class SmartTagGenerator:
+    def __init__(self):
+        self.context_rules = self._load_context_rules()
+        self.confidence_model = self._load_confidence_model()
+
+    def generate_tags_with_confidence(self, announcement):
+        candidate_tags = self._extract_candidate_tags(announcement)
+
+        for tag in candidate_tags:
+            confidence = self._calculate_confidence(tag, announcement)
+            if confidence > 0.8:
+                return tag
+            elif confidence > 0.5:
+                # 수동 검토 필요
+                return tag + "_REVIEW"
+
+        return "기타"  # 기본값
+```
+
+---
+
+## 📈 대시보드 및 검색 시스템 고도화 (2025-09-26 완료)
+
+### ✅ 완료된 주요 기능들
+
+#### 🔧 대시보드 차트 데이터 연동 및 개선
+- ✅ **주간 입찰 트렌드 차트**: 실제 데이터베이스 데이터로 연동 완료
+- ✅ **카테고리별 분포 차트**: 태그 기반 실시간 카테고리 통계 표시
+- ✅ **시간 표시 개선**: "96.2시간 남음" → "4일 0시간 남음" 형태로 개선
+- ✅ **차트 클릭 기능**: 카테고리 클릭 시 해당 카테고리 검색 페이지로 자동 이동
+
+#### 🔍 검색 시스템 품질 개선
+- ✅ **태그 기반 검색 강화**: 제목, 기관명, 태그를 모두 포함한 통합 검색
+- ✅ **잘못된 태그 정리**: 건설공사에 붙은 "소프트웨어" 태그 20개 자동 제거
+- ✅ **카테고리 일관성**: 차트 분포와 검색 결과 완전 일치
+- ✅ **URL 기반 검색**: 쿼리 파라미터 지원으로 뒤로가기/새로고침 가능
+
+#### 🎯 UX/UI 개선사항
+- ✅ **직관적 네비게이션**: 대시보드 → 검색 원클릭 이동
+- ✅ **시각적 힌트**: "💡 카테고리를 클릭하여 해당 항목 검색하기" 안내
+- ✅ **반응형 인터페이스**: 클릭 가능한 요소 cursor: pointer 적용
+
+### 🛠️ 기술적 구현 세부사항
+
+#### 대시보드 차트 클릭 기능
+```typescript
+const handleCategoryClick = (category: string) => {
+  navigate(`/search?q=${encodeURIComponent(category)}`);
+};
+
+// PieChart onClick 이벤트
+onClick={(data) => {
+  if (data && data.category) {
+    handleCategoryClick(data.category);
+  }
+}}
+```
+
+#### 검색 페이지 URL 파라미터 처리
+```typescript
+useEffect(() => {
+  const searchParams = new URLSearchParams(location.search);
+  const queryParam = searchParams.get('q');
+  if (queryParam) {
+    setSearchQuery(queryParam);
+    executeSearch(queryParam);
+  }
+}, [location.search]);
+```
+
+#### 태그 데이터 정리 스크립트
+- 건설/공사 키워드가 있는 입찰에서 "소프트웨어" 태그 자동 제거
+- 정규식 기반 컨텍스트 분석으로 잘못된 분류 감지
+- 27건 → 7건으로 "소프트웨어" 카테고리 정제
+
+### 📊 개선된 사용자 플로우
+```
+대시보드 카테고리 차트 → 특정 카테고리 클릭 →
+자동으로 /search?q=카테고리명 이동 → 해당 카테고리 입찰 결과 표시
+```
+
+### 🎯 다음 우선순위 작업
+1. **알림등록 화면 작업** - 사용자 맞춤 알림 설정
+2. **북마크 기능 구현** - 관심 입찰 저장 및 관리
+3. **AI 매칭 기능 구현** - 개인화된 입찰 추천
+
+---
+
+## Project Context Summary (2025-09-26 업데이트)
 
 ### 🚀 프로젝트 현황
 - **현재 날짜**: 2025년 9월 25일
