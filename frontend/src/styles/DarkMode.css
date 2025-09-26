@@ -1,0 +1,196 @@
+/* Dark Mode Theme Styles */
+:root {
+  /* Light Mode Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e0e0e0;
+  --text-primary: #212121;
+  --text-secondary: #757575;
+  --text-tertiary: #9e9e9e;
+  --border-color: #e0e0e0;
+  --shadow-light: rgba(0, 0, 0, 0.1);
+  --shadow-medium: rgba(0, 0, 0, 0.15);
+  --accent-primary: #1976d2;
+  --accent-secondary: #42a5f5;
+  --success: #4caf50;
+  --warning: #ff9800;
+  --error: #f44336;
+  --info: #2196f3;
+}
+
+[data-theme="dark"] {
+  /* Dark Mode Colors */
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #2c2c2c;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #808080;
+  --border-color: #404040;
+  --shadow-light: rgba(0, 0, 0, 0.3);
+  --shadow-medium: rgba(0, 0, 0, 0.5);
+  --accent-primary: #90caf9;
+  --accent-secondary: #64b5f6;
+  --success: #66bb6a;
+  --warning: #ffb74d;
+  --error: #ef5350;
+  --info: #42a5f5;
+}
+
+/* Base Styles */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Card Components */
+.MuiCard-root {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.MuiPaper-root {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* AppBar */
+.MuiAppBar-root {
+  background-color: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Inputs */
+.MuiTextField-root input,
+.MuiTextField-root textarea,
+.MuiSelect-root {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.MuiTextField-root label {
+  color: var(--text-secondary);
+}
+
+.MuiInput-underline:before {
+  border-bottom-color: var(--border-color);
+}
+
+/* Tables */
+.MuiTable-root {
+  background-color: var(--bg-secondary);
+}
+
+.MuiTableHead-root {
+  background-color: var(--bg-tertiary);
+}
+
+.MuiTableCell-root {
+  color: var(--text-primary) !important;
+  border-bottom-color: var(--border-color);
+}
+
+.MuiTableRow-root:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Buttons */
+.MuiButton-root {
+  transition: all 0.3s ease;
+}
+
+.MuiButton-containedPrimary {
+  background-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.MuiButton-containedPrimary:hover {
+  background-color: var(--accent-secondary);
+}
+
+/* Chips */
+.MuiChip-root {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+/* Dialogs */
+.MuiDialog-paper {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Charts */
+.recharts-text {
+  fill: var(--text-primary) !important;
+}
+
+.recharts-cartesian-grid line {
+  stroke: var(--border-color) !important;
+}
+
+.recharts-surface {
+  background-color: transparent !important;
+}
+
+/* Scrollbars (Webkit browsers) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  :root,
+  [data-theme="dark"] {
+    font-size: 14px;
+  }
+
+  .MuiCard-root {
+    margin: 8px;
+    padding: 12px;
+  }
+
+  .MuiTable-root {
+    font-size: 0.875rem;
+  }
+}
+
+/* Transition for theme switch */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}

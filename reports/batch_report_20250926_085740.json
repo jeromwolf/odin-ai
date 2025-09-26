@@ -1,0 +1,67 @@
+{
+  "collected": 12,
+  "downloaded": 7,
+  "processed": 7,
+  "failed": 0,
+  "extracted_info": {
+    "requirements": 6,
+    "contract_details": 1
+  },
+  "tags_created": 34,
+  "attachments": 0,
+  "extracted_info_count": 7,
+  "extracted_by_category": {
+    "contract_details": 1,
+    "requirements": 6
+  },
+  "execution_time": 7.057048082351685,
+  "db_stats": {
+    "announcements": 12,
+    "documents": 7,
+    "downloaded": 7,
+    "processed": 7,
+    "extracted_info": 7,
+    "tags": 8
+  },
+  "file_types": {
+    "hwp": 6,
+    "hwpx": 1
+  },
+  "processing_stats": {
+    "completed": 7
+  },
+  "tags": [
+    {
+      "name": "건설",
+      "count": 7
+    },
+    {
+      "name": "소프트웨어",
+      "count": 6
+    },
+    {
+      "name": "긴급",
+      "count": 6
+    },
+    {
+      "name": "물품",
+      "count": 6
+    },
+    {
+      "name": "토목",
+      "count": 4
+    },
+    {
+      "name": "통신",
+      "count": 2
+    },
+    {
+      "name": "전기",
+      "count": 2
+    },
+    {
+      "name": "용역",
+      "count": 1
+    }
+  ]
+}

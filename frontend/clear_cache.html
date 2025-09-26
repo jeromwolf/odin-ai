@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>캐시 클리어</title>
+</head>
+<body>
+    <h2>브라우저 캐시 완전 초기화</h2>
+    <button onclick="clearAll()">모든 데이터 삭제</button>
+    <div id="result"></div>
+
+    <script>
+        function clearAll() {
+            // 모든 localStorage 삭제
+            localStorage.clear();
+
+            // 모든 sessionStorage 삭제
+            sessionStorage.clear();
+
+            // 특정 키들도 개별적으로 삭제
+            const keys = [
+                'odin_ai_token',
+                'odin_ai_refresh_token',
+                'auth_token',
+                'refresh_token',
+                'user',
+                'isAuthenticated'
+            ];
+
+            keys.forEach(key => {
+                localStorage.removeItem(key);
+                sessionStorage.removeItem(key);
+            });
+
+            document.getElementById('result').innerHTML =
+                '<p style="color: green;">✅ 모든 캐시가 삭제되었습니다!</p>' +
+                '<p>이제 <a href="http://localhost:3001/login">로그인 페이지</a>로 이동하세요.</p>';
+        }
+
+        // 페이지 로드 시 현재 저장된 데이터 확인
+        window.onload = function() {
+            console.log('현재 localStorage:', localStorage);
+            console.log('현재 sessionStorage:', sessionStorage);
+
+            const tokens = {
+                'odin_ai_token': localStorage.getItem('odin_ai_token'),
+                'odin_ai_refresh_token': localStorage.getItem('odin_ai_refresh_token')
+            };
+
+            console.log('현재 토큰들:', tokens);
+        }
+    </script>
+</body>
+</html>

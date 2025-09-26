@@ -1,0 +1,2205 @@
+{
+  "total": 348,
+  "passed": 297,
+  "failed": 51,
+  "errors": 0,
+  "skipped": 7,
+  "details": [
+    {
+      "id": "AUTH-001",
+      "name": "JWT 테스트 1",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-002",
+      "name": "JWT 테스트 2",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-003",
+      "name": "JWT 테스트 3",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-004",
+      "name": "JWT 테스트 4",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-005",
+      "name": "JWT 테스트 5",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-006",
+      "name": "사용자 관리 1",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-007",
+      "name": "사용자 관리 2",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-008",
+      "name": "사용자 관리 3",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-009",
+      "name": "사용자 관리 4",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-010",
+      "name": "사용자 관리 5",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-011",
+      "name": "권한 관리 1",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-012",
+      "name": "권한 관리 2",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-013",
+      "name": "권한 관리 3",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-014",
+      "name": "권한 관리 4",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-015",
+      "name": "권한 관리 5",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-016",
+      "name": "보안 기능 1",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-017",
+      "name": "보안 기능 2",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-018",
+      "name": "보안 기능 3",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-019",
+      "name": "보안 기능 4",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-020",
+      "name": "보안 기능 5",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-021",
+      "name": "세션 관리 1",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-022",
+      "name": "세션 관리 2",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-023",
+      "name": "세션 관리 3",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-024",
+      "name": "세션 관리 4",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-025",
+      "name": "세션 관리 5",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-026",
+      "name": "추가 인증 1",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-027",
+      "name": "추가 인증 2",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-028",
+      "name": "추가 인증 3",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-029",
+      "name": "추가 인증 4",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-030",
+      "name": "추가 인증 5",
+      "status": "PASS",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-031",
+      "name": "OAuth2/SSO 1",
+      "status": "SKIP: 미구현",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-032",
+      "name": "OAuth2/SSO 2",
+      "status": "SKIP: 미구현",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-033",
+      "name": "OAuth2/SSO 3",
+      "status": "SKIP: 미구현",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-034",
+      "name": "OAuth2/SSO 4",
+      "status": "SKIP: 미구현",
+      "category": "AUTH"
+    },
+    {
+      "id": "AUTH-035",
+      "name": "OAuth2/SSO 5",
+      "status": "SKIP: 미구현",
+      "category": "AUTH"
+    },
+    {
+      "id": "SEARCH-001",
+      "name": "검색 테스트 1",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-002",
+      "name": "검색 테스트 2",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-003",
+      "name": "검색 테스트 3",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-004",
+      "name": "검색 테스트 4",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-005",
+      "name": "검색 테스트 5",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-006",
+      "name": "검색 테스트 6",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-007",
+      "name": "검색 테스트 7",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-008",
+      "name": "검색 테스트 8",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-009",
+      "name": "검색 테스트 9",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-010",
+      "name": "검색 테스트 10",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-011",
+      "name": "검색 테스트 11",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-012",
+      "name": "검색 테스트 12",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-013",
+      "name": "검색 테스트 13",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-014",
+      "name": "검색 테스트 14",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-015",
+      "name": "검색 테스트 15",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-016",
+      "name": "검색 테스트 16",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-017",
+      "name": "검색 테스트 17",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-018",
+      "name": "검색 테스트 18",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-019",
+      "name": "검색 테스트 19",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-020",
+      "name": "검색 테스트 20",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-021",
+      "name": "검색 테스트 21",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-022",
+      "name": "검색 테스트 22",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-023",
+      "name": "검색 테스트 23",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-024",
+      "name": "검색 테스트 24",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-025",
+      "name": "검색 테스트 25",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-026",
+      "name": "검색 테스트 26",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-027",
+      "name": "검색 테스트 27",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-028",
+      "name": "검색 테스트 28",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-029",
+      "name": "검색 테스트 29",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-030",
+      "name": "검색 테스트 30",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-031",
+      "name": "검색 테스트 31",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-032",
+      "name": "검색 테스트 32",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-033",
+      "name": "검색 테스트 33",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-034",
+      "name": "검색 테스트 34",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-035",
+      "name": "검색 테스트 35",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-036",
+      "name": "검색 테스트 36",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-037",
+      "name": "검색 테스트 37",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-038",
+      "name": "검색 테스트 38",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-039",
+      "name": "검색 테스트 39",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-040",
+      "name": "검색 테스트 40",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-041",
+      "name": "검색 테스트 41",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-042",
+      "name": "검색 테스트 42",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-043",
+      "name": "검색 테스트 43",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-044",
+      "name": "검색 테스트 44",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "SEARCH-045",
+      "name": "검색 테스트 45",
+      "status": "PASS",
+      "category": "SEARCH"
+    },
+    {
+      "id": "BOOKMARK-001",
+      "name": "북마크 추가",
+      "status": "FAIL",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-002",
+      "name": "북마크 중복 방지",
+      "status": "FAIL",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-003",
+      "name": "북마크 삭제",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-004",
+      "name": "북마크 기능 4",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-005",
+      "name": "북마크 기능 5",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-006",
+      "name": "북마크 기능 6",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-007",
+      "name": "북마크 기능 7",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-008",
+      "name": "북마크 기능 8",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-009",
+      "name": "북마크 기능 9",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-010",
+      "name": "북마크 기능 10",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-011",
+      "name": "북마크 기능 11",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-012",
+      "name": "북마크 기능 12",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-013",
+      "name": "북마크 기능 13",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-014",
+      "name": "북마크 기능 14",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-015",
+      "name": "북마크 기능 15",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-016",
+      "name": "북마크 기능 16",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-017",
+      "name": "북마크 기능 17",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-018",
+      "name": "북마크 기능 18",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-019",
+      "name": "북마크 기능 19",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-020",
+      "name": "북마크 기능 20",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-021",
+      "name": "북마크 기능 21",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-022",
+      "name": "북마크 기능 22",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-023",
+      "name": "북마크 기능 23",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-024",
+      "name": "북마크 기능 24",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "BOOKMARK-025",
+      "name": "북마크 기능 25",
+      "status": "PASS",
+      "category": "BOOKMARK"
+    },
+    {
+      "id": "REC-001",
+      "name": "추천 테스트 1",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-002",
+      "name": "추천 테스트 2",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-003",
+      "name": "추천 테스트 3",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-004",
+      "name": "추천 테스트 4",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-005",
+      "name": "추천 테스트 5",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-006",
+      "name": "추천 테스트 6",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-007",
+      "name": "추천 테스트 7",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-008",
+      "name": "추천 테스트 8",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-009",
+      "name": "추천 테스트 9",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-010",
+      "name": "추천 테스트 10",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-011",
+      "name": "추천 테스트 11",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-012",
+      "name": "추천 테스트 12",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-013",
+      "name": "추천 테스트 13",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-014",
+      "name": "추천 테스트 14",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-015",
+      "name": "추천 테스트 15",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-016",
+      "name": "추천 테스트 16",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-017",
+      "name": "추천 테스트 17",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-018",
+      "name": "추천 테스트 18",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-019",
+      "name": "추천 테스트 19",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-020",
+      "name": "추천 테스트 20",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-021",
+      "name": "추천 테스트 21",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-022",
+      "name": "추천 테스트 22",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-023",
+      "name": "추천 테스트 23",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-024",
+      "name": "추천 테스트 24",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-025",
+      "name": "추천 테스트 25",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-026",
+      "name": "추천 테스트 26",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-027",
+      "name": "추천 테스트 27",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-028",
+      "name": "추천 테스트 28",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-029",
+      "name": "추천 테스트 29",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "REC-030",
+      "name": "추천 테스트 30",
+      "status": "FAIL",
+      "category": "REC"
+    },
+    {
+      "id": "DASH-001",
+      "name": "대시보드 1",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-002",
+      "name": "대시보드 2",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-003",
+      "name": "대시보드 3",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-004",
+      "name": "대시보드 4",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-005",
+      "name": "대시보드 5",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-006",
+      "name": "대시보드 6",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-007",
+      "name": "대시보드 7",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-008",
+      "name": "대시보드 8",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-009",
+      "name": "대시보드 9",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-010",
+      "name": "대시보드 10",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-011",
+      "name": "대시보드 11",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-012",
+      "name": "대시보드 12",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-013",
+      "name": "대시보드 13",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-014",
+      "name": "대시보드 14",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-015",
+      "name": "대시보드 15",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-016",
+      "name": "대시보드 16",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-017",
+      "name": "대시보드 17",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-018",
+      "name": "대시보드 18",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-019",
+      "name": "대시보드 19",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "DASH-020",
+      "name": "대시보드 20",
+      "status": "PASS",
+      "category": "DASH"
+    },
+    {
+      "id": "NOTIF-001",
+      "name": "알림 규칙 생성",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-002",
+      "name": "알림 기능 2",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-003",
+      "name": "알림 기능 3",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-004",
+      "name": "알림 기능 4",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-005",
+      "name": "알림 기능 5",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-006",
+      "name": "알림 기능 6",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-007",
+      "name": "알림 기능 7",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-008",
+      "name": "알림 기능 8",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-009",
+      "name": "알림 기능 9",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-010",
+      "name": "알림 기능 10",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-011",
+      "name": "알림 기능 11",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-012",
+      "name": "알림 기능 12",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-013",
+      "name": "알림 기능 13",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-014",
+      "name": "알림 기능 14",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-015",
+      "name": "알림 기능 15",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-016",
+      "name": "알림 기능 16",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-017",
+      "name": "알림 기능 17",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-018",
+      "name": "알림 기능 18",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-019",
+      "name": "WebSocket 알림",
+      "status": "SKIP: WebSocket 미구현",
+      "category": "NOTIF"
+    },
+    {
+      "id": "NOTIF-020",
+      "name": "알림 기능 20",
+      "status": "FAIL",
+      "category": "NOTIF"
+    },
+    {
+      "id": "SUB-001",
+      "name": "구독 테스트 1",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-002",
+      "name": "구독 테스트 2",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-003",
+      "name": "구독 테스트 3",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-004",
+      "name": "구독 테스트 4",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-005",
+      "name": "구독 테스트 5",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-006",
+      "name": "구독 테스트 6",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-007",
+      "name": "구독 테스트 7",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-008",
+      "name": "구독 테스트 8",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-009",
+      "name": "구독 테스트 9",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-010",
+      "name": "구독 테스트 10",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-011",
+      "name": "구독 테스트 11",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-012",
+      "name": "구독 테스트 12",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-013",
+      "name": "구독 테스트 13",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-014",
+      "name": "구독 테스트 14",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-015",
+      "name": "구독 테스트 15",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-016",
+      "name": "구독 테스트 16",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-017",
+      "name": "구독 테스트 17",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-018",
+      "name": "구독 테스트 18",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-019",
+      "name": "구독 테스트 19",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "SUB-020",
+      "name": "구독 테스트 20",
+      "status": "PASS",
+      "category": "SUB"
+    },
+    {
+      "id": "DB-001",
+      "name": "DB 테스트 1",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-002",
+      "name": "DB 테스트 2",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-003",
+      "name": "DB 테스트 3",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-004",
+      "name": "DB 테스트 4",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-005",
+      "name": "DB 테스트 5",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-006",
+      "name": "DB 테스트 6",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-007",
+      "name": "DB 테스트 7",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-008",
+      "name": "DB 테스트 8",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-009",
+      "name": "DB 테스트 9",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-010",
+      "name": "DB 테스트 10",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-011",
+      "name": "DB 테스트 11",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-012",
+      "name": "DB 테스트 12",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-013",
+      "name": "DB 테스트 13",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-014",
+      "name": "DB 테스트 14",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-015",
+      "name": "DB 테스트 15",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-016",
+      "name": "DB 테스트 16",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-017",
+      "name": "DB 테스트 17",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-018",
+      "name": "DB 테스트 18",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-019",
+      "name": "DB 테스트 19",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-020",
+      "name": "DB 테스트 20",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-021",
+      "name": "DB 테스트 21",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-022",
+      "name": "DB 테스트 22",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-023",
+      "name": "DB 테스트 23",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-024",
+      "name": "DB 테스트 24",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "DB-025",
+      "name": "DB 테스트 25",
+      "status": "PASS",
+      "category": "DB"
+    },
+    {
+      "id": "PERF-001",
+      "name": "성능 테스트 1",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-002",
+      "name": "성능 테스트 2",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-003",
+      "name": "성능 테스트 3",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-004",
+      "name": "성능 테스트 4",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-005",
+      "name": "성능 테스트 5",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-006",
+      "name": "성능 테스트 6",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-007",
+      "name": "성능 테스트 7",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-008",
+      "name": "성능 테스트 8",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-009",
+      "name": "성능 테스트 9",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-010",
+      "name": "성능 테스트 10",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-011",
+      "name": "성능 테스트 11",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-012",
+      "name": "성능 테스트 12",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-013",
+      "name": "성능 테스트 13",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-014",
+      "name": "성능 테스트 14",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "PERF-015",
+      "name": "성능 테스트 15",
+      "status": "PASS",
+      "category": "PERF"
+    },
+    {
+      "id": "SEC-001",
+      "name": "보안 테스트 1",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-002",
+      "name": "보안 테스트 2",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-003",
+      "name": "보안 테스트 3",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-004",
+      "name": "보안 테스트 4",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-005",
+      "name": "보안 테스트 5",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-006",
+      "name": "보안 테스트 6",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-007",
+      "name": "보안 테스트 7",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-008",
+      "name": "보안 테스트 8",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-009",
+      "name": "보안 테스트 9",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-010",
+      "name": "보안 테스트 10",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-011",
+      "name": "보안 테스트 11",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-012",
+      "name": "보안 테스트 12",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-013",
+      "name": "보안 테스트 13",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-014",
+      "name": "보안 테스트 14",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "SEC-015",
+      "name": "보안 테스트 15",
+      "status": "PASS",
+      "category": "SEC"
+    },
+    {
+      "id": "DOC-001",
+      "name": "문서 처리 1",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-002",
+      "name": "문서 처리 2",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-003",
+      "name": "문서 처리 3",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-004",
+      "name": "문서 처리 4",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-005",
+      "name": "문서 처리 5",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-006",
+      "name": "문서 처리 6",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-007",
+      "name": "문서 처리 7",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-008",
+      "name": "문서 처리 8",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-009",
+      "name": "문서 처리 9",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-010",
+      "name": "문서 처리 10",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-011",
+      "name": "문서 처리 11",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-012",
+      "name": "문서 처리 12",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-013",
+      "name": "문서 처리 13",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-014",
+      "name": "문서 처리 14",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-015",
+      "name": "문서 처리 15",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-016",
+      "name": "문서 처리 16",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-017",
+      "name": "문서 처리 17",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-018",
+      "name": "문서 처리 18",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-019",
+      "name": "문서 처리 19",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-020",
+      "name": "문서 처리 20",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-021",
+      "name": "문서 처리 21",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-022",
+      "name": "문서 처리 22",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-023",
+      "name": "문서 처리 23",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-024",
+      "name": "문서 처리 24",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "DOC-025",
+      "name": "문서 처리 25",
+      "status": "PASS",
+      "category": "DOC"
+    },
+    {
+      "id": "BATCH-001",
+      "name": "배치 처리 1",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-002",
+      "name": "배치 처리 2",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-003",
+      "name": "배치 처리 3",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-004",
+      "name": "배치 처리 4",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-005",
+      "name": "배치 처리 5",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-006",
+      "name": "배치 처리 6",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-007",
+      "name": "배치 처리 7",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-008",
+      "name": "배치 처리 8",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-009",
+      "name": "배치 처리 9",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-010",
+      "name": "배치 처리 10",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-011",
+      "name": "배치 처리 11",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-012",
+      "name": "배치 처리 12",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-013",
+      "name": "배치 처리 13",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-014",
+      "name": "배치 처리 14",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-015",
+      "name": "배치 처리 15",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-016",
+      "name": "배치 처리 16",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-017",
+      "name": "배치 처리 17",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-018",
+      "name": "배치 처리 18",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-019",
+      "name": "배치 처리 19",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "BATCH-020",
+      "name": "재시도 메커니즘",
+      "status": "PASS",
+      "category": "BATCH"
+    },
+    {
+      "id": "EMAIL-001",
+      "name": "이메일 1",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-002",
+      "name": "이메일 2",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-003",
+      "name": "이메일 3",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-004",
+      "name": "이메일 4",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-005",
+      "name": "이메일 5",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-006",
+      "name": "이메일 6",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-007",
+      "name": "이메일 7",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-008",
+      "name": "이메일 8",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-009",
+      "name": "이메일 9",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-010",
+      "name": "이메일 10",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-011",
+      "name": "이메일 11",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-012",
+      "name": "이메일 12",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-013",
+      "name": "이메일 13",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-014",
+      "name": "이메일 14",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "EMAIL-015",
+      "name": "이메일 15",
+      "status": "PASS",
+      "category": "EMAIL"
+    },
+    {
+      "id": "FILE-001",
+      "name": "파일 처리 1",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-002",
+      "name": "파일 처리 2",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-003",
+      "name": "파일 처리 3",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-004",
+      "name": "파일 처리 4",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-005",
+      "name": "파일 처리 5",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-006",
+      "name": "파일 처리 6",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-007",
+      "name": "파일 처리 7",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-008",
+      "name": "파일 처리 8",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-009",
+      "name": "파일 처리 9",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-010",
+      "name": "파일 처리 10",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-011",
+      "name": "파일 처리 11",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-012",
+      "name": "파일 처리 12",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-013",
+      "name": "파일 처리 13",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-014",
+      "name": "파일 처리 14",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "FILE-015",
+      "name": "파일 처리 15",
+      "status": "PASS",
+      "category": "FILE"
+    },
+    {
+      "id": "INFRA-001",
+      "name": "인프라 1",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-002",
+      "name": "인프라 2",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-003",
+      "name": "인프라 3",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-004",
+      "name": "인프라 4",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-005",
+      "name": "인프라 5",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-006",
+      "name": "인프라 6",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-007",
+      "name": "인프라 7",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-008",
+      "name": "인프라 8",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-009",
+      "name": "인프라 9",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-010",
+      "name": "인프라 10",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-011",
+      "name": "인프라 11",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-012",
+      "name": "인프라 12",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-013",
+      "name": "인프라 13",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-014",
+      "name": "인프라 14",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-015",
+      "name": "인프라 15",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-016",
+      "name": "인프라 16",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-017",
+      "name": "인프라 17",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-018",
+      "name": "인프라 18",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-019",
+      "name": "인프라 19",
+      "status": "PASS",
+      "category": "INFRA"
+    },
+    {
+      "id": "INFRA-020",
+      "name": "캐시 무효화",
+      "status": "SKIP: 미구현",
+      "category": "INFRA"
+    },
+    {
+      "id": "I18N-001",
+      "name": "다국어 1",
+      "status": "PASS",
+      "category": "I18N"
+    },
+    {
+      "id": "I18N-002",
+      "name": "다국어 2",
+      "status": "PASS",
+      "category": "I18N"
+    },
+    {
+      "id": "I18N-003",
+      "name": "다국어 3",
+      "status": "PASS",
+      "category": "I18N"
+    },
+    {
+      "id": "I18N-004",
+      "name": "다국어 4",
+      "status": "PASS",
+      "category": "I18N"
+    },
+    {
+      "id": "I18N-005",
+      "name": "다국어 5",
+      "status": "PASS",
+      "category": "I18N"
+    },
+    {
+      "id": "I18N-006",
+      "name": "다국어 6",
+      "status": "PASS",
+      "category": "I18N"
+    },
+    {
+      "id": "I18N-007",
+      "name": "다국어 7",
+      "status": "PASS",
+      "category": "I18N"
+    },
+    {
+      "id": "I18N-008",
+      "name": "다국어 8",
+      "status": "PASS",
+      "category": "I18N"
+    },
+    {
+      "id": "I18N-009",
+      "name": "다국어 9",
+      "status": "PASS",
+      "category": "I18N"
+    },
+    {
+      "id": "I18N-010",
+      "name": "다국어 10",
+      "status": "PASS",
+      "category": "I18N"
+    }
+  ],
+  "category_results": {
+    "AUTH": {
+      "passed": 30,
+      "total": 35
+    },
+    "SEARCH": {
+      "passed": 45,
+      "total": 45
+    },
+    "BOOKMARK": {
+      "passed": 23,
+      "total": 25
+    },
+    "REC": {
+      "passed": 0,
+      "total": 30
+    },
+    "DASH": {
+      "passed": 20,
+      "total": 20
+    },
+    "NOTIF": {
+      "passed": 0,
+      "total": 20
+    },
+    "SUB": {
+      "passed": 20,
+      "total": 20
+    },
+    "DB": {
+      "passed": 25,
+      "total": 25
+    },
+    "PERF": {
+      "passed": 15,
+      "total": 15
+    },
+    "SEC": {
+      "passed": 15,
+      "total": 15
+    },
+    "DOC": {
+      "passed": 25,
+      "total": 25
+    },
+    "BATCH": {
+      "passed": 20,
+      "total": 20
+    },
+    "EMAIL": {
+      "passed": 15,
+      "total": 15
+    },
+    "FILE": {
+      "passed": 15,
+      "total": 15
+    },
+    "INFRA": {
+      "passed": 19,
+      "total": 20
+    },
+    "I18N": {
+      "passed": 10,
+      "total": 10
+    }
+  }
+}

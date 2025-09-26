@@ -1,0 +1,84 @@
+{
+  "collected": 435,
+  "downloaded": 360,
+  "processed": 319,
+  "failed": 41,
+  "extracted_info": {
+    "contract_details": 28,
+    "prices": 13,
+    "requirements": 305
+  },
+  "tags_created": 948,
+  "attachments": 0,
+  "extracted_info_count": 346,
+  "extracted_by_category": {
+    "contract_details": 28,
+    "prices": 13,
+    "requirements": 305
+  },
+  "execution_time": 336.12281608581543,
+  "db_stats": {
+    "announcements": 435,
+    "documents": 360,
+    "downloaded": 360,
+    "processed": 319,
+    "extracted_info": 346,
+    "tags": 10
+  },
+  "file_types": {
+    "hwp": 295,
+    "hwpx": 24,
+    "pdf": 14,
+    "xlsx": 11,
+    "xls": 10,
+    "docx": 4,
+    "zip": 2
+  },
+  "processing_stats": {
+    "skipped": 2,
+    "failed": 39,
+    "completed": 319
+  },
+  "tags": [
+    {
+      "name": "건설",
+      "count": 313
+    },
+    {
+      "name": "유지보수",
+      "count": 146
+    },
+    {
+      "name": "물품",
+      "count": 131
+    },
+    {
+      "name": "기계",
+      "count": 98
+    },
+    {
+      "name": "조경",
+      "count": 64
+    },
+    {
+      "name": "통신",
+      "count": 50
+    },
+    {
+      "name": "용역",
+      "count": 42
+    },
+    {
+      "name": "토목",
+      "count": 39
+    },
+    {
+      "name": "긴급",
+      "count": 33
+    },
+    {
+      "name": "전기",
+      "count": 32
+    }
+  ]
+}

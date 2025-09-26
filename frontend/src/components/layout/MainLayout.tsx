@@ -27,6 +27,7 @@ import {
   Person,
   Settings,
   Notifications,
+  NotificationsActive,
   Logout,
   ChevronLeft,
 } from '@mui/icons-material';
@@ -37,8 +38,7 @@ const drawerWidth = 240;
 const menuItems = [
   { text: '대시보드', icon: <Dashboard />, path: '/dashboard' },
   { text: '입찰 검색', icon: <Search />, path: '/search' },
-  { text: '입찰 목록', icon: <AccountBalance />, path: '/bids' },
-  { text: '북마크', icon: <Bookmark />, path: '/bookmarks' },
+  { text: '알림 설정', icon: <NotificationsActive />, path: '/notifications' },
   { text: '프로필', icon: <Person />, path: '/profile' },
   { text: '설정', icon: <Settings />, path: '/settings' },
 ];
@@ -126,13 +126,19 @@ const MainLayout: React.FC = () => {
             open={Boolean(anchorEl)}
             onClose={handleMenuClose}
           >
-            <MenuItem onClick={() => handleNavigation('/profile')}>
+            <MenuItem onClick={() => {
+              handleNavigation('/profile');
+              handleMenuClose();
+            }}>
               <ListItemIcon>
                 <Person fontSize="small" />
               </ListItemIcon>
               프로필
             </MenuItem>
-            <MenuItem onClick={() => handleNavigation('/subscription')}>
+            <MenuItem onClick={() => {
+              handleNavigation('/subscription');
+              handleMenuClose();
+            }}>
               <ListItemIcon>
                 <AccountBalance fontSize="small" />
               </ListItemIcon>
