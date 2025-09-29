@@ -5,7 +5,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 from datetime import datetime
-from database import get_db_connection
+from backend.database import get_db_connection
 import logging
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,10 @@ async def search_bids(
                     b.estimated_price,
                     b.bid_start_date,
                     b.bid_end_date,
-                    b.status
+                    b.status,
+                    b.bid_method,
+                    b.contract_method,
+                    b.region_restriction
                 FROM bid_announcements b
             """
 
@@ -66,6 +69,9 @@ async def search_bids(
                         b.bid_start_date,
                         b.bid_end_date,
                         b.status,
+                        b.bid_method,
+                        b.contract_method,
+                        b.region_restriction,
                         b.created_at
                     FROM bid_announcements b
                     LEFT JOIN bid_tag_relations btr ON b.bid_notice_no = btr.bid_notice_no
@@ -115,6 +121,41 @@ async def search_bids(
             results = []
 
             for row in cursor.fetchall():
+                bid_notice_no = row[0]
+
+                # 추출된 정보 가져오기
+                cursor2 = conn.cursor()
+                cursor2.execute("""
+                    SELECT info_category, field_name, field_value
+                    FROM bid_extracted_info
+                    WHERE bid_notice_no = %s
+                    AND info_category IN ('requirements', 'contract_details', 'prices')
+                    LIMIT 5
+                """, (bid_notice_no,))
+                extracted_info = {}
+                for info_row in cursor2.fetchall():
+                    category = info_row[0]
+                    if category not in extracted_info:
+                        extracted_info[category] = {}
+                    extracted_info[category][info_row[1]] = info_row[2]
+
+                # 태그 정보 가져오기
+                cursor2.execute("""
+                    SELECT ARRAY_AGG(t.tag_name)
+                    FROM bid_tags t
+                    JOIN bid_tag_relations btr ON t.tag_id = btr.tag_id
+                    WHERE btr.bid_notice_no = %s
+                """, (bid_notice_no,))
+                tags_result = cursor2.fetchone()
+                tags = tags_result[0] if tags_result and tags_result[0] else []
+
+                # 남은 시간 계산
+                remaining_days = None
+                if row[6]:  # bid_end_date
+                    delta = row[6] - datetime.now()
+                    if delta.total_seconds() > 0:
+                        remaining_days = delta.days
+
                 results.append({
                     "bid_notice_no": row[0],
                     "title": row[1],
@@ -123,7 +164,13 @@ async def search_bids(
                     "estimated_price": row[4],
                     "bid_start_date": row[5].isoformat() if row[5] else None,
                     "bid_end_date": row[6].isoformat() if row[6] else None,
-                    "status": row[7] or ("active" if row[6] and row[6] >= datetime.now() else "closed")
+                    "status": row[7] or ("active" if row[6] and row[6] >= datetime.now() else "closed"),
+                    "bid_method": row[8],
+                    "contract_method": row[9],
+                    "region_restriction": row[10],
+                    "remaining_days": remaining_days,
+                    "tags": tags,
+                    "extracted_info": extracted_info
                 })
 
             # 전체 개수 조회

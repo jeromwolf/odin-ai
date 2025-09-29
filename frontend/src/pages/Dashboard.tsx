@@ -104,44 +104,53 @@ const Dashboard: React.FC = () => {
   };
 
   const getUrgencyColor = (hours: number) => {
+    // NaN 또는 undefined/null 체크
+    if (!hours || isNaN(hours)) {
+      return 'default';
+    }
     if (hours <= 24) return 'error';
     if (hours <= 72) return 'warning';
     return 'info';
   };
 
   const formatTimeRemaining = (hours: number) => {
+    // NaN 또는 undefined/null 체크
+    if (!hours || isNaN(hours)) {
+      return '시간 정보 없음';
+    }
+
     const days = Math.floor(hours / 24);
     const remainingHours = Math.floor(hours % 24);
 
     if (days > 0) {
       return `${days}일 ${remainingHours}시간 남음`;
     }
-    return `${remainingHours}시간 남음`;
+    return `${Math.floor(hours)}시간 남음`;
   };
 
   const statCards: StatCard[] = [
     {
       title: '오늘의 신규 입찰',
-      value: overview?.today_new || 0,
-      trend: overview?.weekly_trend?.trend_percentage,
+      value: overview?.activeBids || 0,
+      trend: 5,
       icon: <TrendingUp />,
       color: '#4caf50',
     },
     {
       title: '마감 임박',
-      value: overview?.deadline_soon || 0,
+      value: deadlines?.data?.length || 0,
       icon: <AccessTime />,
       color: '#ff9800',
     },
     {
       title: '북마크',
-      value: overview?.today_stats?.bookmarks || 0,
+      value: bookmarkedBids.size || 0,
       icon: <Bookmark />,
       color: '#2196f3',
     },
     {
       title: 'AI 매칭',
-      value: overview?.today_stats?.matched_bids || 0,
+      value: recommendations?.data?.length || 0,
       icon: <Business />,
       color: '#9c27b0',
     },
@@ -259,7 +268,7 @@ const Dashboard: React.FC = () => {
                   outerRadius={70}
                   fill="#8884d8"
                   dataKey="count"
-                  label={({ percentage }) => `${percentage}%`}
+                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   onClick={(data: any, index: number) => {
                     // 클릭한 데이터의 카테고리 이름 가져오기
                     if (data && data.category) {

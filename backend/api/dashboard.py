@@ -5,8 +5,8 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
-from database import get_db_connection
-from auth.dependencies import get_current_user_optional, get_current_user, User
+from backend.database import get_db_connection
+from backend.auth.dependencies import get_current_user_optional, get_current_user, User
 import logging
 
 logger = logging.getLogger(__name__)
@@ -94,6 +94,70 @@ async def get_total_price(user: User = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"총 예정가격 조회 실패: {e}")
         raise HTTPException(status_code=500, detail="총 예정가격 조회 실패")
+
+
+@router.get("/statistics")
+async def get_dashboard_statistics(days: int = Query(7, ge=1, le=30)):
+    """대시보드 통계 데이터 (차트용)"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # 1. 일별 입찰 통계 (최근 N일)
+            cursor.execute("""
+                SELECT
+                    DATE(created_at) as date,
+                    COUNT(*) as count
+                FROM bid_announcements
+                WHERE created_at >= CURRENT_DATE - INTERVAL '%s days'
+                GROUP BY DATE(created_at)
+                ORDER BY date ASC
+            """, (days,))
+
+            daily_stats = []
+            for row in cursor.fetchall():
+                daily_stats.append({
+                    "date": row[0].isoformat(),
+                    "count": row[1]
+                })
+
+            # 2. 카테고리별 분포 (태그 기반)
+            cursor.execute("""
+                SELECT
+                    t.tag_name as category,
+                    COUNT(DISTINCT btr.bid_notice_no) as count
+                FROM bid_tags t
+                JOIN bid_tag_relations btr ON t.tag_id = btr.tag_id
+                JOIN bid_announcements b ON btr.bid_notice_no = b.bid_notice_no
+                WHERE b.created_at >= CURRENT_DATE - INTERVAL '%s days'
+                GROUP BY t.tag_name
+                ORDER BY count DESC
+                LIMIT 10
+            """, (days,))
+
+            category_distribution = []
+            for row in cursor.fetchall():
+                category_distribution.append({
+                    "category": row[0],
+                    "count": row[1],
+                    "percentage": 0  # 계산은 프론트에서
+                })
+
+            # 퍼센트 계산
+            total = sum(item["count"] for item in category_distribution)
+            if total > 0:
+                for item in category_distribution:
+                    item["percentage"] = round((item["count"] / total) * 100, 1)
+
+            return {
+                "daily_stats": daily_stats,
+                "category_distribution": category_distribution,
+                "period_days": days
+            }
+
+    except Exception as e:
+        logger.error(f"통계 데이터 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail="통계 데이터 조회 실패")
 
 
 @router.get("/closed-bids")
@@ -418,6 +482,7 @@ async def get_approaching_deadlines(
                     deadline["is_bookmarked"] = deadline["bid_id"] in bookmarked_ids
 
             return {
+                "data": deadlines,  # 프론트엔드가 data 필드를 기대함
                 "deadlines": deadlines,
                 "total": len(deadlines),
                 "filter": {

@@ -40,7 +40,7 @@ app.add_middleware(
 
 # 검색 라우터 추가
 try:
-    from api.search import router as search_router
+    from backend.api.search import router as search_router
     app.include_router(search_router)
     print("✅ 검색 API 라우터 등록됨")
 except ImportError as e:
@@ -48,7 +48,7 @@ except ImportError as e:
 
 # 인증 라우터 추가
 try:
-    from api.auth import router as auth_router
+    from backend.api.auth import router as auth_router
     app.include_router(auth_router)
     print("✅ 인증 API 라우터 등록됨")
 except ImportError as e:
@@ -56,7 +56,7 @@ except ImportError as e:
 
 # 북마크 라우터 임포트 및 추가
 try:
-    from api.bookmarks import router as bookmarks_router
+    from backend.api.bookmarks import router as bookmarks_router
     app.include_router(bookmarks_router)
     print("✅ 북마크 API 라우터 등록됨")
 except ImportError as e:
@@ -64,7 +64,7 @@ except ImportError as e:
 
 # 대시보드 라우터 추가
 try:
-    from api.dashboard import router as dashboard_router
+    from backend.api.dashboard import router as dashboard_router
     app.include_router(dashboard_router)
     print("✅ 대시보드 API 라우터 등록됨")
 except ImportError as e:
@@ -72,7 +72,7 @@ except ImportError as e:
 
 # 구독 라우터 추가
 try:
-    from api.subscription import router as subscription_router
+    from backend.api.subscription import router as subscription_router
     app.include_router(subscription_router)
     print("✅ 구독 API 라우터 등록됨")
 except ImportError as e:
@@ -80,7 +80,7 @@ except ImportError as e:
 
 # 결제 라우터 추가
 try:
-    from api.payments import router as payments_router
+    from backend.api.payments import router as payments_router
     app.include_router(payments_router)
     print("✅ 결제 API 라우터 등록됨")
 except ImportError as e:
@@ -88,7 +88,7 @@ except ImportError as e:
 
 # 알림 라우터 추가
 try:
-    from api.notifications import router as notifications_router
+    from backend.api.notifications import router as notifications_router
     app.include_router(notifications_router)
     print("✅ 알림 API 라우터 등록됨")
 except ImportError as e:
@@ -96,7 +96,7 @@ except ImportError as e:
 
 # AI 추천 라우터 추가
 try:
-    from api.recommendations import router as recommendations_router
+    from backend.api.recommendations import router as recommendations_router
     app.include_router(recommendations_router, prefix="/api/recommendations", tags=["recommendations"])
     print("✅ AI 추천 API 라우터 등록됨")
 except ImportError as e:
@@ -272,50 +272,115 @@ async def bid_statistics(period: str = "7d"):
 
 @app.get("/api/dashboard/deadlines")
 async def upcoming_deadlines(days: int = 7):
-    """마감 임박 입찰 - 실제 DB 데이터"""
+    """마감 임박 입찰 - 실제 DB 데이터 (hours_remaining 포함)"""
     conn = get_db_connection()
     if conn:
         try:
             cur = conn.cursor()
 
-            # 마감 임박 입찰 조회 (오늘부터 n일 이내)
+            # 마감 임박 입찰 조회 (오늘부터 n일 이내) - hours_remaining 추가
             cur.execute("""
                 SELECT
                     bid_notice_no as id,
                     title,
                     bid_end_date as deadline,
                     organization_name as organization,
-                    estimated_price as amount
+                    estimated_price as amount,
+                    EXTRACT(EPOCH FROM (bid_end_date - NOW())) / 3600 as hours_remaining
                 FROM bid_announcements
-                WHERE bid_end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '%s days'
+                WHERE bid_end_date BETWEEN NOW() AND NOW() + INTERVAL %s
                 ORDER BY bid_end_date ASC
                 LIMIT 10
-            """, (days,))
+            """, (f'{days} days',))
 
-            deadlines = cur.fetchall()
+            deadlines = []
+            for row in cur.fetchall():
+                hours = row['hours_remaining'] if row['hours_remaining'] else 0
+                deadlines.append({
+                    "id": row['id'],
+                    "title": row['title'],
+                    "deadline": row['deadline'],
+                    "organization": row['organization'],
+                    "amount": row['amount'],
+                    "hours_remaining": round(hours, 1) if hours else 0
+                })
 
             cur.close()
             conn.close()
 
-            return {"deadlines": deadlines}
+            return {"deadlines": deadlines, "data": deadlines}
 
         except Exception as e:
+            import traceback
             print(f"마감임박 조회 에러: {e}")
+            print(f"에러 타입: {type(e)}")
+            traceback.print_exc()
             if conn:
                 conn.close()
+            return {"deadlines": [], "data": []}
 
-    # DB 연결 실패 시 더미 데이터
-    return {
-        "deadlines": [
-            {
-                "id": "bid-001",
-                "title": "소프트웨어 개발 용역",
-                "deadline": "2025-09-26T14:00:00Z",
-                "organization": "서울특별시",
-                "amount": 50000000
+@app.get("/api/dashboard/statistics")
+async def bid_statistics(days: int = 7):
+    """입찰 통계 데이터 - 차트용"""
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+
+            # 1. 일별 입찰 건수 (최근 7일)
+            cur.execute("""
+                SELECT
+                    DATE(created_at) as date,
+                    COUNT(*) as count
+                FROM bid_announcements
+                WHERE created_at >= CURRENT_DATE - INTERVAL %s
+                GROUP BY DATE(created_at)
+                ORDER BY date ASC
+            """, (f'{days} days',))
+
+            daily_stats = []
+            for row in cur.fetchall():
+                daily_stats.append({
+                    "date": row['date'].isoformat() if row['date'] else None,
+                    "count": row['count']
+                })
+
+            # 2. 카테고리별 분포 (태그 기반)
+            cur.execute("""
+                SELECT
+                    bt.tag_name as category,
+                    COUNT(DISTINCT btr.bid_notice_no) as count
+                FROM bid_tags bt
+                JOIN bid_tag_relations btr ON bt.tag_id = btr.tag_id
+                GROUP BY bt.tag_name
+                ORDER BY count DESC
+                LIMIT 10
+            """)
+
+            category_distribution = []
+            for row in cur.fetchall():
+                category_distribution.append({
+                    "category": row['category'],
+                    "count": row['count']
+                })
+
+            cur.close()
+            conn.close()
+
+            return {
+                "daily_stats": daily_stats,
+                "category_distribution": category_distribution
             }
-        ]
-    }
+
+        except Exception as e:
+            print(f"통계 조회 에러: {e}")
+            import traceback
+            traceback.print_exc()
+            if conn:
+                conn.close()
+            return {"daily_stats": [], "category_distribution": []}
+
+    return {"daily_stats": [], "category_distribution": []}
 
 @app.get("/api/dashboard/recommendations")
 async def recommendations(limit: int = 5):
