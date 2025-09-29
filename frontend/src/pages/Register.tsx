@@ -93,21 +93,35 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // 백엔드 API 스키마에 맞게 데이터 변환
       await registerUser({
         email: data.email,
         password: data.password,
-        name: data.name,
+        username: data.email.split('@')[0], // 이메일에서 사용자명 생성
+        full_name: data.name,
         company: data.company,
-        phone: data.phone,
+        phone_number: data.phone,
         marketing_consent: data.agreeMarketing,
       });
       navigate('/dashboard');
     } catch (err: any) {
-      setError(
-        err.response?.data?.detail ||
-        err.message ||
-        '회원가입에 실패했습니다. 다시 시도해주세요.'
-      );
+      console.error('Registration error:', err);
+
+      // 에러 메시지 안전하게 추출
+      let errorMessage = '회원가입에 실패했습니다. 다시 시도해주세요.';
+
+      if (err.response?.data?.detail) {
+        if (typeof err.response.data.detail === 'string') {
+          errorMessage = err.response.data.detail;
+        } else if (Array.isArray(err.response.data.detail)) {
+          // FastAPI validation 에러 배열 처리
+          errorMessage = err.response.data.detail.map((e: any) => e.msg || e.message || '입력값을 확인해주세요').join(', ');
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

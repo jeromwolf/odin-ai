@@ -46,7 +46,7 @@ const menuItems = [
 
 const MainLayout: React.FC = () => {
   const [open, setOpen] = useState(true);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
@@ -63,7 +63,13 @@ const MainLayout: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await logout();
+    console.log('로그아웃 버튼 클릭됨');
+    try {
+      await logout();
+      console.log('로그아웃 성공');
+    } catch (error) {
+      console.error('로그아웃 에러:', error);
+    }
     handleMenuClose();
   };
 
@@ -126,6 +132,35 @@ const MainLayout: React.FC = () => {
             anchorEl={anchorEl}
             open={Boolean(anchorEl)}
             onClose={handleMenuClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+            slotProps={{
+              paper: {
+                sx: {
+                  overflow: 'visible',
+                  filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                  mt: 1.5,
+                  '&:before': {
+                    content: '""',
+                    display: 'block',
+                    position: 'absolute',
+                    top: 0,
+                    right: 14,
+                    width: 10,
+                    height: 10,
+                    bgcolor: 'background.paper',
+                    transform: 'translateY(-50%) rotate(45deg)',
+                    zIndex: 0,
+                  },
+                },
+              }
+            }}
           >
             <MenuItem onClick={() => {
               handleNavigation('/profile');

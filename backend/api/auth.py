@@ -16,7 +16,7 @@ from auth.security import (
     create_email_verification_token,
     decode_token
 )
-from auth.dependencies import get_current_user, User
+from auth.dependencies import get_current_user, get_current_user_optional, User
 
 logger = logging.getLogger(__name__)
 
@@ -316,29 +316,29 @@ async def refresh_token(token_data: TokenRefresh):
 
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_user)):
+async def logout(current_user: User = Depends(get_current_user_optional)):
     """로그아웃"""
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
+        # 토큰이 유효하지 않아도 로그아웃 성공으로 처리 (클라이언트에서 토큰 제거 필요)
+        if current_user:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
 
-            # 모든 세션 비활성화
-            query = """
-                UPDATE user_sessions
-                SET is_active = false
-                WHERE user_id = %s AND is_active = true
-            """
-            cursor.execute(query, (current_user.id,))
-            conn.commit()
+                # 모든 세션 비활성화
+                query = """
+                    UPDATE user_sessions
+                    SET is_active = false
+                    WHERE user_id = %s AND is_active = true
+                """
+                cursor.execute(query, (current_user.id,))
+                conn.commit()
 
-            return {"message": "로그아웃되었습니다"}
+        return {"message": "로그아웃되었습니다"}
 
     except Exception as e:
         logger.error(f"로그아웃 실패: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="로그아웃 처리 중 오류가 발생했습니다"
-        )
+        # 로그아웃은 실패해도 성공으로 처리 (클라이언트에서 토큰 제거해야 함)
+        return {"message": "로그아웃되었습니다"}
 
 
 @router.get("/me", response_model=UserResponse)

@@ -27,7 +27,7 @@ import {
   Business,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   LineChart,
   Line,
@@ -58,6 +58,7 @@ interface StatCard {
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [bookmarkedBids, setBookmarkedBids] = useState<Set<string>>(new Set());
 
   // 대시보드 개요 데이터
@@ -85,23 +86,25 @@ const Dashboard: React.FC = () => {
     queryFn: () => apiClient.getRecommendedBids(5),
   });
 
-  const handleBookmarkToggle = async (bidId: string) => {
-    try {
-      if (bookmarkedBids.has(bidId)) {
-        await apiClient.removeBookmark(bidId);
-        setBookmarkedBids((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(bidId);
-          return newSet;
-        });
-      } else {
-        await apiClient.addBookmark(bidId);
-        setBookmarkedBids((prev) => new Set(prev).add(bidId));
-      }
-    } catch (error) {
-      console.error('북마크 처리 실패:', error);
+  // 북마크 데이터
+  const { data: bookmarks } = useQuery({
+    queryKey: ['bookmarks'],
+    queryFn: () => apiClient.getBookmarks(),
+    staleTime: 10000, // 10초간 캐시 유지 (적절한 밸런스)
+    // refetchOnWindowFocus는 전역 설정(true) 사용
+    // refetchOnMount는 기본값(true) 사용
+  });
+
+  // 북마크 데이터가 로드되면 로컬 상태 동기화
+  useEffect(() => {
+    if (bookmarks && Array.isArray(bookmarks)) {
+      const bookmarkSet = new Set(
+        bookmarks.map((bookmark: any) => bookmark.bid_notice_no)
+      );
+      setBookmarkedBids(bookmarkSet);
     }
-  };
+  }, [bookmarks]);
+
 
   const getUrgencyColor = (hours: number) => {
     // NaN 또는 undefined/null 체크
@@ -336,21 +339,6 @@ const Dashboard: React.FC = () => {
                         </Box>
                       }
                     />
-                    <ListItemSecondaryAction>
-                      <IconButton
-                        edge="end"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBookmarkToggle(bid.bid_id);
-                        }}
-                      >
-                        {bid.is_bookmarked || bookmarkedBids.has(bid.bid_id) ? (
-                          <Bookmark color="primary" />
-                        ) : (
-                          <BookmarkBorder />
-                        )}
-                      </IconButton>
-                    </ListItemSecondaryAction>
                   </ListItem>
                 ))}
               </List>
@@ -398,21 +386,6 @@ const Dashboard: React.FC = () => {
                         </Box>
                       }
                     />
-                    <ListItemSecondaryAction>
-                      <IconButton
-                        edge="end"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBookmarkToggle(bid.bid_id);
-                        }}
-                      >
-                        {bid.is_bookmarked || bookmarkedBids.has(bid.bid_id) ? (
-                          <Bookmark color="primary" />
-                        ) : (
-                          <BookmarkBorder />
-                        )}
-                      </IconButton>
-                    </ListItemSecondaryAction>
                   </ListItem>
                 ))}
               </List>

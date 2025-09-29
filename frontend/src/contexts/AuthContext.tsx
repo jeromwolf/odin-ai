@@ -80,13 +80,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async () => {
+    console.log('AuthContext logout 호출됨');
+
+    // 토큰 존재 여부 확인
+    const token = localStorage.getItem('odin_ai_token');
+    console.log('현재 토큰:', token ? '존재함' : '없음');
+
     try {
-      await apiClient.logout();
+      if (token) {
+        console.log('API 로그아웃 요청 시작');
+        await apiClient.logout();
+        console.log('API 로그아웃 성공');
+      } else {
+        console.log('토큰이 없어 API 호출 스킵');
+      }
     } catch (error) {
       console.error('로그아웃 실패:', error);
+      // 401 에러든 다른 에러든 상관없이 로컬 상태는 정리
+      console.log('에러 발생했지만 로컬 상태 정리 진행');
     } finally {
+      console.log('로그아웃 후처리 시작');
       setUser(null);
       setIsAuthenticated(false);
+      // 토큰들 수동 제거
+      localStorage.removeItem('odin_ai_token');
+      localStorage.removeItem('odin_ai_refresh_token');
+      console.log('로그인 페이지로 리다이렉트');
       window.location.href = '/login';
     }
   };

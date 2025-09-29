@@ -17,7 +17,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true, // 탭 포커스 시 자동 새로고침 활성화
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5분
       gcTime: 10 * 60 * 1000, // 10분 (이전 cacheTime)

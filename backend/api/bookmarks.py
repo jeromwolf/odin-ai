@@ -7,6 +7,7 @@ from typing import List, Optional
 from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from auth.dependencies import get_current_user_optional
 
 router = APIRouter(prefix="/api/bookmarks", tags=["Bookmarks"])
 
@@ -30,8 +31,11 @@ class BookmarkCreate(BaseModel):
     note: Optional[str] = None
 
 @router.get("")
-async def get_bookmarks(user_id: str = "100"):
+async def get_bookmarks(current_user = Depends(get_current_user_optional)):
     """사용자의 북마크 목록 조회"""
+    # JWT 토큰에서 사용자 ID 추출, 없으면 기본값 100 사용 (개발용)
+    user_id = current_user.id if current_user else "100"
+
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -99,8 +103,11 @@ async def get_bookmarks(user_id: str = "100"):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{bid_notice_no}")
-async def add_bookmark(bid_notice_no: str, user_id: str = "100"):
+async def add_bookmark(bid_notice_no: str, current_user = Depends(get_current_user_optional)):
     """북마크 추가"""
+    # JWT 토큰에서 사용자 ID 추출, 없으면 기본값 100 사용 (개발용)
+    user_id = current_user.id if current_user else "100"
+
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -111,8 +118,8 @@ async def add_bookmark(bid_notice_no: str, user_id: str = "100"):
         # 이미 북마크가 있는지 확인
         cur.execute("""
             SELECT id FROM user_bookmarks
-            WHERE user_id = %s AND bid_notice_no = %s
-        """, (user_id, bid_notice_no))
+            WHERE user_id = %s AND (bid_id = %s OR bid_notice_no = %s)
+        """, (user_id, bid_notice_no, bid_notice_no))
 
         existing = cur.fetchone()
 
@@ -121,12 +128,12 @@ async def add_bookmark(bid_notice_no: str, user_id: str = "100"):
             conn.close()
             return {"message": "이미 북마크되어 있습니다.", "id": existing['id']}
 
-        # 북마크 추가
+        # 북마크 추가 - bid_id와 bid_notice_no 모두 설정
         cur.execute("""
-            INSERT INTO user_bookmarks (user_id, bid_notice_no, created_at)
-            VALUES (%s, %s, NOW())
+            INSERT INTO user_bookmarks (user_id, bid_id, bid_notice_no, created_at)
+            VALUES (%s, %s, %s, NOW())
             RETURNING id
-        """, (user_id, bid_notice_no))
+        """, (user_id, bid_notice_no, bid_notice_no))
 
         bookmark_id = cur.fetchone()['id']
         conn.commit()
@@ -147,8 +154,11 @@ async def add_bookmark(bid_notice_no: str, user_id: str = "100"):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{bid_notice_no}")
-async def remove_bookmark(bid_notice_no: str, user_id: str = "100"):
+async def remove_bookmark(bid_notice_no: str, current_user = Depends(get_current_user_optional)):
     """북마크 삭제"""
+    # JWT 토큰에서 사용자 ID 추출, 없으면 기본값 100 사용 (개발용)
+    user_id = current_user.id if current_user else "100"
+
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -159,9 +169,9 @@ async def remove_bookmark(bid_notice_no: str, user_id: str = "100"):
         # 북마크 삭제
         cur.execute("""
             DELETE FROM user_bookmarks
-            WHERE user_id = %s AND bid_notice_no = %s
+            WHERE user_id = %s AND (bid_id = %s OR bid_notice_no = %s)
             RETURNING id
-        """, (user_id, bid_notice_no))
+        """, (user_id, bid_notice_no, bid_notice_no))
 
         deleted = cur.fetchone()
 
@@ -187,8 +197,11 @@ async def remove_bookmark(bid_notice_no: str, user_id: str = "100"):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{bid_notice_no}/note")
-async def update_bookmark_note(bid_notice_no: str, note: str, user_id: str = "100"):
+async def update_bookmark_note(bid_notice_no: str, note: str, current_user = Depends(get_current_user_optional)):
     """북마크 메모 업데이트"""
+    # JWT 토큰에서 사용자 ID 추출, 없으면 기본값 100 사용 (개발용)
+    user_id = current_user.id if current_user else "100"
+
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -200,9 +213,9 @@ async def update_bookmark_note(bid_notice_no: str, note: str, user_id: str = "10
         cur.execute("""
             UPDATE user_bookmarks
             SET notes = %s
-            WHERE user_id = %s AND bid_notice_no = %s
+            WHERE user_id = %s AND (bid_id = %s OR bid_notice_no = %s)
             RETURNING id
-        """, (note, user_id, bid_notice_no))
+        """, (note, user_id, bid_notice_no, bid_notice_no))
 
         updated = cur.fetchone()
 
@@ -228,8 +241,11 @@ async def update_bookmark_note(bid_notice_no: str, note: str, user_id: str = "10
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/check/{bid_notice_no}")
-async def check_bookmark(bid_notice_no: str, user_id: str = "100"):
+async def check_bookmark(bid_notice_no: str, current_user = Depends(get_current_user_optional)):
     """특정 공고가 북마크되어 있는지 확인"""
+    # JWT 토큰에서 사용자 ID 추출, 없으면 기본값 100 사용 (개발용)
+    user_id = current_user.id if current_user else "100"
+
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -239,8 +255,8 @@ async def check_bookmark(bid_notice_no: str, user_id: str = "100"):
 
         cur.execute("""
             SELECT id FROM user_bookmarks
-            WHERE user_id = %s AND bid_notice_no = %s
-        """, (user_id, bid_notice_no))
+            WHERE user_id = %s AND (bid_id = %s OR bid_notice_no = %s)
+        """, (user_id, bid_notice_no, bid_notice_no))
 
         bookmark = cur.fetchone()
         cur.close()

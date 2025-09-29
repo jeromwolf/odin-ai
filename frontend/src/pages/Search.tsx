@@ -12,9 +12,11 @@ import {
   CircularProgress,
   Alert,
   InputAdornment,
+  IconButton,
 } from '@mui/material';
-import { Search as SearchIcon } from '@mui/icons-material';
+import { Search as SearchIcon, Bookmark, BookmarkBorder } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../services/api';
 
 interface SearchResult {
@@ -31,6 +33,7 @@ interface SearchResult {
   region_restriction?: string;
   remaining_days?: number;
   tags?: string[];
+  is_bookmarked?: boolean;
   extracted_info?: {
     requirements?: { [key: string]: string };
     contract_details?: { [key: string]: string };
@@ -41,11 +44,30 @@ interface SearchResult {
 const Search: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalResults, setTotalResults] = useState(0);
+  const [bookmarkedBids, setBookmarkedBids] = useState<Set<string>>(new Set());
+
+  // 북마크 데이터 가져오기
+  const { data: bookmarks } = useQuery({
+    queryKey: ['bookmarks'],
+    queryFn: () => apiClient.getBookmarks(),
+    staleTime: 10000,
+  });
+
+  // 북마크 데이터가 로드되면 로컬 상태 동기화
+  useEffect(() => {
+    if (bookmarks && Array.isArray(bookmarks)) {
+      const bookmarkSet = new Set(
+        bookmarks.map((bookmark: any) => bookmark.bid_notice_no)
+      );
+      setBookmarkedBids(bookmarkSet);
+    }
+  }, [bookmarks]);
 
   // URL 파라미터에서 검색어 가져오기
   useEffect(() => {
@@ -57,6 +79,40 @@ const Search: React.FC = () => {
     }
   }, [location.search]);
 
+  const handleBookmarkToggle = async (result: SearchResult, e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 방지
+
+    const bidId = result.bid_notice_no;
+    const isCurrentlyBookmarked = bookmarkedBids.has(bidId);
+
+    try {
+      if (isCurrentlyBookmarked) {
+        await apiClient.removeBookmark(bidId);
+        setBookmarkedBids(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(bidId);
+          return newSet;
+        });
+        // 검색 결과에서도 북마크 상태 업데이트
+        setResults(prev => prev.map(r =>
+          r.bid_notice_no === bidId ? { ...r, is_bookmarked: false } : r
+        ));
+      } else {
+        await apiClient.addBookmark(bidId);
+        setBookmarkedBids(prev => new Set(prev).add(bidId));
+        // 검색 결과에서도 북마크 상태 업데이트
+        setResults(prev => prev.map(r =>
+          r.bid_notice_no === bidId ? { ...r, is_bookmarked: true } : r
+        ));
+      }
+
+      // React Query 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
+    } catch (error) {
+      console.error('북마크 처리 실패:', error);
+    }
+  };
+
   const handleSearch = async (query?: string) => {
     const searchTerm = query || searchQuery;
     if (!searchTerm.trim()) return;
@@ -67,7 +123,12 @@ const Search: React.FC = () => {
     try {
       const response = await apiClient.searchBids(searchTerm);
       if (response.success) {
-        setResults(response.data || []);
+        // 검색 결과에 북마크 상태 추가
+        const resultsWithBookmarks = (response.data || []).map((result: SearchResult) => ({
+          ...result,
+          is_bookmarked: bookmarkedBids.has(result.bid_notice_no)
+        }));
+        setResults(resultsWithBookmarks);
         setTotalResults(response.total || 0);
       } else {
         setResults([]);
@@ -230,6 +291,24 @@ const Search: React.FC = () => {
                             <Chip label={result.contract_method} size="small" variant="outlined" />
                           )}
                         </Box>
+                      </Box>
+                      {/* 북마크 버튼 */}
+                      <Box>
+                        <IconButton
+                          onClick={(e) => handleBookmarkToggle(result, e)}
+                          color={result.is_bookmarked ? 'primary' : 'default'}
+                          sx={{
+                            '&:hover': {
+                              backgroundColor: result.is_bookmarked ? 'primary.light' : 'action.hover',
+                            },
+                          }}
+                        >
+                          {result.is_bookmarked ? (
+                            <Bookmark />
+                          ) : (
+                            <BookmarkBorder />
+                          )}
+                        </IconButton>
                       </Box>
                     </Box>
 

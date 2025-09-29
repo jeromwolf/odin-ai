@@ -9,6 +9,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import bcrypt
 import os
+from auth.dependencies import get_current_user_optional
 
 router = APIRouter(prefix="/api/profile", tags=["Profile"])
 
@@ -48,8 +49,11 @@ class UserActivity(BaseModel):
     last_bookmark: Optional[datetime] = None
 
 @router.get("")
-async def get_profile(user_id: str = "100"):  # TODO: JWT에서 user_id 추출
+async def get_profile(current_user = Depends(get_current_user_optional)):
     """사용자 프로필 조회"""
+    # JWT 토큰에서 사용자 ID 추출, 없으면 기본값 100 사용 (개발용)
+    user_id = current_user.id if current_user else "100"
+
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -137,8 +141,10 @@ async def get_profile(user_id: str = "100"):  # TODO: JWT에서 user_id 추출
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("")
-async def update_profile(profile: UserProfile, user_id: str = "100"):
+async def update_profile(profile: UserProfile, current_user = Depends(get_current_user_optional)):
     """사용자 프로필 업데이트"""
+    # JWT 토큰에서 사용자 ID 추출, 없으면 기본값 100 사용 (개발용)
+    user_id = current_user.id if current_user else "100"
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -188,8 +194,10 @@ async def update_profile(profile: UserProfile, user_id: str = "100"):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/change-password")
-async def change_password(password_data: PasswordChange, user_id: str = "100"):
+async def change_password(password_data: PasswordChange, current_user = Depends(get_current_user_optional)):
     """비밀번호 변경"""
+    # JWT 토큰에서 사용자 ID 추출, 없으면 기본값 100 사용 (개발용)
+    user_id = current_user.id if current_user else "100"
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -238,8 +246,10 @@ async def change_password(password_data: PasswordChange, user_id: str = "100"):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/activity")
-async def get_activity(user_id: str = "100"):
+async def get_activity(current_user = Depends(get_current_user_optional)):
     """사용자 활동 내역 조회"""
+    # JWT 토큰에서 사용자 ID 추출, 없으면 기본값 100 사용 (개발용)
+    user_id = current_user.id if current_user else "100"
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed")
