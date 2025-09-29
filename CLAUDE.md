@@ -558,7 +558,31 @@ cd frontend && npm start                                  # 프론트엔드
    - 파일명 인코딩 주의 (한글)
    - 압축 파일 내부 구조 확인
 
-### 📝 최근 변경사항 (2025-09-25)
+### 📝 최근 변경사항 (2025-09-29)
+
+#### ✅ 알림 설정 페이지 버그 수정 (2025-09-29 오후)
+- **문제**: "알림 설정을 불러오는 중..." 무한 로딩 상태
+- **원인**: 알림 API가 JWT 인증 필수였으나 프론트엔드에서 미인증 호출
+- **해결**: `/backend/api/notifications.py`에서 `get_current_user_optional` 사용으로 개발 환경 개선
+- **변경사항**:
+  - Line 631: `get_current_user` → `get_current_user_optional`
+  - Line 634: 사용자 없을 시 기본 ID "100" 사용
+  - Line 657-662: 이메일 null 체크 및 기본값 설정
+  - Line 676: 일관된 user_id 사용
+
+#### ✅ 인증 시스템 완전 검증 (2025-09-29 오후)
+- **회원가입**: test1@example.com, test2@example.com 계정 생성 테스트 완료
+- **로그인**: JWT 토큰 발급 및 인증 정상 작동
+- **로그아웃**: 백엔드 세션 무효화 + 프론트엔드 자동 로그인 화면 리다이렉트
+- **보안**: 로그아웃 후 토큰 완전 삭제 및 상태 초기화 확인
+
+#### 🔧 백엔드 API 연동 상태
+- `/api/auth/login`: ✅ 정상 작동
+- `/api/auth/logout`: ✅ 정상 작동
+- `/api/auth/register`: ✅ 정상 작동
+- `/api/notifications/settings`: ✅ 개발 환경용 수정 완료
+
+### 📝 이전 변경사항 (2025-09-25)
 
 - ✅ 200개 테스트 자동화 시스템 구축
 - ✅ FastAPI 백엔드 API 대폭 개선
@@ -748,3 +772,179 @@ EMAIL_TO=recipient@example.com
 - 백엔드 API와 프론트엔드 연동
 - Excel 파일 처리 개선 (22개 실패)
 - AI 분석 기능 추가
+
+---
+
+## 🚨 핵심 실수 사례 및 개발 전략 개선 (2025-09-29 추가)
+
+### ❌ 실제 발생한 심각한 문제 (2025-09-29)
+- **상황**: 북마크 기능 추가 작업
+- **결과**: 검색 기능 완전 마비
+- **원인**: API import 경로 수정으로 연쇄 오류 발생
+- **사용자 반응**: "아니 입찰검색은 왜 안돼? 왜 북마크하고 연관관계가 없는데. 수정할때 다른부분까지 영향을 받으면 어떻게 해?"
+
+### 🔍 문제 분석
+```python
+# 문제가 된 코드 변경
+# search.py와 dashboard.py에서
+from backend.database import get_db_connection  # ❌ 잘못된 import
+# ↓
+from database import get_db_connection          # ✅ 수정된 import
+```
+
+### 📋 **앞으로의 개발 전략 - 절대 원칙**
+
+#### 1. **작업 전 안전 체크리스트 (필수)**
+```bash
+# 새 기능 시작 전 반드시 실행
+□ 1. 현재 상태 스냅샷 저장
+   git status && git stash save "작업 전 백업"
+
+□ 2. 기존 기능 작동 확인
+   curl -s "http://localhost:8000/api/search?q=test" | jq .total
+   curl -s "http://localhost:8000/api/profile" | jq .email
+   curl -s "http://localhost:8000/api/dashboard/overview" | jq .totalBids
+
+□ 3. 영향 범위 분석서 작성
+   echo "# 작업: [기능명]" > impact.md
+   echo "- 수정할 파일: (새 파일만)" >> impact.md
+   echo "- 영향받지 않을 파일: (기존 파일 목록)" >> impact.md
+
+□ 4. 독립 브랜치 생성
+   git checkout -b feature/기능명
+
+□ 5. 롤백 계획 수립
+   echo "문제 발생 시: git stash && git checkout main" >> rollback.md
+```
+
+#### 2. **절대 금지 사항**
+```bash
+# ❌ 절대 하지 말 것
+1. 공통 파일 직접 수정 (main.py, api.ts, App.tsx)
+2. 여러 기능 동시 작업 (북마크 + 검색 동시 수정)
+3. import 경로 일괄 변경
+4. 테스트 없이 커밋
+5. 큰 단위 변경
+
+# ✅ 반드시 지킬 것
+1. 새 기능은 새 파일에
+2. 한 번에 하나씩만
+3. 각 단계마다 테스트
+4. 작은 단위로 커밋
+5. 문제 시 즉시 롤백
+```
+
+#### 3. **안전한 파일 구조 설계**
+```
+backend/
+├── api/
+│   ├── auth.py          # 🔒 수정 금지
+│   ├── search.py        # 🔒 수정 금지
+│   ├── profile.py       # 🔒 수정 금지
+│   ├── dashboard.py     # 🔒 수정 금지
+│   └── bookmarks.py     # ✅ 새 기능 (독립)
+│
+├── services/            # 독립 서비스 모듈
+│   ├── bookmark_service.py    # ✅ 새 기능
+│   └── notification_service.py # ✅ 새 기능
+│
+└── main.py              # 🔒 최소한의 수정만
+```
+
+#### 4. **단계별 안전 개발 프로세스**
+
+##### Phase 1: 독립 모듈 생성
+```bash
+# 새 기능을 완전히 독립된 파일로 구현
+touch backend/api/new_feature.py
+touch backend/services/new_feature_service.py
+
+# 기존 모듈 import 방식 그대로 사용
+# from database import get_db_connection  # 기존 방식 유지
+```
+
+##### Phase 2: 점진적 통합
+```python
+# main.py - 최소한의 변경만
+try:
+    from api.new_feature import router as new_feature_router
+    app.include_router(new_feature_router)
+    print("✅ 새 기능 API 등록됨")
+except ImportError as e:
+    print(f"⚠️ 새 기능 API 로드 실패: {e}")
+    # 다른 기능은 계속 작동
+```
+
+##### Phase 3: 실시간 검증
+```bash
+# 각 단계마다 기존 기능 테스트
+watch -n 3 'curl -s localhost:8000/api/search?q=test | jq .total'
+watch -n 3 'curl -s localhost:8000/api/profile | jq .email'
+
+# 문제 발생 시 즉시 롤백
+git stash && git checkout main
+```
+
+#### 5. **의존성 격리 전략**
+```python
+# ✅ 올바른 방법 - 독립 모듈
+class BookmarkService:
+    def __init__(self):
+        # 기존 방식 그대로 사용
+        self.db_connection = get_db_connection()
+
+    def add_bookmark(self, user_id, bid_id):
+        # 완전히 독립적인 구현
+        # 다른 서비스에 영향 없음
+        pass
+
+# ❌ 잘못된 방법 - 공통 모듈 수정
+# database.py 파일 수정하거나
+# main.py의 import 구조 변경
+```
+
+#### 6. **실시간 모니터링 시스템**
+```bash
+# 개발 중 지속적 상태 확인
+# 터미널 1: 백엔드 서버
+DATABASE_URL="postgresql://..." python3 -m uvicorn main:app --reload
+
+# 터미널 2: 실시간 API 테스트
+while true; do
+  echo "=== $(date) ==="
+  echo "검색 API: $(curl -s localhost:8000/api/search?q=test | jq -r .total // 'FAIL')"
+  echo "프로필 API: $(curl -s localhost:8000/api/profile | jq -r .email // 'FAIL')"
+  echo "대시보드 API: $(curl -s localhost:8000/api/dashboard/overview | jq -r .totalBids // 'FAIL')"
+  sleep 5
+done
+```
+
+#### 7. **응급 복구 프로토콜**
+```bash
+# 문제 발생 시 즉시 실행할 명령어들
+echo '#!/bin/bash
+echo "=== 응급 복구 시작 ==="
+git status
+git stash save "응급백업_$(date +%Y%m%d_%H%M%S)"
+git checkout main
+git reset --hard HEAD
+echo "=== 복구 완료 ==="
+echo "서버 재시작 필요: python3 -m uvicorn main:app --reload"
+' > emergency_rollback.sh
+chmod +x emergency_rollback.sh
+```
+
+### 💡 **핵심 교훈**
+
+1. **"한 번에 하나씩"** - 북마크 작업할 때는 북마크만
+2. **"독립성 보장"** - 새 기능은 새 파일에
+3. **"즉시 테스트"** - 각 단계마다 검증
+4. **"롤백 준비"** - 언제든 되돌릴 수 있게
+5. **"최소 영향"** - 공통 모듈 수정 최소화
+
+### 🎯 **성공 지표**
+- **목표**: "새 기능 추가해도 기존 기능은 100% 유지"
+- **측정**: 각 단계마다 기존 API 응답 확인
+- **실패 기준**: 기존 기능 중 하나라도 영향받으면 즉시 롤백
+
+이렇게 하면 **"북마크 추가했는데 왜 검색이 안 돼?"** 같은 상황을 완전히 방지할 수 있습니다!

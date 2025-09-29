@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -21,7 +21,10 @@ import {
   ListItemSecondaryAction,
   Chip,
   Paper,
+  CircularProgress,
+  Snackbar,
 } from '@mui/material';
+import apiClient from '../services/api';
 import {
   Person,
   Edit,
@@ -42,14 +45,17 @@ import { useAuth } from '../contexts/AuthContext';
 const Profile: React.FC = () => {
   const { user } = useAuth();
   const [editMode, setEditMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [profileData, setProfileData] = useState({
-    name: '홍길동',
-    email: 'hong@example.com',
-    phone: '010-1234-5678',
-    company: '한국건설(주)',
-    position: '입찰담당자',
-    address: '서울특별시 강남구 테헤란로 123',
-    bio: '10년차 건설업계 입찰 전문가입니다. 주로 토목, 건축 분야의 공공입찰을 담당하고 있습니다.',
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    position: '',
+    address: '',
+    bio: '',
   });
 
   const [tempData, setTempData] = useState(profileData);
@@ -60,31 +66,45 @@ const Profile: React.FC = () => {
     confirm: '',
   });
 
-  // 사용자 활동 통계 (예시 데이터)
-  const userStats = {
-    totalSearches: 156,
-    totalBookmarks: 23,
-    recentActivity: 7,
-    joinDate: '2024-01-15',
-  };
+  // 사용자 활동 통계
+  const [userStats, setUserStats] = useState({
+    totalSearches: 0,
+    totalBookmarks: 0,
+    recentActivity: 0,
+    joinDate: '',
+  });
 
-  // 최근 활동 내역 (예시 데이터)
-  const recentActivities = [
-    { id: 1, action: '입찰검색', keyword: 'IT 시스템 구축', date: '2025-09-26' },
-    { id: 2, action: '북마크', title: '서울시청 본관 리모델링 공사', date: '2025-09-25' },
-    { id: 3, action: '입찰검색', keyword: '도로 포장', date: '2025-09-24' },
-    { id: 4, action: '북마크', title: '학교 건설 공사', date: '2025-09-23' },
-  ];
+  // 최근 활동 내역
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
   const handleEdit = () => {
     setTempData(profileData);
     setEditMode(true);
   };
 
-  const handleSave = () => {
-    setProfileData(tempData);
-    setEditMode(false);
-    // TODO: API 호출하여 프로필 업데이트
+  const handleSave = async () => {
+    try {
+      const updateData = {
+        name: tempData.name,
+        email: tempData.email,
+        phone: tempData.phone,
+        company: tempData.company,
+        department: tempData.address,  // address를 department로 저장
+        position: tempData.position,
+      };
+
+      await apiClient.updateProfile(updateData);
+      setProfileData(tempData);
+      setEditMode(false);
+      setSuccess('프로필이 업데이트되었습니다.');
+
+      // 3초 후 성공 메시지 제거
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('프로필 업데이트 실패:', err);
+      setError('프로필 업데이트에 실패했습니다.');
+      setTimeout(() => setError(null), 3000);
+    }
   };
 
   const handleCancel = () => {
@@ -96,11 +116,71 @@ const Profile: React.FC = () => {
     setTempData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handlePasswordChange = () => {
-    // TODO: 비밀번호 변경 API 호출
-    setPasswords({ current: '', new: '', confirm: '' });
-    setChangePasswordOpen(false);
-    alert('비밀번호가 변경되었습니다.');
+  // 프로필 데이터 로드
+  useEffect(() => {
+    loadProfile();
+    loadActivity();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+      const data = await apiClient.getProfile();
+      if (data) {
+        setProfileData({
+          name: data.name || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          company: data.company || '',
+          position: data.position || '',
+          address: data.department || '',  // department를 임시로 address로 사용
+          bio: '',  // bio는 DB에 없음
+        });
+        setUserStats({
+          totalSearches: data.activity?.total_searches || 0,
+          totalBookmarks: data.activity?.total_bookmarks || 0,
+          recentActivity: data.activity?.recent_activity || 0,
+          joinDate: data.created_at ? new Date(data.created_at).toLocaleDateString() : '',
+        });
+      }
+    } catch (err) {
+      console.error('프로필 로드 실패:', err);
+      setError('프로필을 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadActivity = async () => {
+    try {
+      const data = await apiClient.getUserActivity();
+      if (data && data.activities) {
+        const formattedActivities = data.activities.map((act: any, index: number) => ({
+          id: index + 1,
+          action: act.type === 'bookmark' ? '북마크' : '입찰검색',
+          keyword: act.type === 'bookmark' ? '' : act.description,
+          title: act.type === 'bookmark' ? act.description : '',
+          date: act.timestamp ? new Date(act.timestamp).toLocaleDateString() : '',
+        }));
+        setRecentActivities(formattedActivities);
+      }
+    } catch (err) {
+      console.error('활동 내역 로드 실패:', err);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    try {
+      await apiClient.changePassword(passwords.current, passwords.new);
+      setPasswords({ current: '', new: '', confirm: '' });
+      setChangePasswordOpen(false);
+      setSuccess('비밀번호가 변경되었습니다.');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('비밀번호 변경 실패:', err);
+      setError('비밀번호 변경에 실패했습니다.');
+      setTimeout(() => setError(null), 3000);
+    }
   };
 
   const getActionIcon = (action: string) => {
@@ -113,6 +193,15 @@ const Profile: React.FC = () => {
         return <TrendingUp fontSize="small" />;
     }
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -415,6 +504,29 @@ const Profile: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success/Error Messages */}
+      <Snackbar
+        open={!!success}
+        autoHideDuration={3000}
+        onClose={() => setSuccess(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSuccess(null)} severity="success">
+          {success}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={3000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setError(null)} severity="error">
+          {error}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

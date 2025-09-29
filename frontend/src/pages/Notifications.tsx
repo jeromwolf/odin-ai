@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -42,6 +42,7 @@ import {
   Settings,
   Bookmark,
 } from '@mui/icons-material';
+import apiClient from '../services/api';
 
 interface NotificationSettings {
   email: boolean;
@@ -60,6 +61,8 @@ interface KeywordAlert {
 }
 
 const Notifications: React.FC = () => {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [generalSettings, setGeneralSettings] = useState<NotificationSettings>({
     email: true,
     push: true,
@@ -101,6 +104,84 @@ const Notifications: React.FC = () => {
 
   const categories = ['건설', '소프트웨어', '토목', '전기', '통신', '용역', '물품', '기계'];
 
+  // 알림 설정 불러오기
+  useEffect(() => {
+    loadNotificationSettings();
+  }, []);
+
+  const loadNotificationSettings = async () => {
+    try {
+      setLoading(true);
+      const settings = await apiClient.getNotificationSettings();
+      if (settings) {
+        // 일반 설정
+        if (settings.general) {
+          setGeneralSettings({
+            email: settings.general.email !== false,
+            push: settings.general.push !== false,
+          });
+        }
+        // 입찰 알림
+        if (settings.bid_alerts) {
+          setBidAlerts({
+            email: settings.bid_alerts.email !== false,
+            push: settings.bid_alerts.push !== false,
+          });
+        }
+        // 마감 알림
+        if (settings.deadline_alerts) {
+          setDeadlineAlerts({
+            email: settings.deadline_alerts.email !== false,
+            push: settings.deadline_alerts.push !== false,
+          });
+        }
+        // 키워드 알림
+        if (settings.keyword_alerts) {
+          setKeywordAlerts(settings.keyword_alerts.map((alert: any) => ({
+            id: alert.id,
+            keyword: alert.keyword,
+            category: alert.category || '기타',
+            priceRange: alert.min_price && alert.max_price ? {
+              min: alert.min_price,
+              max: alert.max_price
+            } : undefined,
+            enabled: alert.is_active !== false,
+          })));
+        }
+      }
+    } catch (error) {
+      console.error('알림 설정 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveNotificationSettings = async () => {
+    try {
+      setSaving(true);
+      const settings = {
+        general: generalSettings,
+        bid_alerts: bidAlerts,
+        deadline_alerts: deadlineAlerts,
+        keyword_alerts: keywordAlerts.map(alert => ({
+          keyword: alert.keyword,
+          category: alert.category,
+          min_price: alert.priceRange?.min,
+          max_price: alert.priceRange?.max,
+          is_active: alert.enabled,
+        })),
+      };
+
+      await apiClient.updateNotificationSettings(settings);
+      alert('알림 설정이 저장되었습니다.');
+    } catch (error) {
+      console.error('알림 설정 저장 실패:', error);
+      alert('설정 저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleGeneralSettingChange = (key: keyof NotificationSettings, value: boolean) => {
     setGeneralSettings(prev => ({ ...prev, [key]: value }));
   };
@@ -121,11 +202,22 @@ const Notifications: React.FC = () => {
     );
   };
 
-  const handleDeleteKeyword = (id: number) => {
-    setKeywordAlerts(prev => prev.filter(alert => alert.id !== id));
+  const handleDeleteKeyword = async (id: number) => {
+    try {
+      // API 호출하여 삭제 (ID가 문자열인 경우 대비)
+      if (id > 1000000000) { // 새로 추가된 항목 (Date.now()로 생성)
+        setKeywordAlerts(prev => prev.filter(alert => alert.id !== id));
+      } else {
+        await apiClient.deleteNotificationRule(String(id));
+        setKeywordAlerts(prev => prev.filter(alert => alert.id !== id));
+      }
+    } catch (error) {
+      console.error('키워드 삭제 실패:', error);
+      alert('키워드 삭제에 실패했습니다.');
+    }
   };
 
-  const handleAddKeyword = () => {
+  const handleAddKeyword = async () => {
     if (newKeyword.keyword && newKeyword.category) {
       const newAlert: KeywordAlert = {
         id: Date.now(),
@@ -141,6 +233,7 @@ const Notifications: React.FC = () => {
         };
       }
 
+      // 새 키워드를 로컬 상태에 추가
       setKeywordAlerts(prev => [...prev, newAlert]);
       setNewKeyword({ keyword: '', category: '', minPrice: '', maxPrice: '' });
       setOpenAddDialog(false);
@@ -150,6 +243,14 @@ const Notifications: React.FC = () => {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ko-KR').format(price) + '원';
   };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Typography>알림 설정을 불러오는 중...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -414,10 +515,8 @@ const Notifications: React.FC = () => {
           variant="contained"
           size="large"
           sx={{ px: 4 }}
-          onClick={() => {
-            // TODO: 설정 저장 API 호출
-            alert('알림 설정이 저장되었습니다.');
-          }}
+          onClick={saveNotificationSettings}
+          disabled={saving}
         >
           설정 저장
         </Button>

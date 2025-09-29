@@ -10,6 +10,7 @@ import PrivateRoute from './components/auth/PrivateRoute';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const BidDetail = lazy(() => import('./pages/BidDetail'));
 const Search = lazy(() => import('./pages/Search'));
+const Bookmarks = lazy(() => import('./pages/Bookmarks'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Subscription = lazy(() => import('./pages/Subscription'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -50,6 +51,7 @@ const AppRoutes = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/bids/:id" element={<BidDetail />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/bookmarks" element={<Bookmarks />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/profile" element={<Profile />} />

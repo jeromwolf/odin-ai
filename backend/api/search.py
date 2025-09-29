@@ -5,7 +5,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 from datetime import datetime
-from backend.database import get_db_connection
+from database import get_db_connection
 import logging
 
 logger = logging.getLogger(__name__)

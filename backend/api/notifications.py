@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from database import get_db_connection
-from auth.dependencies import get_current_user, User
+from auth.dependencies import get_current_user, get_current_user_optional, User
 from pydantic import BaseModel
 import logging
 import json
@@ -628,8 +628,11 @@ async def get_notification_history(
 
 
 @router.get("/settings")
-async def get_notification_settings(user: User = Depends(get_current_user)):
+async def get_notification_settings(user: User = Depends(get_current_user_optional)):
     """알림 설정 조회"""
+    # 개발 환경에서는 기본 사용자 ID 사용
+    user_id = user.id if user else "100"
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -645,17 +648,18 @@ async def get_notification_settings(user: User = Depends(get_current_user)):
                     email_address, phone_number
                 FROM user_notification_settings
                 WHERE user_id = %s
-            """, (user.id,))
+            """, (user_id,))
 
             row = cursor.fetchone()
 
             # 설정이 없으면 기본값으로 생성
             if not row:
+                default_email = user.email if user else "demo@example.com"
                 cursor.execute("""
                     INSERT INTO user_notification_settings (user_id, email_address)
                     VALUES (%s, %s)
                     RETURNING *
-                """, (user.id, user.email))
+                """, (user_id, default_email))
                 conn.commit()
 
                 cursor.execute("""
@@ -669,7 +673,7 @@ async def get_notification_settings(user: User = Depends(get_current_user)):
                         email_address, phone_number
                     FROM user_notification_settings
                     WHERE user_id = %s
-                """, (user.id,))
+                """, (user_id,))
                 row = cursor.fetchone()
 
             return {

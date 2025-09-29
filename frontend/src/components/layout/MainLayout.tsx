@@ -38,6 +38,7 @@ const drawerWidth = 240;
 const menuItems = [
   { text: '대시보드', icon: <Dashboard />, path: '/dashboard' },
   { text: '입찰 검색', icon: <Search />, path: '/search' },
+  { text: '북마크', icon: <Bookmark />, path: '/bookmarks' },
   { text: '알림 설정', icon: <NotificationsActive />, path: '/notifications' },
   { text: '프로필', icon: <Person />, path: '/profile' },
   { text: '설정', icon: <Settings />, path: '/settings' },

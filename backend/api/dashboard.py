@@ -5,8 +5,8 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
-from backend.database import get_db_connection
-from backend.auth.dependencies import get_current_user_optional, get_current_user, User
+from database import get_db_connection
+from auth.dependencies import get_current_user_optional, get_current_user, User
 import logging
 
 logger = logging.getLogger(__name__)

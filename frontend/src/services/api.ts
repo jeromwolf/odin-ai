@@ -233,7 +233,7 @@ class ApiClient {
 
   async changePassword(oldPassword: string, newPassword: string) {
     const response = await this.client.post('/profile/change-password', {
-      old_password: oldPassword,
+      current_password: oldPassword,
       new_password: newPassword,
     });
     return response.data;
@@ -297,6 +297,62 @@ class ApiClient {
 
   async getBookmarks() {
     const response = await this.client.get('/bookmarks');
+    return response.data;
+  }
+
+  // Notification Settings API
+  async getNotificationSettings() {
+    const response = await this.client.get('/notifications/settings');
+    return response.data;
+  }
+
+  async updateNotificationSettings(settings: any) {
+    const response = await this.client.put('/notifications/settings', settings);
+    return response.data;
+  }
+
+  async addNotificationRule(rule: any) {
+    const response = await this.client.post('/notifications/rules', rule);
+    return response.data;
+  }
+
+  async deleteNotificationRule(ruleId: string) {
+    const response = await this.client.delete(`/notifications/rules/${ruleId}`);
+    return response.data;
+  }
+
+  // Subscription API
+  async getSubscription() {
+    const response = await this.client.get('/subscription');
+    return response.data;
+  }
+
+  async updateSubscription(planId: string) {
+    const response = await this.client.post('/subscription/change-plan', { plan_id: planId });
+    return response.data;
+  }
+
+  async getPaymentHistory() {
+    const response = await this.client.get('/subscription/payment-history');
+    return response.data;
+  }
+
+  // User Activity API
+  async getUserActivity() {
+    const response = await this.client.get('/profile/activity');
+    return response.data;
+  }
+
+  // Data Export/Import API
+  async exportData() {
+    const response = await this.client.get('/settings/export', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async deleteAccount() {
+    const response = await this.client.delete('/settings/account');
     return response.data;
   }
 }

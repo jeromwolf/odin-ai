@@ -21,7 +21,7 @@ import os
 
 # Redis 캐싱 시스템 임포트
 try:
-    from backend.cache import cache, get_cached_or_fetch, CACHE_TTL
+    from cache import cache, get_cached_or_fetch, CACHE_TTL
     CACHE_ENABLED = cache.enabled
 except ImportError:
     CACHE_ENABLED = False
@@ -40,7 +40,7 @@ app.add_middleware(
 
 # 검색 라우터 추가
 try:
-    from backend.api.search import router as search_router
+    from api.search import router as search_router
     app.include_router(search_router)
     print("✅ 검색 API 라우터 등록됨")
 except ImportError as e:
@@ -48,15 +48,23 @@ except ImportError as e:
 
 # 인증 라우터 추가
 try:
-    from backend.api.auth import router as auth_router
+    from api.auth import router as auth_router
     app.include_router(auth_router)
     print("✅ 인증 API 라우터 등록됨")
 except ImportError as e:
     print(f"⚠️ 인증 API 라우터 로드 실패: {e}")
 
+# 프로필 라우터 추가
+try:
+    from api.profile import router as profile_router
+    app.include_router(profile_router)
+    print("✅ 프로필 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 프로필 API 라우터 로드 실패: {e}")
+
 # 북마크 라우터 임포트 및 추가
 try:
-    from backend.api.bookmarks import router as bookmarks_router
+    from api.bookmarks import router as bookmarks_router
     app.include_router(bookmarks_router)
     print("✅ 북마크 API 라우터 등록됨")
 except ImportError as e:
@@ -64,7 +72,7 @@ except ImportError as e:
 
 # 대시보드 라우터 추가
 try:
-    from backend.api.dashboard import router as dashboard_router
+    from api.dashboard import router as dashboard_router
     app.include_router(dashboard_router)
     print("✅ 대시보드 API 라우터 등록됨")
 except ImportError as e:
@@ -72,7 +80,7 @@ except ImportError as e:
 
 # 구독 라우터 추가
 try:
-    from backend.api.subscription import router as subscription_router
+    from api.subscription import router as subscription_router
     app.include_router(subscription_router)
     print("✅ 구독 API 라우터 등록됨")
 except ImportError as e:
@@ -80,7 +88,7 @@ except ImportError as e:
 
 # 결제 라우터 추가
 try:
-    from backend.api.payments import router as payments_router
+    from api.payments import router as payments_router
     app.include_router(payments_router)
     print("✅ 결제 API 라우터 등록됨")
 except ImportError as e:
@@ -88,7 +96,7 @@ except ImportError as e:
 
 # 알림 라우터 추가
 try:
-    from backend.api.notifications import router as notifications_router
+    from api.notifications import router as notifications_router
     app.include_router(notifications_router)
     print("✅ 알림 API 라우터 등록됨")
 except ImportError as e:
@@ -96,7 +104,7 @@ except ImportError as e:
 
 # AI 추천 라우터 추가
 try:
-    from backend.api.recommendations import router as recommendations_router
+    from api.recommendations import router as recommendations_router
     app.include_router(recommendations_router, prefix="/api/recommendations", tags=["recommendations"])
     print("✅ AI 추천 API 라우터 등록됨")
 except ImportError as e:

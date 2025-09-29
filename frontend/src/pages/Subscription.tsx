@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -45,6 +45,7 @@ import {
   Info,
   Upgrade,
 } from '@mui/icons-material';
+import apiClient from '../services/api';
 
 interface PlanFeature {
   name: string;
@@ -73,16 +74,71 @@ interface BillingHistory {
 }
 
 const Subscription: React.FC = () => {
+  const [loading, setLoading] = useState(true);
   const [currentPlan, setCurrentPlan] = useState('basic');
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [billingHistory, setBillingHistory] = useState<BillingHistory[]>([]);
 
-  // 현재 사용량 (예시 데이터)
-  const usage = {
-    searches: { current: 87, limit: 100 },
-    bookmarks: { current: 23, limit: 50 },
-    notifications: { current: 15, limit: 20 },
+  // 현재 사용량
+  const [usage, setUsage] = useState({
+    searches: { current: 0, limit: 100 },
+    bookmarks: { current: 0, limit: 50 },
+    notifications: { current: 0, limit: 20 },
+  });
+
+  // 구독 정보 불러오기
+  useEffect(() => {
+    loadSubscriptionData();
+  }, []);
+
+  const loadSubscriptionData = async () => {
+    try {
+      setLoading(true);
+
+      // 현재 구독 정보 불러오기
+      const subscription = await apiClient.getSubscription();
+      if (subscription) {
+        setCurrentPlan(subscription.plan_type || 'basic');
+      }
+
+      // 사용량 통계 불러오기
+      const usageStats = await apiClient.getUsageStatistics();
+      if (usageStats) {
+        setUsage({
+          searches: {
+            current: usageStats.searches_used || 0,
+            limit: usageStats.searches_limit || 100
+          },
+          bookmarks: {
+            current: usageStats.bookmarks_used || 0,
+            limit: usageStats.bookmarks_limit || 50
+          },
+          notifications: {
+            current: usageStats.notifications_used || 0,
+            limit: usageStats.notifications_limit || 20
+          },
+        });
+      }
+
+      // 결제 내역 불러오기
+      const paymentHistory = await apiClient.getPaymentHistory();
+      if (paymentHistory && Array.isArray(paymentHistory)) {
+        setBillingHistory(paymentHistory.map((payment: any) => ({
+          id: payment.id,
+          date: payment.date,
+          amount: payment.amount,
+          plan: payment.plan_name,
+          status: payment.status,
+          invoice: payment.invoice_id,
+        })));
+      }
+    } catch (error) {
+      console.error('구독 정보 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 요금제 정보
@@ -144,33 +200,7 @@ const Subscription: React.FC = () => {
     },
   ];
 
-  // 결제 내역 (예시 데이터)
-  const billingHistory: BillingHistory[] = [
-    {
-      id: '1',
-      date: '2025-09-01',
-      amount: 29000,
-      plan: 'Pro',
-      status: 'paid',
-      invoice: 'INV-2025-09-001',
-    },
-    {
-      id: '2',
-      date: '2025-08-01',
-      amount: 29000,
-      plan: 'Pro',
-      status: 'paid',
-      invoice: 'INV-2025-08-001',
-    },
-    {
-      id: '3',
-      date: '2025-07-01',
-      amount: 29000,
-      plan: 'Pro',
-      status: 'paid',
-      invoice: 'INV-2025-07-001',
-    },
-  ];
+  // 구독 업그레이드 API 호출을 위한 학들러들 업데이트
 
   const getCurrentPlan = () => plans.find(plan => plan.id === currentPlan);
   const currentPlanInfo = getCurrentPlan();
@@ -180,17 +210,35 @@ const Subscription: React.FC = () => {
     setUpgradeDialogOpen(true);
   };
 
-  const confirmUpgrade = () => {
+  const confirmUpgrade = async () => {
     if (selectedPlan) {
-      setCurrentPlan(selectedPlan);
-      setUpgradeDialogOpen(false);
-      alert(`${plans.find(p => p.id === selectedPlan)?.name} 플랜으로 업그레이드되었습니다.`);
+      try {
+        await apiClient.updateSubscription(selectedPlan);
+        setCurrentPlan(selectedPlan);
+        setUpgradeDialogOpen(false);
+        alert(`${plans.find(p => p.id === selectedPlan)?.name} 플랜으로 업그레이드되었습니다.`);
+
+        // 새로고침하여 새 데이터 불러오기
+        await loadSubscriptionData();
+      } catch (error) {
+        console.error('업그레이드 실패:', error);
+        alert('업그레이드에 실패했습니다.');
+      }
     }
   };
 
-  const handleCancelSubscription = () => {
-    setCancelDialogOpen(false);
-    alert('구독이 취소되었습니다. 현재 결제 기간이 끝날 때까지 서비스를 이용할 수 있습니다.');
+  const handleCancelSubscription = async () => {
+    try {
+      await apiClient.cancelSubscription();
+      setCancelDialogOpen(false);
+      alert('구독이 취소되었습니다. 현재 결제 기간이 끝날 때까지 서비스를 이용할 수 있습니다.');
+
+      // 새로고침하여 새 데이터 불러오기
+      await loadSubscriptionData();
+    } catch (error) {
+      console.error('구독 취소 실패:', error);
+      alert('구독 취소에 실패했습니다.');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -203,6 +251,14 @@ const Subscription: React.FC = () => {
   };
 
   const getUsagePercentage = (current: number, limit: number) => (current / limit) * 100;
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Typography>구독 정보를 불러오는 중...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box>
