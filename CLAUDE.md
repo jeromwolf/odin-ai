@@ -693,6 +693,98 @@ EMAIL_TO=recipient@example.com
 - **읽기 전용**: email_reporter.py
 - **조정 역할**: production_batch.py
 
+## 🔔 알림 시스템 아키텍처 설계 (2025-09-29) ⭐⭐⭐ 메인 서비스
+
+### 🎯 핵심: 알림 매칭이 ODIN-AI의 메인 서비스
+- **서비스 본질**: 사용자 맞춤형 입찰공고 실시간 알림
+- **배치 프로그램**: 데이터 수집 도구
+- **알림 시스템**: 핵심 비즈니스 가치 제공
+
+### 📊 현재 구현 상태 분석
+#### ✅ 완료된 부분
+- **백엔드 API**: 완전한 알림 시스템 구현
+  - `/api/notifications/rules` - 알림 규칙 CRUD
+  - `/api/notifications/` - 알림 목록 조회
+  - `/api/notifications/settings` - 사용자 설정
+- **데이터베이스**: 6개 알림 관련 테이블 구성 완료
+- **프론트엔드**: 알림 설정 페이지 구현
+
+#### ❌ 미구현 부분
+- **대시보드 알림 아이콘**: 하드코딩 "4" → API 연동 필요
+- **알림 센터 페이지**: 알림 내용 표시 페이지 없음
+- **배치-알림 연동**: 새 입찰과 규칙 매칭 로직 미구현
+- **실시간 알림**: 웹소켓/SSE 미구현
+
+### 🏗️ 알림 시스템 아키텍처
+
+#### 1. 배치 프로세스 플로우 (5단계)
+```python
+# batch/production_batch.py
+def run(self):
+    # Phase 1: API 수집 (collector.py)
+    # Phase 2: 파일 다운로드 (downloader.py)
+    # Phase 3: 문서 처리 (processor.py)
+    # Phase 4: 🔔 알림 매칭 (notification_matcher.py) ⭐ 신규
+    # Phase 5: 이메일 보고 (email_reporter.py)
+```
+
+#### 2. 알림 매칭 프로세서 (`notification_matcher.py`)
+- **목적**: 배치 완료 후 새 입찰공고와 사용자 규칙 매칭
+- **매칭 조건**:
+  - 키워드: 제목 + 기관명 검색
+  - 가격 범위: 예정가격 필터링
+  - 지역: 지역제한 매칭
+  - 카테고리: 자동 생성 태그 기반
+- **중복 방지**: 사용자+입찰 조합 체크
+- **이메일 발송**: SMTP 통한 즉시 발송
+
+#### 3. 크론탭 스케줄링 (하루 3-6회)
+```bash
+# 핵심 시간대 (오전 7시, 점심 12시, 저녁 6시)
+0 7 * * * cd /odin-ai && source venv/bin/activate && python batch/production_batch.py
+0 12 * * * cd /odin-ai && source venv/bin/activate && python batch/production_batch.py
+0 18 * * * cd /odin-ai && source venv/bin/activate && python batch/production_batch.py
+```
+
+#### 4. 성능 최적화 전략
+- **시간 범위 제한**: 최근 4-6시간 데이터만 처리
+- **배치 처리**: 대량 데이터 효율적 처리
+- **DB 인덱스**: 쿼리 최적화
+- **비동기 처리**: 이메일 발송 큐 시스템
+
+### 📋 내일(2025-09-30) 개발 계획
+
+#### Phase 1 (오전): 백엔드 구현
+1. `production_batch.py` 수정 - Phase 4 추가
+2. `notification_matcher.py` 테스트 및 완성
+3. 알림 매칭 로직 검증
+
+#### Phase 2 (오후): 프론트엔드 구현
+1. MainLayout.tsx - 알림 뱃지 API 연동
+2. NotificationCenter.tsx - 알림 센터 페이지 생성
+3. 알림 아이콘 클릭 → 알림 내용 페이지 연결
+
+#### Phase 3 (저녁): 통합 테스트
+1. 실제 알림 규칙 매칭 테스트
+2. 이메일 발송 테스트
+3. 크론탭 설정 검증
+
+### 🚨 주의사항
+- **알림이 메인 서비스임을 항상 염두**
+- **사용자 경험 최우선**: 정확한 매칭, 신속한 알림
+- **확장성 고려**: 대량 사용자/알림 처리 대비
+
+---
+
+## 📝 최근 작업 기록 (2025-09-29 오후)
+
+### 북마크 시스템 아키텍처 개선
+- **대시보드**: 북마크 토글 제거, 통계 표시만
+- **검색 페이지**: 북마크 CRUD 기능 완전 구현
+- **React Query**: 상태 동기화 최적화
+
+---
+
 ## 📝 최근 작업 기록 (2025-09-26)
 
 ### ✅ 완료된 작업 - 오후 세션
@@ -1128,3 +1220,212 @@ const resultsWithBookmarks = (response.data || []).map((result: SearchResult) =>
 - **기능 안정성**: 100% (기존 기능 영향 없음)
 - **사용자 만족도**: 개선 (직관적 기능 분리)
 - **개발 효율성**: 향상 (모듈형 개발 적용)
+
+---
+
+## 📝 최근 작업 기록 (2025-10-03)
+
+### ✅ 관리자 웹 화면 테스트 환경 구축 완료
+
+#### 🎯 주요 성과
+- **관리자 로그인 성공**: `admin@odin.ai` / `admin123` 계정으로 정상 로그인 확인
+- **백엔드 API 안정화**: 모든 관리자 API 라우터 정상 작동 (6개)
+- **데이터베이스 스키마 오류 수정**: 2개 주요 버그 해결
+
+#### 🔧 해결한 주요 문제
+
+##### 1. 백엔드 서버 구동 실패 문제
+**문제**:
+- 가상환경 미활성화로 `email-validator` 패키지 없어 관리자 인증 API 로드 실패
+- 결과적으로 백엔드 서버가 자동 종료됨
+
+**해결**:
+```bash
+source venv/bin/activate
+pip install 'pydantic[email]' email-validator
+cd backend && DATABASE_URL="postgresql://..." python -m uvicorn main:app --reload --port 8000
+```
+
+##### 2. 사용자 관리 API 데이터베이스 스키마 불일치
+**파일**: `/backend/api/admin_users.py`
+
+**문제**:
+```sql
+-- 코드에서는 last_login_at 사용
+SELECT ... last_login_at FROM users
+
+-- 실제 DB는 last_login 컬럼
+ERROR: column "last_login_at" does not exist
+```
+
+**수정사항** (admin_users.py:27, 77, 111):
+```python
+# Pydantic Model
+class UserResponse(BaseModel):
+    ...
+    last_login: Optional[datetime]  # last_login_at → last_login 변경
+
+# SQL Query
+SELECT ... last_login FROM users  # 모든 쿼리 수정
+```
+
+##### 3. 알림 발송 현황 API Pydantic Validation 오류
+**파일**: `/backend/api/admin_system.py`
+
+**문제**:
+- `notification_send_logs` 테이블이 비어있을 때 `SUM()` 함수가 `None` 반환
+- Pydantic이 정수형 필드에 `None` 값 거부하여 500 에러 발생
+
+**수정사항** (admin_system.py:335-350):
+```python
+# BEFORE: SUM() 결과가 None일 수 있음
+SELECT
+    SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as success
+
+# AFTER: COALESCE로 NULL → 0 변환
+SELECT
+    COALESCE(SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END), 0) as success
+
+# Python에서도 이중 보호
+total_sent = stats[0] or 0
+success_count = stats[1] or 0
+failed_count = stats[2] or 0
+pending_count = stats[3] or 0
+```
+
+#### 📊 최종 시스템 상태
+
+**백엔드 (Port 8000)**
+```
+✅ 검색 API 라우터 등록됨
+✅ 인증 API 라우터 등록됨
+✅ 프로필 API 라우터 등록됨
+✅ 북마크 API 라우터 등록됨
+✅ 대시보드 API 라우터 등록됨
+✅ 구독 API 라우터 등록됨
+✅ 결제 API 라우터 등록됨
+✅ 알림 API 라우터 등록됨
+✅ AI 추천 API 라우터 등록됨
+✅ 관리자 인증 API 라우터 등록됨
+✅ 관리자 배치 모니터링 API 라우터 등록됨
+✅ 관리자 시스템 모니터링 API 라우터 등록됨
+✅ 관리자 사용자 관리 API 라우터 등록됨
+✅ 관리자 로그 조회 API 라우터 등록됨
+✅ 관리자 통계 분석 API 라우터 등록됨
+```
+
+**프론트엔드 (Port 3000)**
+- ✅ 컴파일 성공 (TypeScript 에러 없음)
+- ✅ 프록시 설정: `http://localhost:8000`
+- ✅ 모든 관리자 페이지 정상 렌더링
+
+**접근 가능한 관리자 페이지**
+- `/admin/login` - 관리자 로그인 ✅
+- `/admin/dashboard` - 관리자 대시보드 ✅
+- `/admin/batch` - 배치 모니터링 ✅
+- `/admin/system` - 시스템 모니터링 ✅
+- `/admin/users` - 사용자 관리 ✅
+- `/admin/logs` - 로그 조회 ✅
+- `/admin/statistics` - 통계 분석 ✅
+
+#### 🔍 디버깅 과정에서 배운 교훈
+
+##### 1. 가상환경 활성화의 중요성
+- **문제**: 시스템 Python과 가상환경 Python의 패키지 차이
+- **교훈**: FastAPI 서버 실행 시 반드시 `source venv/bin/activate` 먼저 실행
+- **체크리스트**:
+  ```bash
+  # 항상 이 순서로 실행
+  1. source venv/bin/activate
+  2. cd backend
+  3. DATABASE_URL="..." python -m uvicorn main:app --reload --port 8000
+  ```
+
+##### 2. 데이터베이스 스키마 불일치 방지
+- **문제**: 코드와 실제 DB 컬럼명 불일치 (`last_login_at` vs `last_login`)
+- **교훈**: API 개발 전 반드시 DB 스키마 확인
+- **체크 방법**:
+  ```bash
+  psql -d odin_db -c "\d users"  # 테이블 구조 확인
+  ```
+
+##### 3. Pydantic Validation과 NULL 처리
+- **문제**: 빈 테이블에서 집계 함수(`SUM`, `AVG` 등)가 `None` 반환
+- **교훈**: SQL 집계 함수는 항상 `COALESCE()`로 감싸기
+- **패턴**:
+  ```python
+  # ❌ 잘못된 방법
+  SELECT SUM(column) FROM table
+
+  # ✅ 올바른 방법
+  SELECT COALESCE(SUM(column), 0) FROM table
+  ```
+
+##### 4. 여러 백그라운드 프로세스 관리
+- **문제**: 이전 세션의 백그라운드 프로세스 6개가 계속 실행 중
+- **교훈**: 작업 시작 전 기존 프로세스 정리 필요
+- **정리 방법**:
+  ```bash
+  lsof -i :8000  # 포트 사용 확인
+  pkill -f "uvicorn.*main:app"  # 모든 uvicorn 프로세스 종료
+  ```
+
+#### 📋 개발 환경 설정 체크리스트
+
+**백엔드 실행 전 필수 사항**:
+- [ ] PostgreSQL 서버 실행 중 (`psql -d odin_db -c "SELECT 1"`)
+- [ ] 가상환경 활성화 (`source venv/bin/activate`)
+- [ ] 필수 패키지 설치 확인 (`pip list | grep -E "fastapi|pydantic|email-validator"`)
+- [ ] DATABASE_URL 환경변수 설정
+- [ ] 기존 포트 8000 프로세스 정리
+
+**프론트엔드 실행 전 필수 사항**:
+- [ ] Node.js 설치 확인 (`node -v`)
+- [ ] npm 패키지 설치 (`cd frontend && npm install`)
+- [ ] 기존 포트 3000 프로세스 정리
+- [ ] `package.json`의 proxy 설정 확인 (`"proxy": "http://localhost:8000"`)
+
+#### 🎯 다음 작업 예정
+
+1. **관리자 웹 기능 테스트 완료**
+   - [ ] 배치 실행 및 모니터링 테스트
+   - [ ] 사용자 관리 (활성화/비활성화) 테스트
+   - [ ] 시스템 메트릭 수집 테스트
+   - [ ] 로그 검색 및 필터링 테스트
+
+2. **추가 버그 수정**
+   - [ ] Redis 연결 실패 경고 해결 (선택사항)
+   - [ ] API 성능 메트릭 수집 구현
+   - [ ] 실시간 알림 시스템 구현
+
+3. **문서화**
+   - [ ] 관리자 웹 사용자 매뉴얼 작성
+   - [ ] API 엔드포인트 문서 업데이트
+   - [ ] 배치 시스템 운영 가이드 업데이트
+
+#### 💡 참고 사항
+
+**관리자 계정 정보**:
+```
+Email: admin@odin.ai
+Password: admin123
+User ID: 107
+Role: admin (is_superuser: true)
+```
+
+**주요 수정 파일**:
+- `/backend/api/admin_users.py` - last_login 컬럼명 수정
+- `/backend/api/admin_system.py` - COALESCE 추가
+- `/backend/api/admin_auth.py` - 이전 세션에서 이미 수정됨
+
+**테스트 완료 API**:
+- ✅ POST `/api/admin/auth/login` - 로그인 (200 OK)
+- ✅ GET `/api/admin/system/status` - 시스템 상태 (200 OK)
+- ✅ GET `/api/admin/users/statistics/summary` - 사용자 통계 (200 OK)
+- ✅ GET `/api/admin/batch/executions` - 배치 실행 내역 (200 OK)
+- ✅ GET `/api/admin/system/metrics` - 시스템 메트릭 (200 OK)
+- ✅ GET `/api/admin/logs/` - 로그 조회 (200 OK)
+
+**아직 테스트 필요 API** (데이터 부족으로 기본값 반환):
+- ⚠️ GET `/api/admin/system/notifications/status` - 알림 발송 현황 (200 OK, 데이터 0건)
+- ⚠️ GET `/api/admin/users/` - 사용자 목록 (수정 후 테스트 필요)

@@ -110,6 +110,58 @@ try:
 except ImportError as e:
     print(f"⚠️ AI 추천 API 라우터 로드 실패: {e}")
 
+# ============================================
+# 관리자 웹 API 라우터 추가
+# ============================================
+
+# 관리자 인증 라우터 추가
+try:
+    from api.admin_auth import router as admin_auth_router
+    app.include_router(admin_auth_router)
+    print("✅ 관리자 인증 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 관리자 인증 API 라우터 로드 실패: {e}")
+
+# 관리자 배치 모니터링 라우터 추가
+try:
+    from api.admin_batch import router as admin_batch_router
+    app.include_router(admin_batch_router)
+    print("✅ 관리자 배치 모니터링 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 관리자 배치 모니터링 API 라우터 로드 실패: {e}")
+
+# 관리자 시스템 모니터링 라우터 추가
+try:
+    from api.admin_system import router as admin_system_router
+    app.include_router(admin_system_router)
+    print("✅ 관리자 시스템 모니터링 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 관리자 시스템 모니터링 API 라우터 로드 실패: {e}")
+
+# 관리자 사용자 관리 라우터 추가
+try:
+    from api.admin_users import router as admin_users_router
+    app.include_router(admin_users_router)
+    print("✅ 관리자 사용자 관리 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 관리자 사용자 관리 API 라우터 로드 실패: {e}")
+
+# 관리자 로그 조회 라우터 추가
+try:
+    from api.admin_logs import router as admin_logs_router
+    app.include_router(admin_logs_router)
+    print("✅ 관리자 로그 조회 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 관리자 로그 조회 API 라우터 로드 실패: {e}")
+
+# 관리자 통계 분석 라우터 추가
+try:
+    from api.admin_statistics import router as admin_statistics_router
+    app.include_router(admin_statistics_router)
+    print("✅ 관리자 통계 분석 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 관리자 통계 분석 API 라우터 로드 실패: {e}")
+
 # 샘플 데이터
 SAMPLE_BIDS = [
     {

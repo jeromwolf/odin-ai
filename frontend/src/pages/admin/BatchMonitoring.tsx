@@ -1,0 +1,456 @@
+/**
+ * 관리자 - 배치 모니터링 화면
+ * 배치 실행 이력, 상세 정보, 수동 실행
+ */
+
+import React, { useEffect, useState } from 'react';
+import {
+  Box,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  Chip,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
+  Grid,
+  Card,
+  CardContent,
+  Alert,
+  CircularProgress,
+  IconButton,
+  Tooltip,
+} from '@mui/material';
+import {
+  Refresh,
+  PlayArrow,
+  Visibility,
+  FilterList,
+} from '@mui/icons-material';
+import { adminApi } from '../../services/admin/adminApi';
+
+interface BatchExecution {
+  id: number;
+  batch_type: string;
+  status: string;
+  start_time: string;
+  end_time: string | null;
+  duration_seconds: number | null;
+  total_items: number;
+  success_items: number;
+  failed_items: number;
+  error_message: string | null;
+}
+
+const BatchMonitoring: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [executions, setExecutions] = useState<BatchExecution[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [error, setError] = useState<string | null>(null);
+
+  // 필터
+  const [batchType, setBatchType] = useState<string>('');
+  const [status, setStatus] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
+  // 상세 모달
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedExecution, setSelectedExecution] = useState<any>(null);
+
+  // 수동 실행 모달
+  const [executeOpen, setExecuteOpen] = useState(false);
+  const [executeBatchType, setExecuteBatchType] = useState<string>('collector');
+  const [executeLoading, setExecuteLoading] = useState(false);
+
+  useEffect(() => {
+    loadExecutions();
+  }, [page, rowsPerPage, batchType, status, startDate, endDate]);
+
+  const loadExecutions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params: any = {
+        page: page + 1,
+        limit: rowsPerPage,
+      };
+
+      if (batchType) params.batch_type = batchType;
+      if (status) params.status = status;
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const data = await adminApi.getBatchExecutions(params);
+      setExecutions(data.executions || []);
+      setTotal(data.total || 0);
+    } catch (err: any) {
+      console.error('배치 실행 이력 조회 실패:', err);
+      setError(err.response?.data?.detail || '데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewDetail = async (executionId: number) => {
+    try {
+      const detail = await adminApi.getBatchExecutionDetail(executionId);
+      setSelectedExecution(detail);
+      setDetailOpen(true);
+    } catch (err: any) {
+      console.error('배치 상세 정보 조회 실패:', err);
+      setError(err.response?.data?.detail || '상세 정보를 불러오는데 실패했습니다.');
+    }
+  };
+
+  const handleExecuteBatch = async () => {
+    try {
+      setExecuteLoading(true);
+      const result = await adminApi.executeBatchManual({
+        batch_type: executeBatchType,
+        test_mode: false,
+      });
+      alert(`배치 실행 요청 성공!\nTask ID: ${result.task_id}\n${result.message}`);
+      setExecuteOpen(false);
+      loadExecutions(); // 목록 새로고침
+    } catch (err: any) {
+      console.error('배치 수동 실행 실패:', err);
+      setError(err.response?.data?.detail || '배치 실행에 실패했습니다.');
+    } finally {
+      setExecuteLoading(false);
+    }
+  };
+
+  const getStatusChip = (status: string) => {
+    const configs: Record<string, { label: string; color: 'success' | 'error' | 'warning' | 'info' }> = {
+      success: { label: '성공', color: 'success' },
+      failed: { label: '실패', color: 'error' },
+      running: { label: '실행중', color: 'info' },
+    };
+    const config = configs[status] || { label: status, color: 'warning' };
+    return <Chip label={config.label} color={config.color} size="small" />;
+  };
+
+  const getBatchTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      collector: '데이터 수집',
+      downloader: '파일 다운로드',
+      processor: '문서 처리',
+      notification: '알림 발송',
+    };
+    return labels[type] || type;
+  };
+
+  return (
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box>
+          <Typography variant="h4" gutterBottom>
+            배치 모니터링
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            배치 프로그램 실행 이력 및 상태 확인
+          </Typography>
+        </Box>
+        <Box>
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={loadExecutions}
+            sx={{ mr: 1 }}
+          >
+            새로고침
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<PlayArrow />}
+            onClick={() => setExecuteOpen(true)}
+          >
+            수동 실행
+          </Button>
+        </Box>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {/* 필터 */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={3}>
+            <TextField
+              select
+              fullWidth
+              label="배치 타입"
+              value={batchType}
+              onChange={(e) => setBatchType(e.target.value)}
+              size="small"
+            >
+              <MenuItem value="">전체</MenuItem>
+              <MenuItem value="collector">데이터 수집</MenuItem>
+              <MenuItem value="downloader">파일 다운로드</MenuItem>
+              <MenuItem value="processor">문서 처리</MenuItem>
+              <MenuItem value="notification">알림 발송</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <TextField
+              select
+              fullWidth
+              label="상태"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              size="small"
+            >
+              <MenuItem value="">전체</MenuItem>
+              <MenuItem value="success">성공</MenuItem>
+              <MenuItem value="failed">실패</MenuItem>
+              <MenuItem value="running">실행중</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <TextField
+              type="date"
+              fullWidth
+              label="시작 날짜"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              size="small"
+            />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <TextField
+              type="date"
+              fullWidth
+              label="종료 날짜"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              size="small"
+            />
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* 배치 실행 이력 테이블 */}
+      <Paper>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>배치 타입</TableCell>
+                <TableCell>상태</TableCell>
+                <TableCell>실행 시간</TableCell>
+                <TableCell align="right">처리 건수</TableCell>
+                <TableCell align="right">성공</TableCell>
+                <TableCell align="right">실패</TableCell>
+                <TableCell align="right">소요 시간</TableCell>
+                <TableCell align="center">작업</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={9} align="center">
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : executions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} align="center">
+                    배치 실행 이력이 없습니다
+                  </TableCell>
+                </TableRow>
+              ) : (
+                executions.map((execution) => (
+                  <TableRow key={execution.id} hover>
+                    <TableCell>{execution.id}</TableCell>
+                    <TableCell>{getBatchTypeLabel(execution.batch_type)}</TableCell>
+                    <TableCell>{getStatusChip(execution.status)}</TableCell>
+                    <TableCell>
+                      {new Date(execution.start_time).toLocaleString('ko-KR')}
+                    </TableCell>
+                    <TableCell align="right">{execution.total_items}</TableCell>
+                    <TableCell align="right">{execution.success_items}</TableCell>
+                    <TableCell align="right">{execution.failed_items}</TableCell>
+                    <TableCell align="right">
+                      {execution.duration_seconds
+                        ? `${execution.duration_seconds}초`
+                        : '-'}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="상세 보기">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleViewDetail(execution.id)}
+                        >
+                          <Visibility />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          labelRowsPerPage="페이지당 행 수:"
+        />
+      </Paper>
+
+      {/* 상세 정보 모달 */}
+      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>배치 실행 상세 정보</DialogTitle>
+        <DialogContent>
+          {selectedExecution && (
+            <Box>
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="textSecondary">
+                    배치 타입
+                  </Typography>
+                  <Typography variant="body1">
+                    {getBatchTypeLabel(selectedExecution.execution.batch_type)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="textSecondary">
+                    상태
+                  </Typography>
+                  {getStatusChip(selectedExecution.execution.status)}
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="textSecondary">
+                    처리 건수
+                  </Typography>
+                  <Typography variant="body1">
+                    {selectedExecution.execution.total_items}건
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="textSecondary">
+                    성공률
+                  </Typography>
+                  <Typography variant="body1">
+                    {selectedExecution.statistics.success_rate.toFixed(1)}%
+                  </Typography>
+                </Grid>
+              </Grid>
+
+              {selectedExecution.execution.error_message && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {selectedExecution.execution.error_message}
+                </Alert>
+              )}
+
+              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                상세 로그 (최근 10개)
+              </Typography>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>레벨</TableCell>
+                      <TableCell>메시지</TableCell>
+                      <TableCell>시간</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {selectedExecution.detail_logs.slice(0, 10).map((log: any) => (
+                      <TableRow key={log.id}>
+                        <TableCell>
+                          <Chip
+                            label={log.log_level}
+                            size="small"
+                            color={
+                              log.log_level === 'ERROR'
+                                ? 'error'
+                                : log.log_level === 'WARNING'
+                                ? 'warning'
+                                : 'default'
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>{log.message}</TableCell>
+                        <TableCell>
+                          {new Date(log.created_at).toLocaleString('ko-KR')}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailOpen(false)}>닫기</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 수동 실행 모달 */}
+      <Dialog open={executeOpen} onClose={() => setExecuteOpen(false)}>
+        <DialogTitle>배치 수동 실행</DialogTitle>
+        <DialogContent>
+          <TextField
+            select
+            fullWidth
+            label="배치 타입"
+            value={executeBatchType}
+            onChange={(e) => setExecuteBatchType(e.target.value)}
+            margin="normal"
+          >
+            <MenuItem value="collector">데이터 수집</MenuItem>
+            <MenuItem value="downloader">파일 다운로드</MenuItem>
+            <MenuItem value="processor">문서 처리</MenuItem>
+            <MenuItem value="notification">알림 발송</MenuItem>
+          </TextField>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            배치를 수동으로 실행하시겠습니까? 실행 중인 배치가 있는 경우 충돌이 발생할 수
+            있습니다.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExecuteOpen(false)}>취소</Button>
+          <Button
+            onClick={handleExecuteBatch}
+            variant="contained"
+            disabled={executeLoading}
+          >
+            {executeLoading ? <CircularProgress size={24} /> : '실행'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default BatchMonitoring;

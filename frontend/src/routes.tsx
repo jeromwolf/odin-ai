@@ -20,6 +20,16 @@ const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
+// Admin pages
+const AdminLogin = lazy(() => import('./pages/admin/Login'));
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
+const AdminBatchMonitoring = lazy(() => import('./pages/admin/BatchMonitoring'));
+const AdminSystemMonitoring = lazy(() => import('./pages/admin/SystemMonitoring'));
+const AdminUsers = lazy(() => import('./pages/admin/Users'));
+const AdminLogs = lazy(() => import('./pages/admin/Logs'));
+const AdminStatistics = lazy(() => import('./pages/admin/Statistics'));
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
+
 const LoadingScreen = () => (
   <Box
     sx={{
@@ -42,6 +52,18 @@ const AppRoutes = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+        </Route>
+
+        {/* Admin Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="batch" element={<AdminBatchMonitoring />} />
+          <Route path="system" element={<AdminSystemMonitoring />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="logs" element={<AdminLogs />} />
+          <Route path="statistics" element={<AdminStatistics />} />
         </Route>
 
         {/* Private Routes */}
