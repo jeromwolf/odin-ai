@@ -1429,3 +1429,259 @@ Role: admin (is_superuser: true)
 **아직 테스트 필요 API** (데이터 부족으로 기본값 반환):
 - ⚠️ GET `/api/admin/system/notifications/status` - 알림 발송 현황 (200 OK, 데이터 0건)
 - ⚠️ GET `/api/admin/users/` - 사용자 목록 (수정 후 테스트 필요)
+
+---
+
+### ✅ 관리자 UserManagement 페이지 리팩토링 완료 (2025-10-03 오후)
+
+#### 🎯 배경
+- **문제**: UserManagement.tsx 파일이 681줄로 너무 커서 유지보수가 어려움
+- **목표**: 모듈형 구조로 분리하여 디버깅 및 사이드이펙트 방지
+
+#### 📊 리팩토링 결과
+
+**Before (1개 파일)**:
+```
+UserManagement.tsx: 681줄
+```
+
+**After (9개 파일, 총 934줄)**:
+```
+UserManagement/
+├── index.tsx                    115줄  (메인 조합)
+├── types.ts                     36줄   (타입 정의)
+├── utils.tsx                    35줄   (헬퍼 함수)
+├── hooks/
+│   └── useUserManagement.ts     141줄  (상태 관리)
+└── components/
+    ├── TabPanel.tsx             15줄   (탭 패널)
+    ├── UserStats.tsx            85줄   (통계 카드)
+    ├── UserFilters.tsx          74줄   (필터)
+    ├── UserTable.tsx            147줄  (테이블)
+    └── UserDetailDialog.tsx     286줄  (상세 모달)
+```
+
+#### ✅ 개선 효과
+
+1. **관심사 분리**: types, utils, hooks, components로 명확하게 구분
+2. **파일 크기 관리**: 최대 286줄 (UserDetailDialog) - 관리 가능한 크기
+3. **유지보수성 향상**: 각 파일이 단일 책임만 가짐
+4. **재사용 가능**: 컴포넌트를 다른 곳에서도 사용 가능
+5. **디버깅 용이**: 문제 발생 시 해당 파일만 수정하면 됨
+
+#### 🔧 작업 프로세스
+
+```bash
+# 1. 안전한 브랜치 생성
+git checkout -b refactor/user-management
+
+# 2. 모듈별 파일 생성
+- types.ts: User, UserDetail, TabPanelProps 인터페이스
+- utils.tsx: getPlanChip, getStatusChip 헬퍼 함수
+- hooks/useUserManagement.ts: 모든 상태와 핸들러
+- components/TabPanel.tsx: 탭 패널 래퍼
+- components/UserStats.tsx: 4개 통계 카드
+- components/UserFilters.tsx: 검색/필터 컨트롤
+- components/UserTable.tsx: 사용자 목록 테이블
+- components/UserDetailDialog.tsx: 상세 정보 모달
+
+# 3. 메인 컴포넌트 통합
+- index.tsx: 모든 컴포넌트 조합
+
+# 4. 테스트 및 병합
+- 브라우저 테스트: 정상 작동 확인 ✅
+- 컴파일: 성공 (에러 없음) ✅
+- API 연동: 200 OK 응답 ✅
+
+# 5. 구버전 파일 삭제 및 커밋
+git rm frontend/src/pages/admin/UserManagement.tsx
+git commit -m "refactor: UserManagement 모듈화 (681줄 → 9개 파일)"
+
+# 6. main 브랜치 병합
+git checkout main
+git merge refactor/user-management --no-ff
+git branch -d refactor/user-management
+
+# 7. GitHub push
+git push origin main
+```
+
+#### 📝 생성된 파일 상세
+
+##### 1. **types.ts** (36줄)
+```typescript
+export interface User {
+  id: number;
+  email: string;
+  username: string;
+  full_name: string | null;
+  company: string | null;
+  phone: string | null;
+  subscription_plan: string;
+  is_active: boolean;
+  email_verified: boolean;
+  created_at: string;
+  last_login: string | null;
+}
+
+export interface UserDetail {
+  user: User;
+  activity_stats: {
+    total_searches: number;
+    total_bookmarks: number;
+    total_notifications: number;
+    last_search_date: string | null;
+  };
+  notification_rules: any[];
+  bookmarks: any[];
+  recent_activities: any[];
+}
+
+export interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+```
+
+##### 2. **utils.tsx** (35줄)
+- `getPlanChip()`: 구독 플랜에 따른 칩 컴포넌트 반환
+- `getStatusChip()`: 사용자 활성 상태 칩 컴포넌트 반환
+
+##### 3. **hooks/useUserManagement.ts** (141줄)
+- 모든 useState 훅 관리
+- loadUsers, loadUserStats, handleViewDetail, handleToggleUserStatus 핸들러
+- useEffect로 페이지/필터 변경 시 자동 데이터 로드
+- 반환값: state, setters, handlers
+
+##### 4. **components/** (5개 컴포넌트)
+- **TabPanel.tsx**: 탭 패널 래퍼 컴포넌트
+- **UserStats.tsx**: 전체/활성/인증/유료 사용자 통계 카드
+- **UserFilters.tsx**: 검색/구독플랜/상태 필터
+- **UserTable.tsx**: 사용자 목록 테이블 + 페이지네이션
+- **UserDetailDialog.tsx**: 상세 정보 모달 (기본정보, 활동통계, 3개 탭)
+
+##### 5. **index.tsx** (115줄)
+```typescript
+const UserManagement: React.FC = () => {
+  const {
+    loading, users, total, page, rowsPerPage, error,
+    searchQuery, planFilter, statusFilter,
+    detailOpen, selectedUser, detailTab, userStats,
+    setPage, setRowsPerPage, setError,
+    setSearchQuery, setPlanFilter, setStatusFilter,
+    setDetailOpen, setDetailTab,
+    loadUsers, handleViewDetail, handleToggleUserStatus,
+  } = useUserManagement();
+
+  return (
+    <Box>
+      {error && <Alert severity="error">{error}</Alert>}
+      <UserStats userStats={userStats} />
+      <UserFilters ... />
+      <UserTable ... />
+      <UserDetailDialog ... />
+    </Box>
+  );
+};
+```
+
+#### 🎓 배운 교훈
+
+##### 1. **모듈형 개발의 중요성**
+- 큰 파일(681줄)은 수정 시 사이드이펙트 발생 가능성 높음
+- 작은 파일들로 분리하면 영향 범위가 명확해짐
+
+##### 2. **컴포넌트 분리 기준**
+- **최대 300줄** 이하로 유지 (UserDetailDialog 286줄)
+- 단일 책임 원칙: 각 컴포넌트는 하나의 역할만
+- 재사용 가능성: 다른 곳에서도 사용 가능하게 설계
+
+##### 3. **Git 브랜치 전략**
+- 리팩토링은 별도 브랜치에서 작업
+- 브라우저 테스트 완료 후 병합
+- `--no-ff` 옵션으로 병합 이력 보존
+
+##### 4. **파일 구조 설계**
+```
+Feature/
+├── index.tsx        # 메인 컴포넌트 (조합)
+├── types.ts         # 타입 정의
+├── utils.tsx        # 헬퍼 함수
+├── hooks/           # 커스텀 훅 (로직)
+└── components/      # UI 컴포넌트
+```
+
+#### 📋 Git 커밋 내역
+
+```
+e7aea05b Merge branch 'refactor/user-management'
+7e0fe209 refactor: UserManagement 모듈화 (681줄 → 9개 파일)
+```
+
+**커밋 메시지**:
+```
+refactor: UserManagement 모듈화 (681줄 → 9개 파일)
+
+## 변경사항
+- UserManagement.tsx (681줄) 삭제
+- 모듈형 구조로 재구성 (9개 파일, 총 934줄)
+
+## 새 구조
+UserManagement/
+├── index.tsx (115줄) - 메인 컴포넌트
+├── types.ts (36줄) - 타입 정의
+├── utils.tsx (35줄) - 헬퍼 함수
+├── hooks/useUserManagement.ts (141줄) - 상태/로직 관리
+└── components/ (5개 파일)
+
+## 개선 효과
+- ✅ 관심사 분리
+- ✅ 파일 크기 감소
+- ✅ 유지보수성 향상
+- ✅ 재사용 가능한 컴포넌트
+- ✅ 디버깅 용이성 증가
+
+🤖 Generated with Claude Code
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+#### ✅ 테스트 결과
+
+- **브라우저**: http://localhost:3000/admin/users 정상 작동
+- **API 응답**:
+  - GET `/api/admin/users/?page=1&limit=20` - 200 OK
+  - GET `/api/admin/users/statistics/summary` - 200 OK
+- **컴파일**: Compiled successfully! (에러 없음)
+- **기능**: 검색, 필터, 페이지네이션, 상세보기 모두 정상
+
+#### 🚀 향후 적용 계획
+
+**다른 큰 파일들도 동일한 방법으로 리팩토링**:
+1. BatchMonitoring.tsx (500줄 이상?)
+2. SystemMonitoring.tsx (500줄 이상?)
+3. Statistics.tsx (500줄 이상?)
+
+**리팩토링 우선순위**:
+- 300줄 이상 파일 우선 분리
+- 여러 개발자가 동시 작업하는 파일 우선
+- 자주 수정되는 파일 우선
+
+---
+
+## 📝 2025-10-03 작업 마무리
+
+### ✅ 오늘 완료된 작업
+1. **관리자 웹 화면 API 버그 수정** - last_login, COALESCE 등
+2. **UserManagement 페이지 리팩토링** - 681줄 → 9개 파일로 모듈화
+3. **Git 커밋 및 GitHub push** - 모든 변경사항 원격 저장소 반영
+
+### 📊 코드 품질 개선
+- **Before**: 1개 파일 681줄 (유지보수 어려움)
+- **After**: 9개 파일 934줄 (모듈화, 명확한 책임 분리)
+- **테스트**: 브라우저 테스트 완료 ✅
+
+### 🎯 다음 작업 예정
+1. 다른 관리자 페이지 리팩토링 (BatchMonitoring, SystemMonitoring 등)
+2. 관리자 웹 기능 완전 테스트
+3. 프로덕션 배포 준비
