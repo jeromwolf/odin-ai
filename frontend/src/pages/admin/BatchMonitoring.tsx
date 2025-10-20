@@ -30,6 +30,9 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
+  Checkbox,
+  FormControlLabel,
+  Divider,
 } from '@mui/material';
 import {
   Refresh,
@@ -72,7 +75,10 @@ const BatchMonitoring: React.FC = () => {
 
   // 수동 실행 모달
   const [executeOpen, setExecuteOpen] = useState(false);
-  const [executeBatchType, setExecuteBatchType] = useState<string>('collector');
+  const [executeBatchType, setExecuteBatchType] = useState<string>('production');
+  const [executeStartDate, setExecuteStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [executeEndDate, setExecuteEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [enableNotification, setEnableNotification] = useState<boolean>(true);
   const [executeLoading, setExecuteLoading] = useState(false);
 
   useEffect(() => {
@@ -122,6 +128,9 @@ const BatchMonitoring: React.FC = () => {
       const result = await adminApi.executeBatchManual({
         batch_type: executeBatchType,
         test_mode: false,
+        start_date: executeStartDate,
+        end_date: executeEndDate,
+        enable_notification: enableNotification,
       });
       alert(`배치 실행 요청 성공!\nTask ID: ${result.task_id}\n${result.message}`);
       setExecuteOpen(false);
@@ -146,10 +155,11 @@ const BatchMonitoring: React.FC = () => {
 
   const getBatchTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
+      production: '전체 배치',
       collector: '데이터 수집',
       downloader: '파일 다운로드',
       processor: '문서 처리',
-      notification: '알림 발송',
+      notification: '알림만 실행',
     };
     return labels[type] || type;
   };
@@ -417,26 +427,80 @@ const BatchMonitoring: React.FC = () => {
       </Dialog>
 
       {/* 수동 실행 모달 */}
-      <Dialog open={executeOpen} onClose={() => setExecuteOpen(false)}>
+      <Dialog open={executeOpen} onClose={() => setExecuteOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>배치 수동 실행</DialogTitle>
         <DialogContent>
-          <TextField
-            select
-            fullWidth
-            label="배치 타입"
-            value={executeBatchType}
-            onChange={(e) => setExecuteBatchType(e.target.value)}
-            margin="normal"
-          >
-            <MenuItem value="collector">데이터 수집</MenuItem>
-            <MenuItem value="downloader">파일 다운로드</MenuItem>
-            <MenuItem value="processor">문서 처리</MenuItem>
-            <MenuItem value="notification">알림 발송</MenuItem>
-          </TextField>
-          <Alert severity="warning" sx={{ mt: 2 }}>
-            배치를 수동으로 실행하시겠습니까? 실행 중인 배치가 있는 경우 충돌이 발생할 수
-            있습니다.
-          </Alert>
+          <Box sx={{ pt: 1 }}>
+            <TextField
+              select
+              fullWidth
+              label="배치 타입"
+              value={executeBatchType}
+              onChange={(e) => setExecuteBatchType(e.target.value)}
+              margin="normal"
+              helperText="production: 전체 배치(수집+처리), notification: 알림만"
+            >
+              <MenuItem value="production">전체 배치 (수집 + 처리 + 알림)</MenuItem>
+              <MenuItem value="notification">알림만 실행 (수집 안 함)</MenuItem>
+              <MenuItem value="collector">데이터 수집만</MenuItem>
+              <MenuItem value="downloader">파일 다운로드만</MenuItem>
+              <MenuItem value="processor">문서 처리만</MenuItem>
+            </TextField>
+
+            <Divider sx={{ my: 2 }} />
+
+            <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+              수집 기간 설정
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="시작 날짜"
+                  value={executeStartDate}
+                  onChange={(e) => setExecuteStartDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="종료 날짜"
+                  value={executeEndDate}
+                  onChange={(e) => setExecuteEndDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+            </Grid>
+
+            <Divider sx={{ my: 2 }} />
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={enableNotification}
+                  onChange={(e) => setEnableNotification(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="알림 실행 (이메일 발송)"
+            />
+
+            <Alert severity="info" sx={{ mt: 2 }}>
+              💡 <strong>알림 동작 방식:</strong>
+              <br />
+              • 선택한 기간의 입찰공고를 사용자 알림 규칙과 매칭
+              <br />
+              • 매칭되면 알림 생성 + 이메일 발송 (설정 시)
+              <br />• 중복 알림 자동 방지
+            </Alert>
+
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              ⚠️ 실행 중인 배치가 있는 경우 충돌이 발생할 수 있습니다.
+            </Alert>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setExecuteOpen(false)}>취소</Button>
@@ -444,8 +508,9 @@ const BatchMonitoring: React.FC = () => {
             onClick={handleExecuteBatch}
             variant="contained"
             disabled={executeLoading}
+            startIcon={executeLoading ? <CircularProgress size={20} /> : <PlayArrow />}
           >
-            {executeLoading ? <CircularProgress size={24} /> : '실행'}
+            {executeLoading ? '실행 중...' : '배치 실행'}
           </Button>
         </DialogActions>
       </Dialog>

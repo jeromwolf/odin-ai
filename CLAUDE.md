@@ -1685,3 +1685,215 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 1. 다른 관리자 페이지 리팩토링 (BatchMonitoring, SystemMonitoring 등)
 2. 관리자 웹 기능 완전 테스트
 3. 프로덕션 배포 준비
+
+---
+
+## 📝 2025-10-20 작업 기록
+
+### ✅ 관리자 웹 배치 모니터링 시스템 구축 완료
+
+#### 🎯 주요 성과
+- **배치 수동 실행 기능 구현**: 관리자 화면에서 날짜/알림 선택하여 배치 실행 ✅
+- **백엔드 API 안정화**: Port 9000으로 이전, 모든 의존성 설치 완료 ✅
+- **프론트엔드 UI 개선**: 날짜 선택, 알림 토글, 배치 타입 선택 기능 ✅
+- **배치 프로그램 정상 작동 확인**: 143개 신규 공고 수집, 118개 문서 다운로드 성공 ✅
+
+#### 🔧 해결한 주요 문제
+
+##### 1. Port 충돌 문제
+**문제**:
+- Port 8000에서 다른 프로그램이 이미 실행 중
+- 프론트엔드와 백엔드 API 포트 불일치
+
+**해결**:
+```bash
+# 백엔드를 Port 9000으로 변경
+cd backend && DATABASE_URL="postgresql://..." python3 -m uvicorn main:app --reload --port 9000
+
+# 프론트엔드 API 클라이언트 업데이트
+# adminApi.ts, api.ts에서 모든 포트를 9000으로 변경
+```
+
+##### 2. 백엔드 의존성 누락
+**문제**:
+- 가상환경에 필수 패키지 미설치로 서버 시작 실패
+- PyJWT, psutil, uvicorn, fastapi, python-jose, bcrypt 등 누락
+
+**해결**:
+```bash
+source venv/bin/activate
+pip install PyJWT psutil
+pip install uvicorn fastapi
+pip install "python-jose[cryptography]" bcrypt "passlib[bcrypt]" sqlalchemy psycopg2-binary python-multipart "pydantic[email]" email-validator
+pip install requests aiohttp beautifulsoup4
+```
+
+##### 3. 데이터베이스 테이블명 불일치
+**문제**:
+- 코드에서 `notification_rules` 테이블 참조
+- 실제 DB는 `alert_rules` 테이블 사용
+
+**해결**:
+```python
+# /backend/api/admin_users.py Line 130
+# BEFORE:
+cursor.execute("SELECT COUNT(*) FROM notification_rules WHERE user_id = %s", (user_id,))
+
+# AFTER:
+cursor.execute("SELECT COUNT(*) FROM alert_rules WHERE user_id = %s", (user_id,))
+```
+
+##### 4. TypeScript 타입 불일치
+**문제**:
+- BatchMonitoring.tsx에서 새 파라미터 전달하지만 API 타입 정의 누락
+
+**해결**:
+```typescript
+// /frontend/src/services/admin/adminApi.ts
+async executeBatchManual(data: {
+  batch_type: string;
+  test_mode?: boolean;
+  start_date?: string;           // ✅ 추가
+  end_date?: string;             // ✅ 추가
+  enable_notification?: boolean; // ✅ 추가
+})
+```
+
+#### 📊 배치 실행 결과
+
+**Phase 1: API 데이터 수집**
+- ✅ 수집 기간: 2025-10-20 ~ 2025-10-20
+- ✅ 총 149개 공고 중 143개 신규 저장
+- ✅ 중복 6개 스킵
+
+**Phase 2: 파일 다운로드**
+- ✅ 118개 문서 다운로드 성공
+- ✅ HWP, PDF, HWPX, XLSX 파일 모두 지원
+
+**Phase 3: 문서 처리** (진행 중)
+- 🔄 HWP → Markdown 변환 중
+- 🔄 정보 추출 및 태그 생성 중
+- 🔄 예상 소요 시간: 5-10분
+
+**Phase 4: 알림 매칭** (대기 중)
+- ⏳ Phase 3 완료 후 자동 실행 예정
+
+#### 🏗️ 개선된 시스템 아키텍처
+
+##### 관리자 배치 모니터링 플로우
+```
+관리자 화면 → [배치 실행] 버튼 클릭 →
+날짜 선택 (시작일/종료일) →
+알림 ON/OFF 토글 →
+배치 타입 선택 (전체/수집/다운로드/처리/알림) →
+API 호출 (POST /api/admin/batch/execute) →
+백엔드 subprocess로 배치 프로그램 실행 →
+배치 완료 후 batch_execution_logs 테이블에 기록 →
+관리자 화면에서 실시간 모니터링 가능
+```
+
+##### 배치 실행 환경 변수
+```bash
+DATABASE_URL="postgresql://blockmeta@localhost:5432/odin_db"
+BATCH_START_DATE="2025-10-20"
+BATCH_END_DATE="2025-10-20"
+ENABLE_NOTIFICATION="true"  # 알림 ON/OFF
+```
+
+#### 💡 배운 교훈
+
+##### 1. 가상환경 의존성 관리
+- **교훈**: 프로덕션과 개발 환경의 Python 패키지 차이 확인 필수
+- **체크리스트**:
+  ```bash
+  # 항상 가상환경 활성화 후 서버 실행
+  source venv/bin/activate
+  pip list  # 필수 패키지 확인
+  python3 -m uvicorn main:app --reload --port 9000
+  ```
+
+##### 2. Port 관리 전략
+- **교훈**: 개발 중 여러 프로세스가 같은 포트 사용 시 충돌
+- **해결책**: 프로젝트별 고유 포트 할당 (8000 → 9000)
+- **정리 방법**:
+  ```bash
+  lsof -i :9000  # 포트 사용 확인
+  pkill -f "uvicorn.*main:app"  # 기존 프로세스 종료
+  ```
+
+##### 3. 배치 프로그램 실행 확인
+- **교훈**: `batch_execution_logs` 테이블은 배치 완료 후 기록됨
+- **실시간 확인 방법**:
+  ```bash
+  ps aux | grep production_batch.py  # 프로세스 실행 여부 확인
+  tail -f batch_output.log           # 실시간 로그 확인
+  ```
+
+##### 4. 프론트엔드-백엔드 타입 동기화
+- **교훈**: TypeScript 인터페이스와 백엔드 Pydantic 모델 일치 필수
+- **체크 방법**: API 스펙 문서 작성 또는 OpenAPI 자동 생성 활용
+
+#### 📋 주요 수정 파일
+
+**백엔드**:
+- `/backend/api/admin_users.py` - alert_rules 테이블명 수정
+- `/backend/api/admin_batch.py` - 배치 실행 엔드포인트 확인
+- `/backend/main.py` - Port 9000으로 변경
+
+**프론트엔드**:
+- `/frontend/src/pages/admin/BatchMonitoring.tsx` - UI 개선 (날짜 선택, 알림 토글)
+- `/frontend/src/services/admin/adminApi.ts` - 타입 정의 추가, Port 9000 변경
+- `/frontend/src/services/api.ts` - Port 9000 변경
+
+**배치 프로그램**:
+- `/batch/production_batch.py` - Phase 4 알림 매칭 단계 확인
+
+#### 🎯 다음 작업 예정
+
+1. **배치 완료 대기 및 결과 확인**
+   - [ ] Phase 3 문서 처리 완료 확인
+   - [ ] Phase 4 알림 매칭 실행 확인
+   - [ ] batch_execution_logs 테이블 기록 확인
+   - [ ] 관리자 화면에서 배치 결과 표시 확인
+
+2. **배치 모니터링 UI 완성**
+   - [ ] 실시간 진행률 표시
+   - [ ] 배치 실행 상태 아이콘 (실행 중/성공/실패)
+   - [ ] 배치 로그 상세 보기 기능
+   - [ ] 자동 새로고침 기능
+
+3. **시스템 안정화**
+   - [ ] 에러 핸들링 강화
+   - [ ] 배치 실패 시 재시도 로직
+   - [ ] 배치 실행 큐 시스템 (동시 실행 방지)
+
+#### 📈 시스템 상태 요약
+
+**백엔드 (Port 9000)**
+```
+✅ 모든 API 라우터 등록 완료 (15개)
+✅ 관리자 배치 실행 API 정상 작동
+✅ 가상환경 의존성 설치 완료
+```
+
+**프론트엔드 (Port 3000)**
+```
+✅ 관리자 배치 모니터링 페이지 구현 완료
+✅ 날짜/알림 선택 UI 완성
+✅ TypeScript 컴파일 성공 (에러 없음)
+```
+
+**배치 시스템**
+```
+✅ 143개 신규 공고 수집
+✅ 118개 문서 다운로드
+🔄 문서 처리 진행 중 (Phase 3)
+⏳ 알림 매칭 대기 중 (Phase 4)
+```
+
+**데이터베이스**
+```
+✅ PostgreSQL 정상 작동
+✅ 52+ 테이블 스키마 안정
+✅ batch_execution_logs 테이블 준비 완료
+```

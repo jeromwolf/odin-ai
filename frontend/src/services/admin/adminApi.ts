@@ -5,7 +5,7 @@
 
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:9000';
 
 class AdminApiClient {
   private client: AxiosInstance;
@@ -135,7 +135,9 @@ class AdminApiClient {
   async executeBatchManual(data: {
     batch_type: string;
     test_mode?: boolean;
-    date_range?: any;
+    start_date?: string;
+    end_date?: string;
+    enable_notification?: boolean;
   }) {
     const response = await this.client.post('/api/admin/batch/execute', data);
     return response.data;

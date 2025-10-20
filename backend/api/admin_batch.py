@@ -79,9 +79,11 @@ class BatchStatisticsResponse(BaseModel):
 
 class BatchManualRunRequest(BaseModel):
     """배치 수동 실행 요청"""
-    batch_type: str = Field(..., description="collector/downloader/processor/notification")
+    batch_type: str = Field(default="production", description="production/collector/downloader/processor")
     test_mode: bool = Field(default=False, description="테스트 모드 (DB 저장 안 함)")
-    date_range: Optional[dict] = Field(None, description="특정 날짜 범위")
+    start_date: Optional[str] = Field(None, description="시작 날짜 (YYYY-MM-DD)")
+    end_date: Optional[str] = Field(None, description="종료 날짜 (YYYY-MM-DD)")
+    enable_notification: bool = Field(default=True, description="알림 실행 여부")
 
 
 class BatchManualRunResponse(BaseModel):
@@ -380,48 +382,54 @@ async def execute_batch_manual(request: BatchManualRunRequest):
     """
     배치 수동 실행
 
-    - batch_type: collector/downloader/processor/notification
+    - batch_type: production (전체 배치)
+    - start_date: 시작 날짜 (YYYY-MM-DD)
+    - end_date: 종료 날짜 (YYYY-MM-DD)
+    - enable_notification: 알림 실행 여부
     - test_mode: 테스트 모드 (DB 저장 안 함)
-    - date_range: 특정 날짜만 처리 (선택사항)
-
-    **주의**: 실제 배치 실행은 Celery 등 백그라운드 작업으로 처리 필요
-    현재는 배치 실행 로그만 생성
     """
+    import subprocess
+    import os
+    from datetime import datetime as dt
+
     try:
-        # 배치 타입 검증
-        valid_types = ['collector', 'downloader', 'processor', 'notification']
-        if request.batch_type not in valid_types:
-            raise HTTPException(
-                status_code=400,
-                detail=f"유효하지 않은 배치 타입입니다. ({', '.join(valid_types)})"
-            )
+        # 기본 날짜 설정 (오늘 날짜)
+        today = dt.now().strftime('%Y-%m-%d')
+        start_date = request.start_date or today
+        end_date = request.end_date or today
 
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
+        # 환경변수 설정
+        env = os.environ.copy()
+        env['DATABASE_URL'] = "postgresql://blockmeta@localhost:5432/odin_db"
+        env['BATCH_START_DATE'] = start_date
+        env['BATCH_END_DATE'] = end_date
+        env['ENABLE_NOTIFICATION'] = "true" if request.enable_notification else "false"
+        if request.test_mode:
+            env['TEST_MODE'] = "true"
 
-            # 배치 실행 로그 생성 (함수 사용)
-            cursor.execute(
-                "SELECT fn_batch_start(%s, %s, %s)",
-                (request.batch_type, 'manual', None)  # TODO: 관리자 user_id 추가
-            )
-            task_id = cursor.fetchone()[0]
-            conn.commit()
+        # 배치 프로그램 경로
+        batch_script = "/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai/batch/production_batch.py"
+        venv_python = "/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai/venv_test/bin/python3"
 
-            # TODO: 실제 배치 실행 로직
-            # - Celery 태스크로 비동기 실행
-            # - 또는 subprocess로 배치 스크립트 실행
-            # - 현재는 로그만 생성
+        # 백그라운드로 배치 실행
+        process = subprocess.Popen(
+            [venv_python, batch_script],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True
+        )
 
-            logger.info(f"배치 수동 실행 요청: {request.batch_type}, task_id={task_id}")
+        task_id = process.pid
 
-            return BatchManualRunResponse(
-                task_id=task_id,
-                status="queued",
-                message=f"{request.batch_type} 배치가 대기열에 추가되었습니다"
-            )
+        logger.info(f"배치 수동 실행: PID={task_id}, 날짜={start_date}~{end_date}, 알림={request.enable_notification}")
 
-    except HTTPException:
-        raise
+        return BatchManualRunResponse(
+            task_id=task_id,
+            status="running",
+            message=f"배치가 실행되었습니다 (PID: {task_id}, 날짜: {start_date} ~ {end_date}, 알림: {'ON' if request.enable_notification else 'OFF'})"
+        )
+
     except Exception as e:
         logger.error(f"배치 수동 실행 실패: {e}")
         raise HTTPException(status_code=500, detail=str(e))

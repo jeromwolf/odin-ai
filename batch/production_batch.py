@@ -12,11 +12,19 @@ import os
 import sys
 import time
 import json
-import redis
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
 from datetime import datetime
 from pathlib import Path
 from loguru import logger
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv 없으면 환경변수만 사용
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -25,10 +33,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from batch.modules.collector import APICollector
 from batch.modules.downloader import DocumentDownloader
 from batch.modules.processor import DocumentProcessorModule
+from batch.modules.notification_matcher import NotificationMatcher
 from batch.modules.email_reporter import EmailReporter
-
-# 환경변수 로드
-load_dotenv()
 
 # 로거 설정
 log_dir = Path("logs")
@@ -55,11 +61,16 @@ class ProductionBatch:
             'failed': 0,
             'extracted_info': 0,
             'tags_created': 0,
-            'attachments': 0
+            'attachments': 0,
+            'notifications_created': 0,
+            'emails_sent': 0
         }
 
         # 새로 수집된 공고 ID 저장
         self.new_bid_ids = []
+
+        # 알림 실행 여부 (환경변수로 제어)
+        self.enable_notification = os.getenv('ENABLE_NOTIFICATION', 'true').lower() == 'true'
 
     def run(self):
         """배치 실행 메인 함수"""
@@ -99,15 +110,24 @@ class ProductionBatch:
             logger.info("="*40)
             self._run_processor()
 
-            # 5. 이메일 보고서 발송
+            # 5. 알림 매칭 (ENABLE_NOTIFICATION=true인 경우만)
+            if self.enable_notification:
+                logger.info("\n" + "="*40)
+                logger.info("🔔 Phase 4: 알림 매칭")
+                logger.info("="*40)
+                self._run_notification_matcher()
+            else:
+                logger.info("\n⏭️ Phase 4: 알림 매칭 건너뜀 (ENABLE_NOTIFICATION=false)")
+
+            # 6. 이메일 보고서 발송
             logger.info("\n" + "="*40)
-            logger.info("📧 Phase 4: 보고서 발송")
+            logger.info("📧 Phase 5: 보고서 발송")
             logger.info("="*40)
             self._send_report()
 
-            # 6. 이벤트 발행 (Redis Pub/Sub)
+            # 7. 이벤트 발행 (Redis Pub/Sub)
             logger.info("\n" + "="*40)
-            logger.info("📢 Phase 5: 이벤트 발행")
+            logger.info("📢 Phase 6: 이벤트 발행")
             logger.info("="*40)
             self._publish_event()
 
@@ -320,6 +340,31 @@ class ProductionBatch:
         except Exception as e:
             logger.error(f"❌ 문서 처리 오류: {e}")
 
+    def _run_notification_matcher(self):
+        """알림 매칭 실행"""
+        try:
+            matcher = NotificationMatcher(self.db_url)
+
+            # 새로 수집된 입찰공고에 대해 알림 매칭
+            if self.new_bid_ids:
+                logger.info(f"🔍 신규 입찰 {len(self.new_bid_ids)}건에 대해 알림 규칙 매칭 중...")
+                result = matcher.process_new_bids(since_hours=4)
+
+                self.stats['notifications_created'] = result.get('notifications_created', 0)
+                self.stats['emails_sent'] = result.get('emails_sent', 0)
+
+                logger.info(f"✅ 알림 매칭 완료:")
+                logger.info(f"   - 처리 대상: {result.get('processed_bids', 0)}건")
+                logger.info(f"   - 알림 생성: {result.get('notifications_created', 0)}개")
+                logger.info(f"   - 이메일 발송: {result.get('emails_sent', 0)}개")
+            else:
+                logger.info("💡 신규 입찰공고가 없어 알림 매칭을 건너뜁니다.")
+
+        except Exception as e:
+            logger.error(f"❌ 알림 매칭 오류: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
     def _send_report(self):
         """이메일 보고서 발송 - 모든 문서 처리 완료 후에만 발송"""
         try:
@@ -367,6 +412,10 @@ class ProductionBatch:
 
     def _publish_event(self):
         """배치 완료 이벤트 발행 (Redis Pub/Sub)"""
+        if not REDIS_AVAILABLE:
+            logger.warning("⚠️ Redis 모듈이 설치되지 않아 이벤트 발행을 건너뜁니다.")
+            return
+
         try:
             # Redis 연결
             redis_client = redis.Redis(
@@ -412,13 +461,18 @@ class ProductionBatch:
         logger.info("\n" + "="*60)
         logger.info("📊 최종 실행 결과")
         logger.info("="*60)
-        logger.info(f"  📡 API 수집: {self.stats['collected']}건")
+        logger.info(f"  📡 API 수집: {self.stats['collected']}건 (신규: {len(self.new_bid_ids)}건)")
         logger.info(f"  📥 다운로드: {self.stats['downloaded']}건")
         logger.info(f"  🔧 처리 완료: {self.stats['processed']}건")
         logger.info(f"  ❌ 실패: {self.stats['failed']}건")
         logger.info(f"  📋 추출 정보: {self.stats['extracted_info']}개")
         logger.info(f"  🏷️ 생성 태그: {self.stats['tags_created']}개")
         logger.info(f"  📎 첨부파일: {self.stats['attachments']}개")
+
+        # 알림 통계 (실행된 경우만)
+        if self.enable_notification:
+            logger.info(f"  🔔 알림 생성: {self.stats['notifications_created']}개")
+            logger.info(f"  📧 이메일 발송: {self.stats['emails_sent']}개")
 
         # 성공률 계산
         total_attempts = self.stats['downloaded'] + self.stats['failed']

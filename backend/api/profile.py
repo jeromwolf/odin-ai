@@ -65,7 +65,7 @@ async def get_profile(current_user = Depends(get_current_user_optional)):
         cur.execute("""
             SELECT u.id, u.username, u.email, u.full_name, u.phone_number,
                    u.company, u.department, u.position, u.created_at,
-                   u.last_login, u.is_active,
+                   u.last_login, u.is_active, u.is_superuser,
                    sp.name as plan_name, us.status as subscription_status,
                    us.started_at, us.expires_at
             FROM users u
@@ -121,6 +121,7 @@ async def get_profile(current_user = Depends(get_current_user_optional)):
             "position": user['position'] or "",
             "created_at": user['created_at'].isoformat() if user['created_at'] else None,
             "last_login": user['last_login'].isoformat() if user['last_login'] else None,
+            "role": "admin" if user.get('is_superuser') else "user",
             "subscription": {
                 "plan": user['plan_name'] or "basic",
                 "status": user['subscription_status'] or "active",

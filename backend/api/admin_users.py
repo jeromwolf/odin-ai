@@ -127,7 +127,7 @@ async def get_user_detail(user_id: int):
             cursor.execute("SELECT COUNT(*) FROM user_bookmarks WHERE user_id = %s", (user_id,))
             bookmark_count = cursor.fetchone()[0]
 
-            cursor.execute("SELECT COUNT(*) FROM notification_rules WHERE user_id = %s", (user_id,))
+            cursor.execute("SELECT COUNT(*) FROM alert_rules WHERE user_id = %s", (user_id,))
             notification_rule_count = cursor.fetchone()[0]
 
             statistics = {
