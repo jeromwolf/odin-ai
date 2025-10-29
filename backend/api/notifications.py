@@ -74,7 +74,7 @@ async def create_notification_rule(
                 rule.rule_name,
                 rule.description,
                 json.dumps(rule.conditions),
-                rule.notification_channels,
+                json.dumps(rule.notification_channels),
                 rule.notification_timing,
                 rule.notification_time,
                 rule.notification_day

@@ -21,11 +21,25 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """일반 비밀번호와 해시된 비밀번호 비교"""
-    return pwd_context.verify(plain_password, hashed_password)
+    # bcrypt는 72바이트 제한이 있으므로 비밀번호를 UTF-8로 인코딩하여 잘라냄
+    try:
+        # 비밀번호를 72바이트로 제한
+        if len(plain_password.encode('utf-8')) > 72:
+            plain_password = plain_password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        # bcrypt 오류 발생 시 로깅하고 False 반환
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"비밀번호 검증 오류: {e}")
+        return False
 
 
 def get_password_hash(password: str) -> str:
     """비밀번호 해시 생성"""
+    # bcrypt는 72바이트 제한이 있으므로 비밀번호를 UTF-8로 인코딩하여 잘라냄
+    if len(password.encode('utf-8')) > 72:
+        password = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
     return pwd_context.hash(password)
 
 

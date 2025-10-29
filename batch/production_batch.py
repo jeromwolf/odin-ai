@@ -348,7 +348,7 @@ class ProductionBatch:
             # 새로 수집된 입찰공고에 대해 알림 매칭
             if self.new_bid_ids:
                 logger.info(f"🔍 신규 입찰 {len(self.new_bid_ids)}건에 대해 알림 규칙 매칭 중...")
-                result = matcher.process_new_bids(since_hours=4)
+                result = matcher.process_new_bids(since_hours=24)  # 타임존 차이 고려하여 24시간으로 설정
 
                 self.stats['notifications_created'] = result.get('notifications_created', 0)
                 self.stats['emails_sent'] = result.get('emails_sent', 0)

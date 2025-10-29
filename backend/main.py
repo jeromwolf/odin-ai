@@ -32,7 +32,7 @@ app = FastAPI(title="ODIN-AI Search API", version="1.0.0")
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:9000", "http://localhost:3000", "http://localhost:8000"],
+    allow_origins=["http://localhost:5173", "http://localhost:9000", "http://localhost:3000", "http://localhost:8000", "http://localhost:9029"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -233,31 +233,7 @@ SAMPLE_COMPANIES = [
 async def root():
     return {"message": "ODIN-AI Search API", "version": "1.0.0"}
 
-# 더미 인증 엔드포인트 추가 (개발용)
-@app.post("/api/auth/register")
-async def register_dummy():
-    """더미 회원가입 - 개발용"""
-    return {
-        "id": "user-001",
-        "email": "test@example.com",
-        "name": "테스트 사용자",
-        "token": "dummy-token-123"
-    }
-
-@app.post("/api/auth/login")
-async def login_dummy():
-    """더미 로그인 - 개발용"""
-    return {
-        "id": "user-001",
-        "email": "test@example.com",
-        "name": "테스트 사용자",
-        "token": "dummy-token-123"
-    }
-
-@app.get("/api/auth/check")
-async def check_auth():
-    """인증 상태 확인 - 개발용"""
-    return {"authenticated": True, "user": {"id": "user-001", "name": "테스트 사용자"}}
+# 더미 인증 엔드포인트 제거됨 - api/auth.py의 실제 엔드포인트 사용
 
 # 대시보드 엔드포인트 - DB 연동
 @app.get("/api/dashboard/overview")
@@ -877,110 +853,7 @@ async def get_metrics():
         "errorRate": 0.002
     }
 
-# Auth Endpoints (for login state management)
-@app.post("/api/auth/login")
-async def login(data: dict):
-    """로그인 엔드포인트 (개발용 - 비밀번호 체크 안함)"""
-    email = data.get("email", "user@example.com")
-    # 개발 모드에서는 모든 로그인 허용
-    return {
-        "access_token": "dummy-token-12345",
-        "refresh_token": "dummy-refresh-token",
-        "user": {
-            "id": "user-001",
-            "email": email,
-            "name": "켈리",
-            "company": "ODIN-AI",
-            "role": "관리자"
-        }
-    }
-
-@app.post("/api/auth/logout")
-async def logout():
-    """로그아웃"""
-    return {"message": "Logged out successfully"}
-
-@app.post("/api/auth/refresh")
-async def refresh_token(data: dict):
-    """토큰 갱신"""
-    return {
-        "access_token": "dummy-token-renewed-12345",
-        "refresh_token": "dummy-refresh-token-renewed"
-    }
-
-# Profile Endpoints
-@app.get("/api/profile")
-async def get_profile():
-    """프로필 정보 조회"""
-    return {
-        "id": "user-001",
-        "email": "jeromwolf@gmail.com",
-        "name": "켈리",
-        "company": "ODIN-AI",
-        "role": "관리자",
-        "phone": "010-1234-5678",
-        "department": "개발팀",
-        "created_at": "2025-01-01T00:00:00",
-        "last_login": datetime.now().isoformat(),
-        "subscription": {
-            "plan": "Premium",
-            "status": "active",
-            "expires_at": "2026-01-01T00:00:00"
-        },
-        "preferences": {
-            "notifications": True,
-            "email_alerts": True,
-            "language": "ko"
-        }
-    }
-
-@app.put("/api/profile")
-async def update_profile(data: dict):
-    """프로필 정보 수정"""
-    return {
-        "message": "Profile updated successfully",
-        "profile": {
-            "id": "user-001",
-            "email": data.get("email", "jeromwolf@gmail.com"),
-            "name": data.get("name", "켈리"),
-            "company": data.get("company", "ODIN-AI"),
-            "role": data.get("role", "관리자"),
-            "phone": data.get("phone", "010-1234-5678"),
-            "department": data.get("department", "개발팀")
-        }
-    }
-
-@app.post("/api/profile/change-password")
-async def change_password(data: dict):
-    """비밀번호 변경"""
-    return {"message": "Password changed successfully"}
-
-# Settings Endpoints
-@app.get("/api/settings")
-async def get_settings():
-    """설정 조회"""
-    return {
-        "notifications": {
-            "email": True,
-            "push": False,
-            "sms": False
-        },
-        "search": {
-            "resultsPerPage": 20,
-            "autoComplete": True,
-            "saveHistory": True
-        },
-        "theme": "light",
-        "language": "ko"
-    }
-
-@app.put("/api/settings")
-async def update_settings(data: dict):
-    """설정 업데이트"""
-    return {
-        "message": "Settings updated successfully",
-        "settings": data
-    }
+# 중복 엔드포인트 제거됨 - api/auth.py, api/profile.py의 실제 엔드포인트 사용
 
 if __name__ == "__main__":
     import uvicorn

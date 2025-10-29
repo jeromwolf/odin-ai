@@ -32,6 +32,7 @@ class UserRegister(BaseModel):
     full_name: Optional[str] = None
     company: Optional[str] = None
     phone_number: Optional[str] = None
+    marketing_consent: Optional[bool] = False
 
     @validator('username')
     def username_alphanumeric(cls, v):

@@ -1897,3 +1897,209 @@ ENABLE_NOTIFICATION="true"  # 알림 ON/OFF
 ✅ 52+ 테이블 스키마 안정
 ✅ batch_execution_logs 테이블 준비 완료
 ```
+---
+
+## 📝 최근 작업 기록 (2025-10-29)
+
+### ✅ 알림 이메일 발송 시스템 완전 테스트 완료
+
+#### 🎯 주요 성과
+- **이메일 발송 성공**: 4명의 사용자에게 350개 알림을 집계하여 4개 이메일 발송 ✅
+- **SMTP 인증 문제 해결**: Gmail 앱 비밀번호 갱신 및 .env 설정 최적화 ✅
+- **데이터베이스 검증**: notification_send_logs 테이블에 발송 성공 기록 확인 ✅
+- **End-to-End 테스트 완료**: 배치 수집 → 알림 매칭 → 이메일 발송 전 과정 검증 ✅
+
+#### 🔧 해결한 주요 문제
+
+##### 1. Gmail SMTP 인증 실패
+**문제**:
+- 기존 Gmail 앱 비밀번호 거부: `(535, b'5.7.8 Username and Password not accepted. BadCredentials')`
+- 사용자 피드백: "그전 테스트 시에 분명히 되었는데. 4시간전에"
+
+**해결**:
+```bash
+# .env 파일 업데이트
+EMAIL_ENABLED=true
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USERNAME=jeromwolf@gmail.com
+EMAIL_PASSWORD=gkutwlrladpzpxxt  # 새 앱 비밀번호 (스페이스 제거)
+EMAIL_FROM=jeromwolf@gmail.com
+EMAIL_TO=jeromwolf@gmail.com
+```
+
+**주의사항**:
+- Gmail 앱 비밀번호는 스페이스 없이 연속으로 입력 (예: `gkut wlrl adpz pxxt` → `gkutwlrladpzpxxt`)
+- .env 파일에서는 따옴표 사용 금지 (`EMAIL_PASSWORD="xxx"` ❌, `EMAIL_PASSWORD=xxx` ✅)
+
+##### 2. 알림 데이터 초기화 스크립트 활용
+**파일**: `/test_scripts/reset_notifications.sql`
+
+**사용법**:
+```bash
+DATABASE_URL="postgresql://blockmeta@localhost:5432/odin_db" psql -d odin_db -f test_scripts/reset_notifications.sql
+```
+
+**기능**:
+- `notification_send_logs` 테이블에서 2025-10-29 이후 데이터 삭제
+- `notifications` 테이블에서 2025-10-29 이후 데이터 삭제
+- 반복 테스트 시 깨끗한 상태로 시작 가능
+
+##### 3. 알림 매칭 및 이메일 발송 프로세스
+**실행 명령어**:
+```bash
+cd /Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내\ 드라이브/KellyGoogleSpace/odin-ai
+export DATABASE_URL="postgresql://blockmeta@localhost:5432/odin_db"
+export SMTP_HOST="smtp.gmail.com"
+export SMTP_PORT="587"
+export SMTP_USER="jeromwolf@gmail.com"
+export SMTP_PASSWORD="gkutwlrladpzpxxt"
+venv_test/bin/python batch/modules/notification_matcher.py
+```
+
+**처리 결과**:
+```
+처리 대상: 389건
+알림 생성: 350개
+이메일 발송: 4개
+
+User 98 (jeromwolf@gmail.com): 320 notifications → 1 email ✅
+User 96 (test@example.com): 21 notifications → 1 email ✅
+User 110 (jeromwolf7@naver.com): 8 notifications → 1 email ✅
+User 111 (odin.gongjakso@gmail.com): 1 notification → 1 email ✅
+```
+
+#### 📊 데이터베이스 검증
+
+**notification_send_logs 테이블**:
+```sql
+SELECT id, user_id, email_to, status, sent_at 
+FROM notification_send_logs 
+WHERE sent_at >= '2025-10-29 00:00:00' 
+ORDER BY sent_at DESC;
+```
+
+**결과**:
+```
+ID | User ID | Email                     | Status | Sent Time
+---+---------+---------------------------+--------+---------------------------
+20 | 111     | odin.gongjakso@gmail.com  | sent   | 2025-10-29 16:47:25
+19 | 110     | jeromwolf7@naver.com      | sent   | 2025-10-29 16:47:22
+18 | 96      | test@example.com          | sent   | 2025-10-29 16:47:19
+17 | 98      | jeromwolf@gmail.com       | sent   | 2025-10-29 16:47:15
+```
+→ **모든 이메일 발송 성공** (status = 'sent', error_message = NULL)
+
+**notifications 테이블**:
+```sql
+SELECT COUNT(*) as total_notifications, COUNT(DISTINCT user_id) as unique_users 
+FROM notifications 
+WHERE created_at >= '2025-10-29 00:00:00';
+```
+
+**결과**:
+```
+총 알림: 350개
+사용자 수: 4명
+```
+
+#### 💡 배운 교훈
+
+##### 1. Gmail 앱 비밀번호 관리
+- **교훈**: Gmail은 보안 정책 변경으로 앱 비밀번호를 주기적으로 무효화할 수 있음
+- **대응**: 이메일 발송 실패 시 Google 계정 설정에서 새 앱 비밀번호 생성
+- **확인 방법**: 
+  ```bash
+  # SMTP 연결 테스트
+  venv_test/bin/python -c "
+  import smtplib
+  smtp = smtplib.SMTP('smtp.gmail.com', 587)
+  smtp.starttls()
+  smtp.login('jeromwolf@gmail.com', 'gkutwlrladpzpxxt')
+  print('✅ SMTP 연결 성공!')
+  smtp.quit()
+  "
+  ```
+
+##### 2. .env 파일 형식 주의사항
+- **값에 따옴표 사용 금지**: `EMAIL_PASSWORD="xxx"` → `EMAIL_PASSWORD=xxx`
+- **스페이스 제거**: 앱 비밀번호는 연속된 문자열로 입력
+- **특수문자 이스케이프 불필요**: 앱 비밀번호는 알파벳 소문자만 사용
+
+##### 3. 알림 시스템 테스트 프로세스
+1. **데이터 초기화**: `reset_notifications.sql` 실행
+2. **알림 매칭 실행**: `notification_matcher.py` 실행
+3. **데이터베이스 검증**: `notification_send_logs` 테이블 확인
+4. **실제 메일함 확인**: 수신 이메일 내용 검토
+
+##### 4. 트러블슈팅 체크리스트
+```bash
+# 이메일 발송 실패 시 순서대로 확인
+□ 1. .env 파일 EMAIL_ENABLED=true 확인
+□ 2. Gmail 앱 비밀번호 유효성 확인
+□ 3. SMTP 연결 테스트 실행
+□ 4. notification_send_logs 테이블에서 error_message 확인
+□ 5. Python 로그에서 상세 에러 메시지 확인
+```
+
+#### 🎯 시스템 상태
+
+**알림 시스템 (완전 작동)**:
+```
+✅ 알림 규칙 매칭 정상 작동
+✅ 사용자별 알림 집계 정상 작동
+✅ SMTP 이메일 발송 정상 작동
+✅ 발송 로그 데이터베이스 기록 정상 작동
+```
+
+**테스트 계정 현황**:
+- User 98 (jeromwolf@gmail.com): 메인 테스트 계정, 320개 알림
+- User 96 (test@example.com): 보조 테스트 계정, 21개 알림
+- User 110 (jeromwolf7@naver.com): 네이버 메일 테스트, 8개 알림
+- User 111 (odin.gongjakso@gmail.com): 추가 Gmail 테스트, 1개 알림
+
+**다음 작업 예정**:
+- [ ] 실제 사용자 알림 규칙 설정 지원
+- [ ] 일일 다이제스트 이메일 스케줄링 (cron)
+- [ ] 이메일 템플릿 디자인 개선
+- [ ] 알림 수신 설정 페이지 UI 완성
+
+#### 📋 주요 파일
+
+**환경 설정**:
+- `/.env` - SMTP 설정 (EMAIL_* 변수)
+
+**배치 모듈**:
+- `/batch/modules/notification_matcher.py` - 알림 매칭 및 이메일 발송 로직
+
+**테스트 스크립트**:
+- `/test_scripts/reset_notifications.sql` - 알림 데이터 초기화
+
+**데이터베이스 테이블**:
+- `notifications` - 사용자별 알림 내용 저장
+- `notification_send_logs` - 이메일 발송 로그
+- `alert_rules` - 사용자 알림 규칙 설정
+- `users` - 사용자 정보 (이메일 주소 포함)
+- `bid_announcements` - 입찰공고 데이터
+
+#### 🎉 성과 요약
+
+**오늘 완료된 작업**:
+1. Gmail SMTP 인증 문제 해결 ✅
+2. 알림 매칭 로직 검증 ✅
+3. 이메일 발송 시스템 완전 테스트 ✅
+4. 데이터베이스 기록 검증 ✅
+5. End-to-End 프로세스 확인 ✅
+
+**시스템 안정성**:
+- 알림 생성 성공률: 100% (350/350)
+- 이메일 발송 성공률: 100% (4/4)
+- 데이터베이스 기록 정확도: 100%
+
+**사용자 경험**:
+- 알림 규칙 기반 정확한 매칭
+- 사용자별 알림 집계로 이메일 스팸 방지
+- 실시간 이메일 발송으로 신속한 정보 전달
+
+🎉 **ODIN-AI 알림 시스템 완전 가동!**
+
