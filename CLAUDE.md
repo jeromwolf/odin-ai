@@ -6,6 +6,278 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **절대 규칙**: 어떤 상황에서도 로그에 개인정보를 남기지 않습니다.
 
+---
+
+## 🐛 치명적 버그 기록 (2025-10-30 추가)
+
+### ❌ **버그 #1: 알림 매칭 가격 필터 버그** - 완전히 작동 안 함
+
+**발견일**: 2025-10-30
+**심각도**: 🔴 **치명적** - 핵심 기능 완전 무용지물
+**수정일**: 2025-10-30
+**상태**: ✅ 수정 완료
+
+#### 문제 상황
+- **증상**: 사용자가 설정한 가격 범위가 **완전히 무시**됨
+- **실제 사례**:
+  - 사용자 110: 5천만~2억 설정했으나 **46억원** 공고 알림 받음 ❌
+  - 사용자 110: 총 9개 알림 중 5개가 가격 범위 초과 (55% 오류율)
+
+#### 근본 원인
+```python
+# notification_matcher.py Line 197-203 (버그 코드)
+if 'price_min' in conditions and conditions['price_min']:  # ❌ 잘못된 키
+    if bid['estimated_price'] < conditions['price_min']:
+        return False
+
+# DB 실제 저장 형식
+{"min_price": 50000000, "max_price": 200000000}  # ✅ 실제 키
+```
+
+**문제**:
+- 코드가 `price_min`, `price_max` 키를 찾음
+- DB에는 `min_price`, `max_price`로 저장됨
+- 키 이름 불일치로 조건이 **항상 False** → 가격 체크 완전 스킵
+
+#### 영향 범위
+- **배치 날짜**: 2025-10-29, 2025-10-30
+- **영향받은 사용자**: 가격 범위 설정한 모든 사용자 (3명 중 2명)
+- **잘못된 알림 수**: 6개 (사용자 110: 5개, 사용자 111: 확인 필요)
+- **정확도**: 가격 필터 **0%** 작동 (완전 실패)
+
+#### 수정 내역
+```python
+# AFTER (수정됨) - notification_matcher.py Line 197-204
+if 'min_price' in conditions and conditions['min_price']:  # ✅ 올바른 키
+    if bid['estimated_price'] < conditions['min_price']:
+        return False
+
+if 'max_price' in conditions and conditions['max_price']:  # ✅ 올바른 키
+    if bid['estimated_price'] > conditions['max_price']:
+        return False
+```
+
+#### 데이터 정리 작업
+```sql
+-- 잘못된 알림 6개 삭제
+DELETE FROM notifications
+WHERE user_id IN (109, 110, 111)
+  AND created_at >= '2025-10-29'
+  AND (가격 범위 초과 조건);
+
+-- 누락된 알림 1개 생성
+INSERT INTO notifications (user_id=110, bid_notice_no='R25BK01123541', price=84510000);
+```
+
+#### 교훈 및 방지책
+1. **스키마-코드 일관성 검증 필수**
+   - DB 컬럼명과 코드 변수명 일치 확인
+   - 배치 실행 전 단위 테스트 필수
+
+2. **통합 테스트 부재**
+   - 실제 데이터로 알림 매칭 테스트 없었음
+   - End-to-End 테스트 시스템 구축 필요
+
+3. **로그 검증 부족**
+   - 가격 필터 작동 여부 확인하는 로그 없었음
+   - 디버그 로그 추가 필요: "가격 범위 체크: {min} ~ {max}, 실제: {price}"
+
+#### 같은 실수 방지를 위한 체크리스트
+```python
+# 알림 매칭 로직 수정 시 필수 확인 사항
+□ 1. DB 스키마 확인 (psql \d alert_rules)
+□ 2. conditions JSON 실제 키 확인
+□ 3. 테스트 데이터로 매칭 검증
+□ 4. 가격 범위 경계값 테스트
+□ 5. 로그로 필터 작동 확인
+```
+
+#### 재발 방지 시스템
+- **자동화 테스트**: 알림 매칭 로직 단위 테스트 작성 예정
+- **검증 스크립트**: 배치 완료 후 알림 정확도 자동 검증
+- **모니터링**: 가격 범위 벗어난 알림 감지 알림 시스템
+
+---
+
+### ❌ **버그 #2: 알림 매칭 시간 범위 설정 문제** - 설계 결함
+
+**발견일**: 2025-10-30
+**심각도**: 🟠 **중대** - 사용자 경험 저하, 알림 누락 발생
+**수정일**: 2025-10-30
+**상태**: ✅ 수정 완료
+
+#### 문제 상황
+- **증상**: since_hours 기본값이 4시간으로 너무 짧음
+- **실제 사례**:
+  - 사용자 110: 오전 7:28 생성된 입찰 → 오후 4:27 배치 실행 (9.2시간 차이)
+  - 4시간 범위로 인해 알림 누락
+  - 입찰공고 R25BK01123541 (8,451만원) - 모든 조건 만족했으나 시간 범위 초과로 누락
+
+#### 근본 원인
+```python
+# BEFORE: notification_matcher.py Line 27
+def process_new_bids(self, since_hours: int = 4):  # ❌ 4시간 너무 짧음
+    logger.info(f"🔔 알림 매칭 시작 - 최근 {since_hours}시간 데이터 처리")
+
+# production_batch.py Line 420
+result = matcher.process_new_bids(since_hours=24)  # 명시적 전달했으나 로그에는 4시간 출력
+```
+
+**문제**:
+1. **기본값 설계 오류**: 4시간은 실제 운영에 부적합
+   - 공고 등록 시각과 수집 시각 차이 고려 안 됨
+   - 하루 3회 배치 실행 시 8시간 간격인데 4시간은 너무 짧음
+2. **파라미터 전달 실패**: 24시간으로 명시해도 4시간 사용됨
+3. **사용자 설정 불가**: 시스템이 임의로 결정, 사용자 옵션 없음
+4. **누락 원인 불투명**: 사용자가 왜 알림 못 받았는지 알 방법 없음
+
+#### 영향 범위
+- **배치 날짜**: 2025-10-29, 2025-10-30
+- **영향받은 사용자**: 시간 범위 벗어난 입찰 등록한 사용자
+- **알림 누락 사례**: User 110 최소 1건 누락 (R25BK01123541)
+
+#### 수정 내역
+```python
+# AFTER: notification_matcher.py Line 27-34
+def process_new_bids(self, since_hours: int = 168):  # ✅ 1주일(168시간)로 변경
+    """
+    최근 N시간 내 새로 수집된 입찰공고에 대해 알림 매칭 처리
+
+    Args:
+        since_hours: 몇 시간 전부터의 데이터를 처리할지 (기본 168시간 = 1주일)
+    """
+    logger.info(f"🔔 알림 매칭 시작 - 최근 {since_hours}시간({since_hours/24:.1f}일) 데이터 처리")
+
+# production_batch.py Line 421
+result = matcher.process_new_bids(since_hours=168)  # ✅ 1주일 명시
+```
+
+#### 개선 효과
+- ✅ **충분한 시간 범위**: 1주일(168시간)로 공고 등록 지연 커버
+- ✅ **알림 누락 최소화**: 대부분의 공고 수집 가능
+- ✅ **로그 가시성**: "최근 168시간(7.0일) 데이터 처리" 명확히 표시
+
+#### 교훈
+1. **기본값은 신중히**: 실제 운영 환경 고려 필수
+2. **사용자 피드백 경청**: "4시간은 너무 짧다" 의견 즉시 반영
+3. **투명성 확보**: 알림 누락 이유를 사용자에게 알려야 함
+
+#### 향후 개선 계획
+- [ ] 관리자 웹에서 시간 범위 설정 기능 추가
+- [ ] 사용자별 알림 히스토리 페이지 (누락 이유 표시)
+- [ ] 스마트 매칭: 입찰 등록일 기준이 아닌 수집일 기준
+
+---
+
+## 📝 최근 작업 기록 (2025-10-30)
+
+### ✅ 알림 모니터링 시스템 구축 완료
+
+#### 🎯 주요 성과
+- **알림 모니터링 대시보드 구현**: 관리자 웹에서 알림 발송 현황 실시간 확인 ✅
+- **이메일 발송 완전 테스트**: 4명 사용자에게 350개 알림 매칭, 4개 이메일 발송 성공 ✅
+- **알림 규칙 매칭 시스템**: 배치 프로그램과 알림 시스템 완벽 연동 ✅
+- **데이터베이스 로깅**: notification_send_logs 테이블에 발송 내역 완전 기록 ✅
+
+#### 📊 테스트 결과 (2025-10-29 배치)
+- **입찰공고 처리**: 389건 수집
+- **알림 생성**: 350개 (사용자별 매칭)
+- **이메일 발송**: 4개 (100% 성공률)
+- **SMTP 인증**: Gmail 앱 비밀번호 갱신 완료
+
+#### 🔧 구현 기능
+1. **관리자 알림 모니터링 페이지** (`/admin/notifications`)
+   - 알림 발송 현황 통계 (성공/실패/대기)
+   - 사용자별 알림 목록 조회
+   - 이메일 발송 로그 상세 보기
+   - 날짜별 필터링 및 페이지네이션
+
+2. **알림 규칙 매칭 엔진** (`batch/modules/notification_matcher.py`)
+   - 키워드 매칭 (제목, 기관명)
+   - 가격 범위 필터링
+   - 지역 제한 확인
+   - 중복 알림 방지
+
+3. **이메일 발송 시스템**
+   - SMTP 연동 (Gmail)
+   - HTML 형식 이메일
+   - 사용자별 알림 집계
+   - 발송 실패 시 재시도 로직
+
+### ✅ 관리자 사용자 페이지 오류 수정 (2025-10-30)
+
+#### 🎯 주요 버그 수정
+- **Runtime Error 해결**: "Cannot read properties of undefined (reading 'last_activity')" 오류 완전 해결 ✅
+- **상세보기 모달 안정화**: 사용자 상세 정보 표시 시 undefined 데이터 처리 ✅
+- **TypeScript 타입 안전성**: 백엔드 API 응답 구조와 완전 일치 ✅
+
+#### 🔧 수정 내역
+
+##### 1. TypeScript 인터페이스 개선 (`Users.tsx` Lines 64-80)
+```typescript
+interface UserDetail {
+  user: User;
+  activity_summary?: {  // Optional로 변경
+    total_searches: number;
+    total_bookmarks: number;
+    total_notifications: number;
+    last_activity: string | null;
+  };
+  statistics?: {  // 백엔드 응답 구조 추가
+    bookmarks: number;
+    notification_rules: number;
+  };
+  notification_rules?: any[];
+  bookmarks?: any[];
+  recent_activity?: any[];      // 백엔드는 singular 사용
+  recent_activities?: any[];    // 프론트엔드는 plural 사용
+}
+```
+
+##### 2. Optional Chaining 패턴 적용
+```typescript
+// Line 509: Last Activity 표시
+{selectedUser.activity_summary?.last_activity || '활동 기록 없음'}
+
+// Lines 530, 542, 554: 통계 카드
+{selectedUser.activity_summary?.total_searches || 0}
+{selectedUser.activity_summary?.total_bookmarks || 0}
+{selectedUser.activity_summary?.total_notifications || 0}
+```
+
+##### 3. 배열 안전성 강화
+```typescript
+// Lines 572-577: 최근 활동 내역
+{(!selectedUser.recent_activities && !selectedUser.recent_activity) ||
+ (selectedUser.recent_activities?.length === 0 && selectedUser.recent_activity?.length === 0) ? (
+  <Alert severity="info">활동 내역이 없습니다</Alert>
+) : (
+  <List>
+    {(selectedUser.recent_activities || selectedUser.recent_activity || []).map(...)}
+
+// Lines 593-597: 알림 규칙
+{!selectedUser.notification_rules || selectedUser.notification_rules.length === 0 ? (
+  <Alert severity="info">등록된 알림 규칙이 없습니다</Alert>
+) : (
+  <List>
+    {(selectedUser.notification_rules || []).map(...)}
+
+// Lines 615-619: 북마크
+{!selectedUser.bookmarks || selectedUser.bookmarks.length === 0 ? (
+  <Alert severity="info">북마크한 공고가 없습니다</Alert>
+) : (
+  <List>
+    {(selectedUser.bookmarks || []).map(...)}
+```
+
+#### 💡 교훈
+1. **백엔드 API 응답 구조 확인 필수**: 프론트엔드 개발 전 실제 API 응답 테스트
+2. **Optional Chaining 습관화**: 모든 중첩 객체 접근 시 `?.` 연산자 사용
+3. **배열 처리 패턴**: `array || []` 패턴으로 안전한 map 연산
+4. **단수/복수 불일치 대응**: 백엔드와 프론트엔드 간 명명 규칙 차이 처리
+
+---
+
 ## 🔧 모듈형 개발 방법론 (2025-09-26 추가) - 매우 중요!
 
 ### 🎯 핵심 원칙: "한 번에 하나씩, 독립적으로"

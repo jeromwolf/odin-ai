@@ -63,15 +63,20 @@ interface User {
 
 interface UserDetail {
   user: User;
-  activity_summary: {
+  activity_summary?: {
     total_searches: number;
     total_bookmarks: number;
     total_notifications: number;
     last_activity: string | null;
   };
-  notification_rules: any[];
-  bookmarks: any[];
-  recent_activities: any[];
+  statistics?: {
+    bookmarks: number;
+    notification_rules: number;
+  };
+  notification_rules?: any[];
+  bookmarks?: any[];
+  recent_activity?: any[];
+  recent_activities?: any[];
 }
 
 interface TabPanelProps {
@@ -506,7 +511,7 @@ const Users: React.FC = () => {
                       최근 활동
                     </Typography>
                     <Typography variant="body1">
-                      {selectedUser.activity_summary.last_activity
+                      {selectedUser.activity_summary?.last_activity
                         ? new Date(
                             selectedUser.activity_summary.last_activity
                           ).toLocaleString('ko-KR')
@@ -527,7 +532,7 @@ const Users: React.FC = () => {
                             검색 횟수
                           </Typography>
                           <Typography variant="h5">
-                            {selectedUser.activity_summary.total_searches}
+                            {selectedUser.activity_summary?.total_searches || 0}
                           </Typography>
                         </CardContent>
                       </Card>
@@ -539,7 +544,7 @@ const Users: React.FC = () => {
                             북마크 수
                           </Typography>
                           <Typography variant="h5">
-                            {selectedUser.activity_summary.total_bookmarks}
+                            {selectedUser.activity_summary?.total_bookmarks || 0}
                           </Typography>
                         </CardContent>
                       </Card>
@@ -551,7 +556,7 @@ const Users: React.FC = () => {
                             알림 수신
                           </Typography>
                           <Typography variant="h5">
-                            {selectedUser.activity_summary.total_notifications}
+                            {selectedUser.activity_summary?.total_notifications || 0}
                           </Typography>
                         </CardContent>
                       </Card>
@@ -564,11 +569,12 @@ const Users: React.FC = () => {
                 <Typography variant="body2" color="textSecondary" gutterBottom>
                   최근 활동 내역 (최근 20개)
                 </Typography>
-                {selectedUser.recent_activities.length === 0 ? (
+                {(!selectedUser.recent_activities && !selectedUser.recent_activity) ||
+                 (selectedUser.recent_activities?.length === 0 && selectedUser.recent_activity?.length === 0) ? (
                   <Alert severity="info">활동 내역이 없습니다</Alert>
                 ) : (
                   <List>
-                    {selectedUser.recent_activities.map((activity: any, index: number) => (
+                    {(selectedUser.recent_activities || selectedUser.recent_activity || []).map((activity: any, index: number) => (
                       <ListItem key={index} divider>
                         <ListItemText
                           primary={activity.description}
@@ -584,11 +590,11 @@ const Users: React.FC = () => {
                 <Typography variant="body2" color="textSecondary" gutterBottom>
                   등록된 알림 규칙
                 </Typography>
-                {selectedUser.notification_rules.length === 0 ? (
+                {!selectedUser.notification_rules || selectedUser.notification_rules.length === 0 ? (
                   <Alert severity="info">등록된 알림 규칙이 없습니다</Alert>
                 ) : (
                   <List>
-                    {selectedUser.notification_rules.map((rule: any) => (
+                    {(selectedUser.notification_rules || []).map((rule: any) => (
                       <ListItem key={rule.id} divider>
                         <ListItemText
                           primary={rule.keywords.join(', ')}
@@ -606,11 +612,11 @@ const Users: React.FC = () => {
                 <Typography variant="body2" color="textSecondary" gutterBottom>
                   북마크한 입찰공고
                 </Typography>
-                {selectedUser.bookmarks.length === 0 ? (
+                {!selectedUser.bookmarks || selectedUser.bookmarks.length === 0 ? (
                   <Alert severity="info">북마크한 공고가 없습니다</Alert>
                 ) : (
                   <List>
-                    {selectedUser.bookmarks.map((bookmark: any) => (
+                    {(selectedUser.bookmarks || []).map((bookmark: any) => (
                       <ListItem key={bookmark.id} divider>
                         <ListItemText
                           primary={bookmark.title || bookmark.bid_notice_no}
