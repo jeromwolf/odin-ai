@@ -117,13 +117,13 @@ async def get_bid_collection_stats(
             # 수집 통계 조회
             query = f"""
                 SELECT
-                    DATE_TRUNC('{date_trunc}', publish_date)::date as stat_date,
+                    DATE_TRUNC('{date_trunc}', announcement_date)::date as stat_date,
                     COUNT(*) as total_collected,
-                    COUNT(*) FILTER (WHERE created_at::date = publish_date) as new_bids,
-                    COUNT(*) FILTER (WHERE created_at::date != publish_date) as updated_bids,
+                    COUNT(*) FILTER (WHERE created_at::date = announcement_date::date) as new_bids,
+                    COUNT(*) FILTER (WHERE created_at::date != announcement_date::date) as updated_bids,
                     COALESCE(SUM(estimated_price), 0) as total_amount
                 FROM bid_announcements
-                WHERE publish_date >= %s AND publish_date <= %s
+                WHERE announcement_date >= %s AND announcement_date <= %s
                 GROUP BY stat_date
                 ORDER BY stat_date DESC
             """
@@ -147,7 +147,7 @@ async def get_bid_collection_stats(
                     COALESCE(SUM(estimated_price), 0) as total_amount,
                     COALESCE(AVG(estimated_price), 0) as avg_amount
                 FROM bid_announcements
-                WHERE publish_date >= %s AND publish_date <= %s
+                WHERE announcement_date >= %s AND announcement_date <= %s
             """
             cursor.execute(summary_query, (start_date, end_date, start_date, end_date))
             summary_row = cursor.fetchone()
@@ -199,7 +199,7 @@ async def get_category_distribution(
             # 전체 건수 조회
             cursor.execute("""
                 SELECT COUNT(*) FROM bid_announcements
-                WHERE publish_date >= %s AND publish_date <= %s
+                WHERE announcement_date >= %s AND announcement_date <= %s
             """, (start_date, end_date))
             total_bids = cursor.fetchone()[0]
 
@@ -222,7 +222,7 @@ async def get_category_distribution(
                 FROM bid_announcements ba
                 JOIN bid_tag_relations btr ON ba.id = btr.bid_id
                 JOIN bid_tags t ON btr.tag_id = t.id
-                WHERE ba.publish_date >= %s AND ba.publish_date <= %s
+                WHERE ba.announcement_date >= %s AND ba.announcement_date <= %s
                 GROUP BY t.tag_name
                 ORDER BY count DESC
                 LIMIT 10

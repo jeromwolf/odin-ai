@@ -30,7 +30,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../services/api';
 
-interface BidDetail {
+interface BidDetailData {
   bid_notice_no: string;
   title: string;
   organization_name: string;
@@ -60,7 +60,7 @@ const BidDetail: React.FC = () => {
     queryFn: async () => {
       if (!id) throw new Error('ID가 없습니다');
       const response = await apiClient.getBidDetail(id);
-      return response.data as BidDetail;
+      return response.data as BidDetailData;
     },
     enabled: !!id,
   });

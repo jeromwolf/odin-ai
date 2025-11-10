@@ -192,15 +192,18 @@ class NotificationMatcher:
             if not keywords_matched:
                 return False
 
-        # 2. 가격 범위 매칭
+        # 2. 가격 범위 매칭 (두 가지 형식 모두 지원: min_price/max_price, price_min/price_max)
         if bid['estimated_price']:
-            # DB에는 min_price, max_price로 저장되어 있음 (price_min, price_max 아님)
-            if 'min_price' in conditions and conditions['min_price']:
-                if bid['estimated_price'] < conditions['min_price']:
+            # 최소 가격 체크 (min_price 또는 price_min)
+            min_price = conditions.get('min_price') or conditions.get('price_min')
+            if min_price:
+                if bid['estimated_price'] < min_price:
                     return False
 
-            if 'max_price' in conditions and conditions['max_price']:
-                if bid['estimated_price'] > conditions['max_price']:
+            # 최대 가격 체크 (max_price 또는 price_max)
+            max_price = conditions.get('max_price') or conditions.get('price_max')
+            if max_price:
+                if bid['estimated_price'] > max_price:
                     return False
 
         # 3. 기관 매칭
