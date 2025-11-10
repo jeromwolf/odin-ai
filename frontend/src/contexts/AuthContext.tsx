@@ -61,7 +61,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      const { user: userData } = await apiClient.login(email, password);
+      await apiClient.login(email, password);
+      // 로그인 후 프로필 정보 가져오기 (role 포함)
+      const userData = await apiClient.getProfile();
       setUser(userData);
       setIsAuthenticated(true);
     } catch (error) {

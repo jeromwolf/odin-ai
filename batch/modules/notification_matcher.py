@@ -24,14 +24,14 @@ class NotificationMatcher:
         self.notification_count = 0
         self.email_sent_count = 0
 
-    def process_new_bids(self, since_hours: int = 4) -> Dict[str, Any]:
+    def process_new_bids(self, since_hours: int = 168) -> Dict[str, Any]:
         """
         최근 N시간 내 새로 수집된 입찰공고에 대해 알림 매칭 처리
 
         Args:
-            since_hours: 몇 시간 전부터의 데이터를 처리할지 (기본 4시간)
+            since_hours: 몇 시간 전부터의 데이터를 처리할지 (기본 168시간 = 1주일)
         """
-        logger.info(f"🔔 알림 매칭 시작 - 최근 {since_hours}시간 데이터 처리")
+        logger.info(f"🔔 알림 매칭 시작 - 최근 {since_hours}시간({since_hours/24:.1f}일) 데이터 처리")
 
         try:
             # 1. 최근 새로 추가된 입찰공고 조회
@@ -194,12 +194,13 @@ class NotificationMatcher:
 
         # 2. 가격 범위 매칭
         if bid['estimated_price']:
-            if 'price_min' in conditions and conditions['price_min']:
-                if bid['estimated_price'] < conditions['price_min']:
+            # DB에는 min_price, max_price로 저장되어 있음 (price_min, price_max 아님)
+            if 'min_price' in conditions and conditions['min_price']:
+                if bid['estimated_price'] < conditions['min_price']:
                     return False
 
-            if 'price_max' in conditions and conditions['price_max']:
-                if bid['estimated_price'] > conditions['price_max']:
+            if 'max_price' in conditions and conditions['max_price']:
+                if bid['estimated_price'] > conditions['max_price']:
                     return False
 
         # 3. 기관 매칭

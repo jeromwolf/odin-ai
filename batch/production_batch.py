@@ -52,6 +52,7 @@ class ProductionBatch:
         self.db_file_init = os.getenv('DB_FILE_INIT', 'false').lower() == 'true'
         self.db_url = os.getenv('DATABASE_URL', 'postgresql://blockmeta@localhost:5432/odin_db')
         self.start_time = time.time()
+        self.execution_id = None  # 배치 실행 로그 ID
 
         # 통계 초기화
         self.stats = {
@@ -80,6 +81,9 @@ class ProductionBatch:
         logger.info(f"🔧 테스트 모드: {self.test_mode}")
         logger.info(f"🗂️ DB/파일 초기화: {self.db_file_init}")
         logger.info("="*60)
+
+        # 배치 실행 시작 로그 기록
+        self._log_batch_start()
 
         try:
             # 1. DB/파일 완전 초기화 (DB_FILE_INIT=true인 경우)
@@ -139,6 +143,9 @@ class ProductionBatch:
             import traceback
             logger.error(traceback.format_exc())
 
+            # 배치 실패 로그 기록
+            self._log_batch_failed(str(e))
+
             # 오류 발생 시에도 보고서 발송 시도
             try:
                 self.stats['error'] = str(e)
@@ -150,6 +157,10 @@ class ProductionBatch:
             elapsed = time.time() - self.start_time
             logger.info(f"\n⏱️ 총 실행 시간: {elapsed:.1f}초")
             logger.info("🏁 배치 종료")
+
+            # 배치 완료 로그 기록 (성공한 경우만)
+            if not hasattr(self, '_batch_failed'):
+                self._log_batch_complete()
 
     def _complete_initialization(self):
         """DB_FILE_INIT=true: 완전 초기화 (테이블 DROP + 파일 삭제)"""
@@ -308,14 +319,40 @@ class ProductionBatch:
             download_limit = 20 if self.test_mode else None  # 프로덕션에서는 제한 없음
             result = downloader.download_pending(limit=download_limit)
 
-            self.stats['downloaded'] = result.get('success', 0)
-            self.stats['failed'] += result.get('failed', 0)
+            # 전체 다운로드 통계 (로그용)
+            total_downloaded = result.get('success', 0)
+            total_download_failed = result.get('failed', 0)
 
             # 실패한 파일 재시도
-            if result.get('failed', 0) > 0:
+            if total_download_failed > 0:
                 logger.info("🔄 실패한 다운로드 재시도")
                 retry_result = downloader.retry_failed(max_retries=2)
-                self.stats['downloaded'] += retry_result.get('success', 0)
+                total_downloaded += retry_result.get('success', 0)
+
+            logger.info(f"📊 전체 파일 다운로드: 성공 {total_downloaded}건, 실패 {total_download_failed}건")
+
+            # 신규 공고에 대한 다운로드만 카운트 (배치 로그용)
+            if self.new_bid_ids:
+                # DB에서 신규 공고의 문서 다운로드 상태 조회
+                import psycopg2
+                conn = psycopg2.connect(self.db_url)
+                cursor = conn.cursor()
+
+                cursor.execute("""
+                    SELECT COUNT(*) FROM bid_documents
+                    WHERE bid_notice_no = ANY(%s)
+                    AND download_status = 'completed'
+                """, (self.new_bid_ids,))
+
+                new_downloaded = cursor.fetchone()[0]
+                conn.close()
+
+                self.stats['downloaded'] = new_downloaded or 0
+                logger.info(f"📊 신규 공고 다운로드: {self.stats['downloaded']}건 (총 {len(self.new_bid_ids)}건)")
+            else:
+                # 신규 공고가 없으면 전체 통계 사용
+                self.stats['downloaded'] = total_downloaded
+                self.stats['failed'] = total_download_failed
 
         except Exception as e:
             logger.error(f"❌ 다운로드 오류: {e}")
@@ -329,8 +366,40 @@ class ProductionBatch:
             process_limit = 20 if self.test_mode else None  # 프로덕션에서는 제한 없음
             result = processor.process_downloaded(limit=process_limit)
 
-            self.stats['processed'] = result.get('success', 0)
-            self.stats['failed'] += result.get('failed', 0)
+            # 전체 처리 통계 (로그용)
+            total_processed = result.get('success', 0)
+            total_failed = result.get('failed', 0)
+
+            logger.info(f"📊 전체 문서 처리: 성공 {total_processed}건, 실패 {total_failed}건")
+
+            # 신규 공고에 대한 처리 결과만 카운트 (배치 로그용)
+            if self.new_bid_ids:
+                # DB에서 신규 공고의 문서 처리 상태 조회
+                import psycopg2
+                conn = psycopg2.connect(self.db_url)
+                cursor = conn.cursor()
+
+                cursor.execute("""
+                    SELECT
+                        COUNT(*) FILTER (WHERE processing_status = 'completed') as success,
+                        COUNT(*) FILTER (WHERE processing_status IN ('failed', 'skipped')) as failed
+                    FROM bid_documents
+                    WHERE bid_notice_no = ANY(%s)
+                """, (self.new_bid_ids,))
+
+                new_success, new_failed = cursor.fetchone()
+                conn.close()
+
+                self.stats['processed'] = new_success or 0
+                self.stats['failed'] = new_failed or 0
+
+                logger.info(f"📊 신규 공고 처리: 성공 {self.stats['processed']}건, 실패 {self.stats['failed']}건 (총 {len(self.new_bid_ids)}건)")
+            else:
+                # 신규 공고가 없으면 전체 통계 사용
+                self.stats['processed'] = total_processed
+                self.stats['failed'] = total_failed
+
+            # 기타 통계는 전체 기준
             self.stats['extracted_info'] = result.get('info_extracted', 0)
             self.stats['extracted_info_count'] = result.get('info_extracted', 0)  # 이메일용
             self.stats['tags_created'] = result.get('tags_created', 0)
@@ -346,9 +415,10 @@ class ProductionBatch:
             matcher = NotificationMatcher(self.db_url)
 
             # 새로 수집된 입찰공고에 대해 알림 매칭
+            # since_hours=168 (1주일): 공고 등록 시각과 수집 시각 차이 고려
             if self.new_bid_ids:
                 logger.info(f"🔍 신규 입찰 {len(self.new_bid_ids)}건에 대해 알림 규칙 매칭 중...")
-                result = matcher.process_new_bids(since_hours=24)  # 타임존 차이 고려하여 24시간으로 설정
+                result = matcher.process_new_bids(since_hours=168)  # 1주일 (168시간)
 
                 self.stats['notifications_created'] = result.get('notifications_created', 0)
                 self.stats['emails_sent'] = result.get('emails_sent', 0)
@@ -479,6 +549,152 @@ class ProductionBatch:
         if total_attempts > 0:
             success_rate = (self.stats['processed'] / total_attempts) * 100
             logger.info(f"  📈 전체 성공률: {success_rate:.1f}%")
+
+    # ============================================
+    # 배치 실행 로깅 메서드
+    # ============================================
+
+    def _log_batch_start(self):
+        """배치 시작 로그 기록"""
+        try:
+            import psycopg2
+            conn = psycopg2.connect(self.db_url)
+            cursor = conn.cursor()
+
+            # batch_execution_logs INSERT
+            cursor.execute("""
+                INSERT INTO batch_execution_logs (
+                    batch_type, status, start_time, triggered_by, created_at
+                ) VALUES (%s, %s, NOW(), %s, NOW())
+                RETURNING id
+            """, ('production', 'running', 'admin'))
+
+            self.execution_id = cursor.fetchone()[0]
+            conn.commit()
+            conn.close()
+
+            logger.info(f"📝 배치 실행 로그 시작: execution_id={self.execution_id}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 배치 로그 기록 실패: {e}")
+            self.execution_id = None
+
+    def _update_batch_progress(self):
+        """배치 진행 상황 업데이트"""
+        if not self.execution_id:
+            return
+
+        try:
+            import psycopg2
+            conn = psycopg2.connect(self.db_url)
+            cursor = conn.cursor()
+
+            # 진행 상황 업데이트
+            cursor.execute("""
+                UPDATE batch_execution_logs SET
+                    total_items = %s,
+                    success_items = %s,
+                    failed_items = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (
+                self.stats['collected'],
+                self.stats['processed'],
+                self.stats['failed'],
+                self.execution_id
+            ))
+
+            conn.commit()
+            conn.close()
+
+        except Exception as e:
+            logger.warning(f"⚠️ 배치 진행 상황 업데이트 실패: {e}")
+
+    def _log_batch_complete(self):
+        """배치 완료 로그 기록"""
+        if not self.execution_id:
+            return
+
+        try:
+            import psycopg2
+            conn = psycopg2.connect(self.db_url)
+            cursor = conn.cursor()
+
+            # 최종 통계 기록
+            total_items = self.stats['collected']
+            success_items = self.stats['processed']
+            failed_items = self.stats['failed']
+            duration_seconds = int(time.time() - self.start_time)
+
+            cursor.execute("""
+                UPDATE batch_execution_logs SET
+                    status = 'success',
+                    end_time = NOW(),
+                    duration_seconds = %s,
+                    total_items = %s,
+                    success_items = %s,
+                    failed_items = %s,
+                    skipped_items = 0,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (
+                duration_seconds,
+                total_items,
+                success_items,
+                failed_items,
+                self.execution_id
+            ))
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"✅ 배치 완료 로그 기록: execution_id={self.execution_id}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 배치 완료 로그 기록 실패: {e}")
+
+    def _log_batch_failed(self, error_message):
+        """배치 실패 로그 기록"""
+        self._batch_failed = True
+
+        if not self.execution_id:
+            return
+
+        try:
+            import psycopg2
+            conn = psycopg2.connect(self.db_url)
+            cursor = conn.cursor()
+
+            duration_seconds = int(time.time() - self.start_time)
+
+            cursor.execute("""
+                UPDATE batch_execution_logs SET
+                    status = 'failed',
+                    end_time = NOW(),
+                    duration_seconds = %s,
+                    total_items = %s,
+                    success_items = %s,
+                    failed_items = %s,
+                    error_message = %s,
+                    error_count = 1,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (
+                duration_seconds,
+                self.stats['collected'],
+                self.stats['processed'],
+                self.stats['failed'],
+                error_message[:500],  # 500자 제한
+                self.execution_id
+            ))
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"❌ 배치 실패 로그 기록: execution_id={self.execution_id}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 배치 실패 로그 기록 실패: {e}")
 
 
 def main():

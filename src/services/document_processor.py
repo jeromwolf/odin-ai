@@ -73,6 +73,121 @@ class DocumentProcessor:
             'failed': 0
         }
 
+    def _detect_file_type(self, file_path: Path) -> str:
+        """
+        파일의 실제 타입을 감지 (확장자가 아닌 파일 내용 기반)
+
+        Returns:
+            'hwp', 'hwpx', 'pdf', 'docx', 'xlsx', 'xls', 'unknown'
+        """
+        try:
+            # 파일의 첫 바이트를 읽어 매직 넘버 확인
+            with open(file_path, 'rb') as f:
+                header = f.read(512)
+
+            # PDF 파일 시그니처: %PDF (가장 먼저 체크 - 명확함)
+            if header[:4] == b'%PDF':
+                return 'pdf'
+
+            # OLE2 Compound Document (HWP 5.x, XLS, DOC 등)
+            if header[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':
+                # 더 많은 데이터를 읽어서 구분
+                with open(file_path, 'rb') as f:
+                    content = f.read(8192)  # 8KB 읽기
+
+                    # HWP 5.x 시그니처 우선 확인 (UTF-16LE 인코딩)
+                    # OLE2 구조에서 문자열은 대부분 UTF-16LE로 저장됨
+                    hwp_signatures = [
+                        b'H\x00w\x00p\x00S\x00u\x00m\x00m\x00a\x00r\x00y\x00I\x00n\x00f\x00o\x00r\x00m\x00a\x00t\x00i\x00o\x00n\x00',  # HwpSummaryInformation
+                        b'F\x00i\x00l\x00e\x00H\x00e\x00a\x00d\x00e\x00r\x00',  # FileHeader (HWP 특유)
+                        b'H\x00W\x00P\x00 \x00D\x00o\x00c\x00u\x00m\x00e\x00n\x00t\x00',  # HWP Document
+                        b'H\x00w\x00p\x00D\x00o\x00c\x00',  # HwpDoc
+                        b'\xbb\xea\xc7\xd1\xb1\xdb',  # "한글" in EUC-KR
+                    ]
+
+                    if any(sig in content for sig in hwp_signatures):
+                        return 'hwp'
+
+                    # Excel 시그니처 확인 (UTF-16LE)
+                    excel_signatures = [
+                        b'M\x00i\x00c\x00r\x00o\x00s\x00o\x00f\x00t\x00 \x00E\x00x\x00c\x00e\x00l\x00',  # Microsoft Excel
+                        b'W\x00o\x00r\x00k\x00b\x00o\x00o\x00k\x00',  # Workbook
+                        b'Microsoft Excel',  # ASCII 형태도 체크
+                        b'Workbook',  # ASCII 형태도 체크
+                    ]
+
+                    if any(sig in content for sig in excel_signatures):
+                        return 'xls'
+
+                    # Word 시그니처 확인 (UTF-16LE)
+                    word_signatures = [
+                        b'M\x00i\x00c\x00r\x00o\x00s\x00o\x00f\x00t\x00 \x00W\x00o\x00r\x00d\x00',  # Microsoft Word
+                        b'W\x00o\x00r\x00d\x00.\x00D\x00o\x00c\x00u\x00m\x00e\x00n\x00t\x00',  # Word.Document
+                        b'Microsoft Word',  # ASCII 형태도 체크
+                    ]
+
+                    if any(sig in content for sig in word_signatures):
+                        return 'doc'
+
+                    # 위에서 구분 못하면 OLE2이지만 알 수 없음
+                    # 파일 확장자 기반으로 추정
+                    extension = file_path.suffix.lower()
+                    if extension == '.hwp':
+                        return 'hwp'
+                    elif extension == '.xls':
+                        return 'xls'
+                    elif extension == '.doc':
+                        return 'doc'
+
+            # ZIP 기반 파일들 (HWPX, DOCX, XLSX)
+            if header[:4] == b'PK\x03\x04':
+                try:
+                    with zipfile.ZipFile(file_path, 'r') as z:
+                        namelist = z.namelist()
+
+                        # HWPX: Contents/ 디렉토리 포함
+                        if any('Contents/' in name or name.startswith('Contents/') for name in namelist):
+                            return 'hwpx'
+
+                        # DOCX: word/ 디렉토리 포함
+                        if any('word/' in name or name.startswith('word/') for name in namelist):
+                            return 'docx'
+
+                        # XLSX: xl/ 디렉토리 포함
+                        if any('xl/' in name or name.startswith('xl/') for name in namelist):
+                            return 'xlsx'
+
+                        # ZIP이지만 형식 불명 - 확장자로 추정
+                        extension = file_path.suffix.lower()
+                        if extension == '.hwpx':
+                            return 'hwpx'
+                        elif extension == '.docx':
+                            return 'docx'
+                        elif extension == '.xlsx':
+                            return 'xlsx'
+
+                except Exception as e:
+                    logger.warning(f"ZIP 파일 검사 실패: {e}")
+                    # ZIP 파일이지만 열기 실패 - 확장자 기반 추정
+                    extension = file_path.suffix.lower()
+                    if extension in ['.hwpx', '.docx', '.xlsx']:
+                        return extension[1:]
+
+            # 확장자 기반 폴백
+            extension = file_path.suffix.lower()
+            if extension in ['.hwp', '.hwpx', '.pdf', '.docx', '.xlsx', '.xls', '.doc']:
+                return extension[1:]  # . 제거
+
+            return 'unknown'
+
+        except Exception as e:
+            logger.error(f"파일 타입 감지 오류: {e}")
+            # 에러 발생 시 확장자 기반 폴백
+            extension = file_path.suffix.lower()
+            if extension:
+                return extension[1:]
+            return 'unknown'
+
     async def process_pending_documents(self) -> dict:
         """
         대기 중인 문서 처리
@@ -124,28 +239,40 @@ class DocumentProcessor:
             if file_path.is_dir():
                 text_content, extraction_method = await self._extract_hwp(file_path)
             else:
-                # 파일 확장자별 처리
+                # 실제 파일 타입 감지 (확장자가 아닌 파일 내용 기반)
+                actual_file_type = self._detect_file_type(file_path)
                 extension = file_path.suffix.lower()
+
+                # 확장자와 실제 타입이 다른 경우 로그 출력
+                expected_type = extension[1:] if extension else 'unknown'
+                if actual_file_type != expected_type and actual_file_type != 'unknown':
+                    logger.warning(
+                        f"⚠️ 파일 타입 불일치 감지: {file_path.name}\n"
+                        f"   확장자: {extension} → 실제 타입: {actual_file_type}\n"
+                        f"   실제 타입으로 처리합니다."
+                    )
+
                 text_content = None
                 extraction_method = None
 
-                if extension in ['.hwp', '.hwpx']:
-                    if extension == '.hwpx':
+                # 실제 파일 타입에 따라 처리
+                if actual_file_type in ['hwp', 'hwpx']:
+                    if actual_file_type == 'hwpx':
                         # HWPX 파일은 고급 추출기 사용
                         text_content, extraction_method = await self._extract_hwpx_advanced(file_path)
                     else:
                         # 일반 HWP 파일은 기존 방법 사용
                         text_content, extraction_method = await self._extract_hwp(file_path)
-                elif extension == '.pdf':
+                elif actual_file_type == 'pdf':
                     text_content, extraction_method = await self._extract_pdf(file_path)
-                elif extension in ['.docx', '.doc']:
+                elif actual_file_type in ['docx', 'doc']:
                     text_content, extraction_method = await self._extract_docx(file_path)
-                elif extension in ['.xlsx', '.xls']:
+                elif actual_file_type in ['xlsx', 'xls']:
                     text_content, extraction_method = await self._extract_excel(file_path)
                 else:
-                    logger.warning(f"지원하지 않는 형식: {extension}")
+                    logger.warning(f"지원하지 않는 형식: {actual_file_type} (파일: {file_path.name})")
                     document.processing_status = 'skipped'
-                    document.error_message = f"지원하지 않는 형식: {extension}"
+                    document.error_message = f"지원하지 않는 형식: {actual_file_type}"
                     self.db_session.commit()
                     return
 
@@ -270,19 +397,52 @@ class DocumentProcessor:
             return await self._extract_hwpx_fallback(file_path)
 
     async def _extract_hwpx_fallback(self, file_path: Path) -> Tuple[Optional[str], str]:
-        """HWPX 백업 처리 방법 (hwp_safe_extractor 사용)"""
+        """HWPX 백업 처리 방법 (ZIP XML 직접 파싱)"""
         try:
-            # HWPX도 HWP와 동일한 방법으로 처리
-            from src.services.hwp_safe_extractor import extract_hwp_safe
+            import xml.etree.ElementTree as ET
 
-            text, method = extract_hwp_safe(file_path)
+            # HWPX는 ZIP 형식이므로 직접 풀어서 XML 파싱
+            with zipfile.ZipFile(file_path, 'r') as zf:
+                text_parts = []
 
-            if text and not text.startswith("[HWP 문서]"):
-                logger.info(f"HWPX 백업 처리 성공: {file_path.name} - {len(text)}자 추출 (방법: {method})")
-                return text, f"hwpx-{method}"
-            else:
-                logger.warning(f"HWPX 백업 처리 실패: {file_path.name} (방법: {method})")
-                return None, f"hwpx-failed-{method}"
+                # Contents/section*.xml 파일들에서 텍스트 추출
+                section_files = [f for f in zf.namelist()
+                               if 'section' in f.lower() and f.endswith('.xml')]
+
+                logger.debug(f"HWPX ZIP 내부 파일: {len(zf.namelist())}개, section 파일: {len(section_files)}개")
+
+                for section_file in section_files[:10]:  # 최대 10개 섹션만 처리
+                    try:
+                        with zf.open(section_file) as f:
+                            content = f.read()
+
+                            # XML 파싱
+                            root = ET.fromstring(content)
+
+                            # 모든 텍스트 노드 추출 (재귀적으로)
+                            for elem in root.iter():
+                                # 태그 이름에 'text', 'para', 'char' 등이 포함된 요소의 텍스트 추출
+                                if elem.text and elem.text.strip():
+                                    text_parts.append(elem.text.strip())
+                                if elem.tail and elem.tail.strip():
+                                    text_parts.append(elem.tail.strip())
+
+                    except Exception as e:
+                        logger.debug(f"섹션 파일 파싱 실패 ({section_file}): {e}")
+                        continue
+
+                # 텍스트 합치기
+                if text_parts:
+                    full_text = '\n'.join(text_parts)
+                    logger.info(f"HWPX ZIP 파싱 성공: {file_path.name} - {len(full_text)}자 추출")
+                    return full_text, "hwpx-zip-xml"
+                else:
+                    logger.warning(f"HWPX ZIP 파싱 실패: 텍스트 없음 ({file_path.name})")
+                    return None, "hwpx-zip-no-text"
+
+        except zipfile.BadZipFile:
+            logger.error(f"HWPX ZIP 오류: 유효하지 않은 ZIP 파일 ({file_path.name})")
+            return None, "hwpx-bad-zip"
 
         except Exception as e:
             logger.error(f"HWPX 백업 처리 오류: {e}")
@@ -333,6 +493,18 @@ class DocumentProcessor:
                 if text_parts:
                     logger.info(f"PDF 백업 처리 완료: {file_path.name} - {len(pdf_reader.pages)}페이지")
                     return '\n'.join(text_parts), f'PyPDF2-fallback ({len(pdf_reader.pages)}페이지)'
+                else:
+                    # 텍스트가 없는 경우 (이미지 기반 PDF)
+                    logger.warning(f"PDF 텍스트 없음 (이미지 기반): {file_path.name} - {len(pdf_reader.pages)}페이지")
+                    fallback_text = f"""
+[PDF 문서 정보]
+파일명: {file_path.name}
+페이지 수: {len(pdf_reader.pages)}
+상태: 이미지 기반 PDF (OCR 필요)
+
+※ 이 PDF는 텍스트를 포함하지 않습니다. OCR (광학 문자 인식) 처리가 필요합니다.
+"""
+                    return fallback_text, f'PyPDF2-image-based ({len(pdf_reader.pages)}페이지)'
 
             return None, None
 

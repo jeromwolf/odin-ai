@@ -30,6 +30,12 @@ import {
   NotificationsActive,
   Logout,
   ChevronLeft,
+  AdminPanelSettings,
+  Schedule,
+  Computer,
+  People,
+  Assessment,
+  Description,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -42,6 +48,15 @@ const menuItems = [
   { text: '알림 설정', icon: <NotificationsActive />, path: '/notifications' },
   { text: '프로필', icon: <Person />, path: '/profile' },
   { text: '설정', icon: <Settings />, path: '/settings' },
+];
+
+const adminMenuItems = [
+  { text: '관리자 대시보드', icon: <AdminPanelSettings />, path: '/admin/dashboard' },
+  { text: '배치 모니터링', icon: <Schedule />, path: '/admin/batch' },
+  { text: '시스템 모니터링', icon: <Computer />, path: '/admin/system' },
+  { text: '사용자 관리', icon: <People />, path: '/admin/users' },
+  { text: '로그 조회', icon: <Description />, path: '/admin/logs' },
+  { text: '통계 분석', icon: <Assessment />, path: '/admin/statistics' },
 ];
 
 const MainLayout: React.FC = () => {
@@ -273,6 +288,51 @@ const MainLayout: React.FC = () => {
             </ListItem>
           ))}
         </List>
+
+        {/* 관리자 메뉴 - 관리자만 표시 */}
+        {user?.role === 'admin' && (
+          <>
+            <Divider />
+            <List>
+              <ListItem disablePadding sx={{ display: 'block' }}>
+                <ListItemText
+                  primary="관리자"
+                  sx={{
+                    opacity: open ? 1 : 0,
+                    px: 2.5,
+                    py: 1,
+                    color: 'text.secondary',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}
+                />
+              </ListItem>
+              {adminMenuItems.map((item) => (
+                <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+                  <ListItemButton
+                    sx={{
+                      minHeight: 48,
+                      justifyContent: open ? 'initial' : 'center',
+                      px: 2.5,
+                    }}
+                    onClick={() => handleNavigation(item.path)}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        minWidth: 0,
+                        mr: open ? 3 : 'auto',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText primary={item.text} sx={{ opacity: open ? 1 : 0 }} />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </>
+        )}
       </Drawer>
 
       <Box

@@ -34,6 +34,10 @@ import {
   Logout,
   AccountCircle,
   Computer,
+  Search,
+  Bookmark,
+  Notifications,
+  Person,
 } from '@mui/icons-material';
 import { adminApi } from '../../services/admin/adminApi';
 
@@ -73,10 +77,22 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     }
   };
 
-  const menuItems = [
-    { text: '대시보드', icon: <Dashboard />, path: '/admin/dashboard' },
+  // 일반 사용자 메뉴
+  const userMenuItems = [
+    { text: '대시보드', icon: <Dashboard />, path: '/dashboard' },
+    { text: '입찰 검색', icon: <Search />, path: '/search' },
+    { text: '북마크', icon: <Bookmark />, path: '/bookmarks' },
+    { text: '알림 설정', icon: <Notifications />, path: '/notifications' },
+    { text: '프로필', icon: <Person />, path: '/profile' },
+    { text: '설정', icon: <Settings />, path: '/settings' },
+  ];
+
+  // 관리자 메뉴
+  const adminMenuItems = [
+    { text: '관리자 대시보드', icon: <Dashboard />, path: '/admin/dashboard' },
     { text: '배치 모니터링', icon: <Storage />, path: '/admin/batch' },
     { text: '시스템 모니터링', icon: <Computer />, path: '/admin/system' },
+    { text: '알림 모니터링', icon: <Notifications />, path: '/admin/notifications' },
     { text: '사용자 관리', icon: <People />, path: '/admin/users' },
     { text: '로그 조회', icon: <Description />, path: '/admin/logs' },
     { text: '통계 분석', icon: <BarChart />, path: '/admin/statistics' },
@@ -90,8 +106,39 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </Typography>
       </Toolbar>
       <Divider />
+
+      {/* 일반 사용자 메뉴 */}
+      <Typography
+        variant="overline"
+        sx={{ px: 2, pt: 2, pb: 1, display: 'block', color: 'text.secondary' }}
+      >
+        일반 메뉴
+      </Typography>
       <List>
-        {menuItems.map((item) => (
+        {userMenuItems.map((item) => (
+          <ListItem key={item.text} disablePadding>
+            <ListItemButton
+              selected={location.pathname === item.path}
+              onClick={() => navigate(item.path)}
+            >
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+
+      <Divider sx={{ my: 1 }} />
+
+      {/* 관리자 메뉴 */}
+      <Typography
+        variant="overline"
+        sx={{ px: 2, pt: 1, pb: 1, display: 'block', color: 'text.secondary' }}
+      >
+        관리자 메뉴
+      </Typography>
+      <List>
+        {adminMenuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               selected={location.pathname === item.path}

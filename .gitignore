@@ -16,36 +16,15 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
 # Virtual Environment
 venv/
-env/
+venv_test/
 ENV/
-env.bak/
-venv.bak/
-
-# Environment Variables
-.env
-.env.local
-.env.production
-.env.test
-
-# Database
-*.db
-*.sqlite3
-data/
-postgres_data/
-odin_db/
-
-# Logs
-*.log
-logs/
-*.log.*
+env/
 
 # IDE
 .vscode/
@@ -53,116 +32,39 @@ logs/
 *.swp
 *.swo
 *~
-.cursor/
 
 # OS
 .DS_Store
-.DS_Store?
-._*
 Thumbs.db
-ehthumbs.db
-Desktop.ini
 
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb_checkpoints
+# Project specific
+storage/documents/
+storage/markdown/
+*.log
+*.backup_*
+*.py.backup
 
-# Testing
-.coverage
-.coverage.*
-htmlcov/
-.pytest_cache/
-.tox/
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
+# Node modules
+node_modules/
+frontend/node_modules/
 
-# ML Models & Data
-models/
-*.pkl
-*.joblib
-*.h5
-*.model
-data/raw/
-data/processed/
+# Environment variables
+.env
+.env.local
 
-# Document Processing & Storage
-temp_files/
-uploaded_files/
-processed_docs/
-storage/
-downloads/
-markdown/
-odin_ai_data/
-*.hwp
-*.pdf
-*.docx
-*.xlsx
-
-# Crawler Data
-crawler_cache/
-screenshots/
-cookies/
-selenium/
-
-# Redis
-dump.rdb
-
-# Docker
-docker-compose.override.yml
-
-# Local Config
-local_config.yaml
-
-# API Keys & Secrets
-secrets/
-api_keys.txt
-credentials.json
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
 # Temporary files
 tmp/
 temp/
 *.tmp
-*.temp
-*.cache
-*.pid
 
-# Backup files
-*.bak
-*.backup
-*.old
-*.orig
-
-# Test scripts & outputs
-test_*.py
-!test_scripts/
-test_outputs/
-test_results/
-
-# Background processes
-nohup.out
-*.out
-
-# Python tools
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pyre/
-.pytype/
-*.pyc
-
-# Package managers
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Tools directory (keeping only source)
-tools/pdf-viewer/venv/
-tools/hwp-viewer/venv/
-tools/**/__pycache__/
-tools/**/*.pyc
-
-# ChromeDriver
-chromedriver
-chromedriver.exe
-*.crdownload
+# Test files (루트 디렉토리)
+/test_*.py
+/check_*.py
+/debug_*.py
+/explain_*.py
+/reprocess_*.py

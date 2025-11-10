@@ -78,21 +78,7 @@ const Notifications: React.FC = () => {
     push: true,
   });
 
-  const [keywordAlerts, setKeywordAlerts] = useState<KeywordAlert[]>([
-    {
-      id: 1,
-      keyword: 'IT 시스템',
-      category: '소프트웨어',
-      priceRange: { min: 1000000, max: 50000000 },
-      enabled: true,
-    },
-    {
-      id: 2,
-      keyword: '도로 포장',
-      category: '토목',
-      enabled: true,
-    },
-  ]);
+  const [keywordAlerts, setKeywordAlerts] = useState<KeywordAlert[]>([]);
 
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [newKeyword, setNewKeyword] = useState({
@@ -219,24 +205,46 @@ const Notifications: React.FC = () => {
 
   const handleAddKeyword = async () => {
     if (newKeyword.keyword && newKeyword.category) {
-      const newAlert: KeywordAlert = {
-        id: Date.now(),
-        keyword: newKeyword.keyword,
-        category: newKeyword.category,
-        enabled: true,
-      };
-
-      if (newKeyword.minPrice && newKeyword.maxPrice) {
-        newAlert.priceRange = {
-          min: parseInt(newKeyword.minPrice),
-          max: parseInt(newKeyword.maxPrice),
+      try {
+        // 백엔드 API로 알림 규칙 생성
+        const ruleData = {
+          rule_name: `${newKeyword.keyword} (${newKeyword.category})`,
+          description: `${newKeyword.category} 카테고리의 ${newKeyword.keyword} 키워드 알림`,
+          conditions: {
+            keywords: [newKeyword.keyword],
+            category: newKeyword.category,
+            min_price: newKeyword.minPrice ? parseInt(newKeyword.minPrice) : undefined,
+            max_price: newKeyword.maxPrice ? parseInt(newKeyword.maxPrice) : undefined,
+          },
+          notification_channels: ["email", "web"],
+          notification_timing: "immediate"
         };
-      }
 
-      // 새 키워드를 로컬 상태에 추가
-      setKeywordAlerts(prev => [...prev, newAlert]);
-      setNewKeyword({ keyword: '', category: '', minPrice: '', maxPrice: '' });
-      setOpenAddDialog(false);
+        const createdRule = await apiClient.addNotificationRule(ruleData);
+
+        // 생성된 규칙을 로컬 상태에 추가
+        const newAlert: KeywordAlert = {
+          id: createdRule.id,
+          keyword: newKeyword.keyword,
+          category: newKeyword.category,
+          enabled: true,
+        };
+
+        if (newKeyword.minPrice && newKeyword.maxPrice) {
+          newAlert.priceRange = {
+            min: parseInt(newKeyword.minPrice),
+            max: parseInt(newKeyword.maxPrice),
+          };
+        }
+
+        setKeywordAlerts(prev => [...prev, newAlert]);
+        setNewKeyword({ keyword: '', category: '', minPrice: '', maxPrice: '' });
+        setOpenAddDialog(false);
+        alert('알림 규칙이 저장되었습니다.');
+      } catch (error) {
+        console.error('알림 규칙 생성 실패:', error);
+        alert('알림 규칙 생성에 실패했습니다.');
+      }
     }
   };
 

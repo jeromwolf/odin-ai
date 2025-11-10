@@ -3,7 +3,7 @@
  * 배치 실행 이력, 상세 정보, 수동 실행
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -24,8 +24,6 @@ import {
   TextField,
   MenuItem,
   Grid,
-  Card,
-  CardContent,
   Alert,
   CircularProgress,
   IconButton,
@@ -38,7 +36,6 @@ import {
   Refresh,
   PlayArrow,
   Visibility,
-  FilterList,
 } from '@mui/icons-material';
 import { adminApi } from '../../services/admin/adminApi';
 
@@ -76,16 +73,23 @@ const BatchMonitoring: React.FC = () => {
   // 수동 실행 모달
   const [executeOpen, setExecuteOpen] = useState(false);
   const [executeBatchType, setExecuteBatchType] = useState<string>('production');
-  const [executeStartDate, setExecuteStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [executeEndDate, setExecuteEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  // 한국시간 기준 오늘 날짜 (UTC 변환 문제 방지)
+  const getKoreaDateString = () => {
+    const now = new Date();
+    const koreaOffset = 9 * 60; // KST는 UTC+9
+    const koreaTime = new Date(now.getTime() + koreaOffset * 60 * 1000);
+    return koreaTime.toISOString().split('T')[0];
+  };
+  const [executeStartDate, setExecuteStartDate] = useState<string>(getKoreaDateString());
+  const [executeEndDate, setExecuteEndDate] = useState<string>(getKoreaDateString());
   const [enableNotification, setEnableNotification] = useState<boolean>(true);
   const [executeLoading, setExecuteLoading] = useState(false);
 
-  useEffect(() => {
-    loadExecutions();
-  }, [page, rowsPerPage, batchType, status, startDate, endDate]);
+  // 자동 새로고침 상태
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
 
-  const loadExecutions = async () => {
+  const loadExecutions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -109,7 +113,24 @@ const BatchMonitoring: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, rowsPerPage, batchType, status, startDate, endDate]);
+
+  // 페이지/필터 변경 시 데이터 로드
+  useEffect(() => {
+    loadExecutions();
+  }, [loadExecutions]);
+
+  // 자동 새로고침 (5초마다)
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const intervalId = setInterval(() => {
+      loadExecutions();
+      setLastRefreshTime(new Date());
+    }, 5000); // 5초마다 새로고침
+
+    return () => clearInterval(intervalId);
+  }, [autoRefresh, loadExecutions]);
 
   const handleViewDetail = async (executionId: number) => {
     try {
@@ -174,8 +195,24 @@ const BatchMonitoring: React.FC = () => {
           <Typography variant="body2" color="textSecondary">
             배치 프로그램 실행 이력 및 상태 확인
           </Typography>
+          {autoRefresh && (
+            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
+              🔄 자동 새로고침 활성화 • 마지막 업데이트: {lastRefreshTime.toLocaleTimeString('ko-KR')}
+            </Typography>
+          )}
         </Box>
         <Box>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                color="primary"
+              />
+            }
+            label="자동 새로고침 (5초)"
+            sx={{ mr: 2 }}
+          />
           <Button
             variant="outlined"
             startIcon={<Refresh />}

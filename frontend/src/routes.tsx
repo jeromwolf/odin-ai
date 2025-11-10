@@ -25,6 +25,7 @@ const AdminLogin = lazy(() => import('./pages/admin/Login'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminBatchMonitoring = lazy(() => import('./pages/admin/BatchMonitoring'));
 const AdminSystemMonitoring = lazy(() => import('./pages/admin/SystemMonitoring'));
+const AdminNotificationMonitoring = lazy(() => import('./pages/admin/NotificationMonitoring'));
 const AdminUsers = lazy(() => import('./pages/admin/Users'));
 const AdminLogs = lazy(() => import('./pages/admin/Logs'));
 const AdminStatistics = lazy(() => import('./pages/admin/Statistics'));
@@ -61,6 +62,7 @@ const AppRoutes = () => {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="batch" element={<AdminBatchMonitoring />} />
           <Route path="system" element={<AdminSystemMonitoring />} />
+          <Route path="notifications" element={<AdminNotificationMonitoring />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="logs" element={<AdminLogs />} />
           <Route path="statistics" element={<AdminStatistics />} />

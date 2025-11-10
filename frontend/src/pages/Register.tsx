@@ -70,10 +70,11 @@ const Register: React.FC = () => {
     if (activeStep === 0) {
       fieldsToValidate = ['email', 'password', 'passwordConfirm', 'name'];
     } else if (activeStep === 1) {
-      fieldsToValidate = ['company', 'phone'];
+      // 회사정보는 선택사항이므로 검증하지 않음
+      fieldsToValidate = [];
     }
 
-    const isValid = await trigger(fieldsToValidate);
+    const isValid = fieldsToValidate.length === 0 || await trigger(fieldsToValidate);
     if (isValid) {
       setActiveStep((prevStep) => prevStep + 1);
     }
@@ -94,10 +95,14 @@ const Register: React.FC = () => {
 
     try {
       // 백엔드 API 스키마에 맞게 데이터 변환
+      // username: 영문, 숫자, -, _만 허용하므로 이메일에서 변환
+      const emailPrefix = data.email.split('@')[0];
+      const sanitizedUsername = emailPrefix.replace(/[^a-zA-Z0-9_-]/g, '_'); // 허용되지 않는 문자를 _로 변경
+
       await registerUser({
         email: data.email,
         password: data.password,
-        username: data.email.split('@')[0], // 이메일에서 사용자명 생성
+        username: sanitizedUsername,
         full_name: data.name,
         company: data.company,
         phone_number: data.phone,
@@ -146,7 +151,7 @@ const Register: React.FC = () => {
               label="이메일"
               autoComplete="email"
               error={!!errors.email}
-              helperText={errors.email?.message}
+              helperText={errors.email?.message || '📧 이 이메일로 입찰 알림을 받습니다'}
             />
 
             <TextField
@@ -221,10 +226,10 @@ const Register: React.FC = () => {
               margin="normal"
               required
               fullWidth
-              label="이름"
+              label="이름 (본인)"
               autoComplete="name"
               error={!!errors.name}
-              helperText={errors.name?.message}
+              helperText={errors.name?.message || '예: 홍길동'}
             />
           </>
         );
@@ -233,30 +238,26 @@ const Register: React.FC = () => {
         return (
           <>
             <TextField
-              {...register('company', {
-                required: '회사명을 입력해주세요',
-              })}
+              {...register('company')}
               margin="normal"
-              required
               fullWidth
-              label="회사명"
+              label="소속 회사명 (선택사항)"
               autoComplete="organization"
+              placeholder="예: (주)오딘테크놀로지"
               error={!!errors.company}
-              helperText={errors.company?.message}
+              helperText={errors.company?.message || '입찰 관련 업무를 하는 회사명을 입력하세요'}
             />
 
             <TextField
               {...register('phone', {
-                required: '연락처를 입력해주세요',
                 pattern: {
                   value: /^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/,
                   message: '올바른 휴대폰 번호 형식이 아닙니다',
                 },
               })}
               margin="normal"
-              required
               fullWidth
-              label="휴대폰 번호"
+              label="휴대폰 번호 (선택사항)"
               placeholder="010-1234-5678"
               autoComplete="tel"
               error={!!errors.phone}

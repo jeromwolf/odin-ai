@@ -162,6 +162,14 @@ try:
 except ImportError as e:
     print(f"⚠️ 관리자 통계 분석 API 라우터 로드 실패: {e}")
 
+# 관리자 알림 모니터링 라우터 추가
+try:
+    from api.admin_notifications import router as admin_notifications_router
+    app.include_router(admin_notifications_router)
+    print("✅ 관리자 알림 모니터링 API 라우터 등록됨")
+except ImportError as e:
+    print(f"⚠️ 관리자 알림 모니터링 API 라우터 로드 실패: {e}")
+
 # 샘플 데이터
 SAMPLE_BIDS = [
     {

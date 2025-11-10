@@ -215,6 +215,50 @@ class AdminApiClient {
   }
 
   // ============================================
+  // 알림 모니터링 API
+  // ============================================
+
+  async getNotificationsList(params: {
+    page?: number;
+    limit?: number;
+    user_id?: number;
+    rule_id?: number;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+  }) {
+    const response = await this.client.get('/api/admin/notifications/list', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getNotificationsStats() {
+    const response = await this.client.get('/api/admin/notifications/stats');
+    return response.data;
+  }
+
+  async getEmailSendLogs(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+  }) {
+    const response = await this.client.get('/api/admin/notifications/email-logs', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getNotificationDetail(notificationId: number) {
+    const response = await this.client.get(
+      `/api/admin/notifications/detail/${notificationId}`
+    );
+    return response.data;
+  }
+
+  // ============================================
   // 로그 조회 API
   // ============================================
 

@@ -391,6 +391,7 @@ async def execute_batch_manual(request: BatchManualRunRequest):
     import subprocess
     import os
     from datetime import datetime as dt
+    from pathlib import Path
 
     try:
         # 기본 날짜 설정 (오늘 날짜)
@@ -404,6 +405,7 @@ async def execute_batch_manual(request: BatchManualRunRequest):
         env['BATCH_START_DATE'] = start_date
         env['BATCH_END_DATE'] = end_date
         env['ENABLE_NOTIFICATION'] = "true" if request.enable_notification else "false"
+        env['BID_API_KEY'] = "6h2l2VPWSfA2vG3xSFr7gf6iwaZT2dmzcoCOzklLnOIJY6sw17lrwHNQ3WxPdKMDIN%2FmMlv2vBTWTIzBDPKVdw%3D%3D"
         if request.test_mode:
             env['TEST_MODE'] = "true"
 
@@ -411,23 +413,37 @@ async def execute_batch_manual(request: BatchManualRunRequest):
         batch_script = "/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai/batch/production_batch.py"
         venv_python = "/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai/venv_test/bin/python3"
 
-        # 백그라운드로 배치 실행
+        # 로그 파일 경로 설정 (타임스탬프 포함)
+        timestamp = dt.now().strftime('%Y%m%d_%H%M%S')
+        log_dir = Path("/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai/backend/logs")
+        log_dir.mkdir(exist_ok=True)
+
+        stdout_log = log_dir / f"batch_{timestamp}_stdout.log"
+        stderr_log = log_dir / f"batch_{timestamp}_stderr.log"
+
+        # 로그 파일 오픈 (배치 종료까지 유지)
+        stdout_file = open(stdout_log, 'w', buffering=1)
+        stderr_file = open(stderr_log, 'w', buffering=1)
+
+        # 백그라운드로 배치 실행 (로그 파일로 출력)
         process = subprocess.Popen(
             [venv_python, batch_script],
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True
+            stdout=stdout_file,
+            stderr=stderr_file,
+            start_new_session=True,
+            cwd="/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai"
         )
 
         task_id = process.pid
 
         logger.info(f"배치 수동 실행: PID={task_id}, 날짜={start_date}~{end_date}, 알림={request.enable_notification}")
+        logger.info(f"배치 로그: stdout={stdout_log}, stderr={stderr_log}")
 
         return BatchManualRunResponse(
             task_id=task_id,
             status="running",
-            message=f"배치가 실행되었습니다 (PID: {task_id}, 날짜: {start_date} ~ {end_date}, 알림: {'ON' if request.enable_notification else 'OFF'})"
+            message=f"배치가 실행되었습니다 (PID: {task_id}, 날짜: {start_date} ~ {end_date}, 알림: {'ON' if request.enable_notification else 'OFF'})\n로그: {stdout_log}"
         )
 
     except Exception as e:
