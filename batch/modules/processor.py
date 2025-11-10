@@ -221,6 +221,237 @@ class DocumentProcessorModule:
             self.session.add(info)
             extracted_count += 1
 
+        # ===== 신규 1: 공사기간 추출 =====
+        duration_patterns = [
+            (r'공사기간\s*[:：]\s*착공일?로부터\s*(\d+)\s*일', 'construction_days'),
+            (r'착공일?로부터\s*(\d+)\s*일?간', 'construction_days'),
+            (r'공사기간\s*[:：]\s*(\d{4}[\./]\d{2}[\./]\d{2})\s*[~～-]\s*(\d{4}[\./]\d{2}[\./]\d{2})', 'construction_period'),
+            # 개선: "착공일로부터 2025. 12. 31.까지" 패턴
+            (r'착공일?로부터\s*(\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?)까지', 'construction_deadline'),
+            (r'공사기간\s*[:：]\s*착공일?로부터\s*(\d{4}[\./-]\d{1,2}[\./-]\d{1,2})까지', 'construction_deadline'),
+        ]
+
+        for pattern, field_name in duration_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                if isinstance(match, tuple):
+                    value = ' ~ '.join(match) if len(match) > 1 else match[0]
+                else:
+                    value = match
+
+                info = BidExtractedInfo(
+                    bid_notice_no=document.bid_notice_no,
+                    info_category='duration',
+                    field_name=field_name,
+                    field_value=str(value),
+                    confidence_score=0.9,
+                    extraction_method='regex',
+                    extracted_at=datetime.now()
+                )
+                self.session.add(info)
+                extracted_count += 1
+
+        # ===== 신규 2: 업종/공종 추출 =====
+        work_type_patterns = [
+            (r'주\s*공\s*종\s*[:：]\s*([^\n]+)', 'main_work_type'),
+            (r'공사구분\s*[:：]\s*([^\n]+)', 'work_classification'),
+            (r'([가-힣]+공사업)\s*으?로\s*등록', 'required_license'),
+        ]
+
+        for pattern, field_name in work_type_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                info = BidExtractedInfo(
+                    bid_notice_no=document.bid_notice_no,
+                    info_category='work_type',
+                    field_name=field_name,
+                    field_value=match.strip(),
+                    confidence_score=0.85,
+                    extraction_method='regex',
+                    extracted_at=datetime.now()
+                )
+                self.session.add(info)
+                extracted_count += 1
+
+        # ===== 신규 3: 지역제한 추출 =====
+        region_patterns = [
+            (r'지역제한\s*[:：]?\s*\(?\s*([가-힣]+(?:광역시|특별시|특별자치시|도|특별자치도))', 'region_restriction'),
+            (r'([가-힣]+(?:광역시|특별시|특별자치시|도|특별자치도))\s*내에\s*소재', 'region_restriction'),
+            (r'본점\s*소재지.*?([가-힣]+(?:광역시|특별시|특별자치시|도|특별자치도))', 'region_restriction'),
+        ]
+
+        for pattern, field_name in region_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                info = BidExtractedInfo(
+                    bid_notice_no=document.bid_notice_no,
+                    info_category='region',
+                    field_name=field_name,
+                    field_value=match.strip(),
+                    confidence_score=0.85,
+                    extraction_method='regex',
+                    extracted_at=datetime.now()
+                )
+                self.session.add(info)
+                extracted_count += 1
+                break  # 첫 번째 매칭만 사용
+
+        # ===== 신규 4: 담당자 연락처 추출 =====
+        contact_patterns = [
+            (r'(?:문의|담당자?|연락처|전화)\s*[:：]?\s*(\d{2,3}[-\s]?\d{3,4}[-\s]?\d{4})', 'contact_phone'),
+            (r'☎\s*(\d{2,3}[-\s]?\d{3,4}[-\s]?\d{4})', 'contact_phone'),
+        ]
+
+        for pattern, field_name in contact_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches[:3]:  # 최대 3개까지
+                info = BidExtractedInfo(
+                    bid_notice_no=document.bid_notice_no,
+                    info_category='contact',
+                    field_name=field_name,
+                    field_value=match.strip(),
+                    confidence_score=0.9,
+                    extraction_method='regex',
+                    extracted_at=datetime.now()
+                )
+                self.session.add(info)
+                extracted_count += 1
+
+        # ===== 신규 5: 금액 상세 추출 =====
+        detailed_price_patterns = [
+            (r'부가가?치세\s*[:：]?\s*\(?\s*[A-Z]?\s*\)?\s*[:：]?\s*([\d,]+)', 'vat'),
+            (r'관급자재\s*[:：]?\s*\(?\s*[A-Z]?\s*\)?\s*[:：]?\s*([\d,]+)', 'government_materials'),
+            (r'공사추정금액\s*[:：]?\s*\(?\s*[A-Z+]+\s*\)?\s*[:：]?\s*([\d,]+)', 'total_estimated'),
+        ]
+
+        for pattern, field_name in detailed_price_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                value = match.replace(',', '')
+                info = BidExtractedInfo(
+                    bid_notice_no=document.bid_notice_no,
+                    info_category='prices',
+                    field_name=field_name,
+                    field_value=value,
+                    confidence_score=0.85,
+                    extraction_method='regex',
+                    extracted_at=datetime.now()
+                )
+                self.session.add(info)
+                extracted_count += 1
+
+        # ===== 신규 6: 일정 정보 추출 =====
+        schedule_patterns = [
+            (r'견적서\s*제출기간\s*[:：]\s*(\d{4}[\./-]\d{2}[\./-]\d{2}.*?\d{4}[\./-]\d{2}[\./-]\d{2})', 'submission_period'),
+            (r'개찰일시\s*[:：]\s*(\d{4}[\./-]\d{2}[\./-]\d{2}.*?\d{2}:\d{2})', 'opening_datetime'),
+            (r'입찰마감\s*[:：]\s*(\d{4}[\./-]\d{2}[\./-]\d{2})', 'bid_deadline'),
+        ]
+
+        for pattern, field_name in schedule_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                info = BidExtractedInfo(
+                    bid_notice_no=document.bid_notice_no,
+                    info_category='schedule',
+                    field_name=field_name,
+                    field_value=match.strip(),
+                    confidence_score=0.85,
+                    extraction_method='regex',
+                    extracted_at=datetime.now()
+                )
+                self.session.add(info)
+                extracted_count += 1
+
+        # ===== 신규 7: 특수조건 추출 =====
+        special_keywords = [
+            '청렴서약제', '노무비구분관리', '퇴직공제부금비',
+            '산업안전보건관리비', '지문인식', '전자입찰',
+            '적격심사', '총액입찰', '대안입찰'
+        ]
+
+        found_conditions = []
+        for keyword in special_keywords:
+            if keyword in text:
+                found_conditions.append(keyword)
+
+        if found_conditions:
+            info = BidExtractedInfo(
+                bid_notice_no=document.bid_notice_no,
+                info_category='special_conditions',
+                field_name='conditions_list',
+                field_value=', '.join(found_conditions),
+                confidence_score=0.9,
+                extraction_method='keyword_match',
+                extracted_at=datetime.now()
+            )
+            self.session.add(info)
+            extracted_count += 1
+
+        # ===== 신규 8: 공동도급 추출 =====
+        joint_venture_patterns = [
+            (r'공동도급\s*[:：]?\s*(허용|불허|금지|가능|불가능)', 'joint_venture_allowed'),
+        ]
+
+        for pattern, field_name in joint_venture_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                info = BidExtractedInfo(
+                    bid_notice_no=document.bid_notice_no,
+                    info_category='contract_details',
+                    field_name=field_name,
+                    field_value=match.strip(),
+                    confidence_score=0.9,
+                    extraction_method='regex',
+                    extracted_at=datetime.now()
+                )
+                self.session.add(info)
+                extracted_count += 1
+
+        # ===== 신규 9: 현장설명 추출 =====
+        site_explanation_patterns = [
+            (r'현장설명\s*[:：]?\s*(생략|필수|실시|미실시)', 'site_explanation_required'),
+            (r'현장설명회?\s*[:：]?\s*(\d{4}[\./-]\d{2}[\./-]\d{2})', 'site_explanation_date'),
+            # 개선: "현장설명을 생략" 패턴
+            (r'현장설명을\s*(생략)', 'site_explanation_required'),
+        ]
+
+        for pattern, field_name in site_explanation_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                info = BidExtractedInfo(
+                    bid_notice_no=document.bid_notice_no,
+                    info_category='site_explanation',
+                    field_name=field_name,
+                    field_value=match.strip(),
+                    confidence_score=0.85,
+                    extraction_method='regex',
+                    extracted_at=datetime.now()
+                )
+                self.session.add(info)
+                extracted_count += 1
+
+        # ===== 신규 10: 공사개요 추출 =====
+        project_overview_patterns = [
+            (r'공사개요\s*[:：]\s*([^\n]{10,150})', 'project_overview'),
+            (r'공\s*사\s*명\s*[:：]\s*([^\n]{10,150})', 'project_name'),
+        ]
+
+        for pattern, field_name in project_overview_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                info = BidExtractedInfo(
+                    bid_notice_no=document.bid_notice_no,
+                    info_category='project_info',
+                    field_name=field_name,
+                    field_value=match.strip(),
+                    confidence_score=0.8,
+                    extraction_method='regex',
+                    extracted_at=datetime.now()
+                )
+                self.session.add(info)
+                extracted_count += 1
+                break  # 첫 번째만
+
         self.session.commit()
         return extracted_count
 

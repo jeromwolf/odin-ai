@@ -169,6 +169,373 @@ result = matcher.process_new_bids(since_hours=168)  # ✅ 1주일 명시
 
 ---
 
+## 🚀 향후 확장 계획 (2025-11-10 추가)
+
+### **확장 로드맵: Phase 1 → Phase 2 → Phase 3**
+
+#### **Phase 1: 디버깅 & 배포 (현재 버전 v2.0 완성)** ✅ 진행 중
+**목표**: 안정적인 MVP 출시 및 초기 사용자 확보
+**기간**: 4주
+
+**핵심 작업:**
+- [ ] 버그 수정 (Excel 22개 실패, 알림 필터 검증)
+- [ ] 성능 최적화 (Redis 캐싱, DB 쿼리 최적화)
+- [ ] 사용자 경험 개선 (로딩 UI, 에러 메시지)
+- [ ] 베타 출시 준비 (AWS/GCP 배포, 도메인 연결)
+- [ ] 초기 사용자 10-20명 확보
+
+**완료 기준:**
+- 배치 처리 성공률 95% 이상
+- 검색 API 응답 시간 100ms 이하
+- 알림 매칭 정확도 95% 이상
+- 베타 사용자 만족도 4.0/5.0 이상
+
+---
+
+#### **Phase 2: RFP RAG 벡터 DB 시스템 (v2.5)** ⏳ 6개월 후
+**목표**: AI 기반 의미 검색 및 문서 질의응답 시스템 구축
+**기간**: 6주
+**선행 조건**: 1,000개 이상 입찰공고 데이터 축적
+
+**핵심 작업:**
+```
+Week 1-2: 문서 청킹 및 임베딩 파이프라인
+Week 3: ChromaDB 통합 및 벡터 저장
+Week 4: 하이브리드 검색 API 개발
+Week 5: RAG 기반 질의응답 시스템
+Week 6: 프론트엔드 UI (채팅 인터페이스)
+```
+
+**기술 스택:**
+- **임베딩**: OpenAI text-embedding-3-small (1536 dim)
+- **벡터 DB**: ChromaDB (로컬) → Pinecone (클라우드)
+- **LLM**: GPT-4-turbo-preview (질의응답)
+- **하이브리드 검색**: PostgreSQL + ChromaDB
+
+**예상 비용:**
+- OpenAI Embedding: $0.13 / 1,000개 공고
+- GPT-4 질의응답: $40-60 / 1,000 질문
+- Pinecone: $70/월 (Standard plan)
+
+**완료 기준:**
+- 의미 검색 정확도 85% 이상
+- RAG 질의응답 만족도 8/10 이상
+- 하이브리드 검색이 키워드 검색 대비 20% 성능 향상
+
+---
+
+#### **Phase 3: 온톨로지 기반 지식 그래프 (v3.0)** ⏳ 9개월 후
+**목표**: 공공입찰 도메인 지식 구조화 및 지능형 추천
+**기간**: 4주
+**선행 조건**: Phase 2 완료, 3,000개 이상 입찰공고 데이터
+
+**핵심 작업:**
+```
+Week 1: 온톨로지 스키마 설계 및 DB 구축
+Week 2: 수동 온톨로지 구축 (50개 핵심 개념)
+Week 3: 자동 분류 및 매칭 시스템 개발
+Week 4: 온톨로지 기반 추천 API 개발
+```
+
+**온톨로지 구조:**
+```
+입찰공고 (BidAnnouncement)
+├── 공사 (Construction)
+│   ├── 건축공사 → 신축/증축/리모델링
+│   ├── 토목공사 → 도로/교량/터널
+│   └── 전기공사/통신공사
+├── 용역 (Service)
+│   ├── 시스템개발 → 웹/앱/AI개발
+│   ├── 컨설팅/연구/유지보수
+└── 물품 (Goods)
+```
+
+**데이터베이스 스키마:**
+- `ontology_concepts`: 개념 계층 구조
+- `ontology_relations`: 개념 간 관계 (isA, requires, partOf)
+- `bid_ontology_mappings`: 입찰공고-온톨로지 매핑
+
+**완료 기준:**
+- 자동 분류 정확도 80% 이상
+- 온톨로지 기반 추천이 태그 기반 대비 30% 성능 향상
+- 검색 확장 (예: "도로" 검색 시 교량/터널 자동 포함)
+
+---
+
+### 📋 **Phase 2/3 확장 시 필수 준비사항**
+
+#### **1. Feature Flag 시스템 구현**
+```python
+# backend/core/feature_flags.py
+
+class FeatureFlags:
+    """기능 토글 시스템 - 서비스 중단 없이 기능 활성화/비활성화"""
+
+    @staticmethod
+    def is_enabled(feature_name: str, user_id: int = None) -> bool:
+        flags = {
+            "rag_search": {
+                "enabled": True,
+                "rollout_percentage": 10,  # 10% 사용자에게만
+                "beta_users": [98, 110, 111]  # 특정 베타 사용자
+            },
+            "ontology": {
+                "enabled": False,  # 아직 비활성화
+                "rollout_percentage": 0
+            }
+        }
+
+        if feature_name not in flags:
+            return False
+
+        flag = flags[feature_name]
+
+        # 완전 비활성화
+        if not flag["enabled"]:
+            return False
+
+        # 베타 사용자 우선
+        if user_id in flag.get("beta_users", []):
+            return True
+
+        # 퍼센트 롤아웃
+        if user_id:
+            rollout = flag.get("rollout_percentage", 0)
+            return (user_id % 100) < rollout
+
+        return flag["enabled"]
+
+# 사용 예시
+@router.get("/api/search")
+def search(q: str, user: User = Depends(get_current_user)):
+    if FeatureFlags.is_enabled("rag_search", user.id):
+        return rag_search(q)  # Phase 2
+    else:
+        return keyword_search(q)  # Phase 1
+```
+
+**필요 시기**: Phase 2 배포 1주일 전
+**파일 위치**: `backend/core/feature_flags.py`
+
+---
+
+#### **2. API 버저닝 시스템**
+```python
+# backend/main.py
+
+# Phase 1 API (하위 호환 유지)
+app.include_router(search_v1.router, prefix="/api/v1")
+
+# Phase 2 API (RAG 추가)
+app.include_router(search_v2.router, prefix="/api/v2")
+
+# Phase 3 API (온톨로지 추가)
+app.include_router(search_v3.router, prefix="/api/v3")
+
+# 기본 라우트는 최신 버전으로 리다이렉트
+@app.get("/api/search")
+def search_redirect():
+    return RedirectResponse("/api/v3/search")
+```
+
+**필요 시기**: Phase 2 배포 전
+**파일 위치**: `backend/main.py`, `backend/api/search_v2.py`
+
+---
+
+#### **3. 롤백 스크립트**
+```bash
+# scripts/rollback_phase2.sh
+
+#!/bin/bash
+echo "🚨 Phase 2 롤백 시작..."
+
+# 1. Feature Flag 비활성화
+curl -X POST http://localhost:9000/api/admin/feature-flags \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{"rag_search": {"enabled": false}}'
+
+# 2. Nginx 트래픽을 v1으로 리다이렉트
+sudo sed -i 's|/api/v2/search|/api/v1/search|g' /etc/nginx/sites-enabled/odin-ai
+sudo nginx -s reload
+
+# 3. ChromaDB 중단 (선택사항)
+docker stop chromadb
+
+# 4. 로그 기록
+echo "[$(date)] ROLLBACK TO PHASE 1" >> /var/log/odin-ai/rollback.log
+
+echo "✅ 롤백 완료 - Phase 1로 복귀"
+```
+
+**필요 시기**: Phase 2 배포 전
+**파일 위치**: `scripts/rollback_phase2.sh`
+
+---
+
+#### **4. 데이터베이스 마이그레이션 (Blue-Green 방식)**
+```sql
+-- migrations/phase2_rag_preparation.sql
+
+-- ✅ Step 1: 새 테이블 생성 (기존 테이블 건드리지 않음)
+CREATE TABLE IF NOT EXISTS rfp_document_chunks (
+    chunk_id SERIAL PRIMARY KEY,
+    bid_notice_no VARCHAR(100) REFERENCES bid_announcements(bid_notice_no),
+    chunk_index INT NOT NULL,
+    chunk_text TEXT NOT NULL,
+    chunk_tokens INT,
+
+    -- 임베딩 정보
+    embedding_id VARCHAR(100) UNIQUE,
+    embedding_model VARCHAR(50) DEFAULT 'text-embedding-3-small',
+
+    -- 메타데이터
+    section_type VARCHAR(50),  -- "요약", "자격요건", "제출서류"
+    page_number INT,
+
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ✅ Step 2: 새 컬럼 추가 (Nullable, 기존 데이터 영향 없음)
+ALTER TABLE bid_announcements
+ADD COLUMN IF NOT EXISTS has_embedding BOOLEAN DEFAULT FALSE;
+
+-- ✅ Step 3: 인덱스 추가 (CONCURRENTLY로 Lock 최소화)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS
+idx_chunk_bid_notice ON rfp_document_chunks(bid_notice_no);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS
+idx_bid_has_embedding ON bid_announcements(has_embedding);
+
+-- ❌ 절대 금지 사항
+-- DROP TABLE bid_announcements;  ❌ 절대 안 됨
+-- ALTER TABLE bid_announcements DROP COLUMN bid_notice_no;  ❌ 절대 안 됨
+-- TRUNCATE TABLE bid_announcements;  ❌ 절대 안 됨
+```
+
+**필요 시기**: Phase 2 배포 당일 새벽 4시
+**파일 위치**: `migrations/phase2_rag_preparation.sql`
+
+---
+
+#### **5. 단계별 배포 체크리스트**
+
+```markdown
+## Phase 2 배포 체크리스트
+
+### 배포 1주일 전
+- [ ] 스테이징 환경에서 Phase 2 완전 테스트
+- [ ] 부하 테스트 (동시 접속 1000명, JMeter 사용)
+- [ ] 데이터 마이그레이션 스크립트 검증 (Dry run)
+- [ ] 롤백 스크립트 준비 및 테스트
+- [ ] Feature Flag 시스템 구현 완료
+- [ ] API v2 엔드포인트 완성
+
+### 배포 3일 전
+- [ ] 전체 데이터베이스 백업 (pg_dump)
+- [ ] ChromaDB 설치 및 연결 테스트
+- [ ] OpenAI API 키 발급 및 크레딧 확인
+- [ ] 모니터링 시스템 확인 (Sentry, Grafana)
+- [ ] 베타 사용자 10명 선정 및 안내
+
+### 배포 당일 (새벽 4시 - 트래픽 최소)
+- [ ] 04:00 - 데이터베이스 마이그레이션 실행
+- [ ] 04:10 - 백엔드 배포 (docker-compose up -d)
+- [ ] 04:20 - Feature Flag로 RAG 10% 활성화
+- [ ] 04:30 - 30분 모니터링 (에러율 1% 이하 확인)
+- [ ] 05:00 - 문제 없으면 30% → 50% → 100% 단계적 확대
+- [ ] 06:00 - 베타 사용자 피드백 수집 시작
+
+### 배포 후 1주일
+- [ ] 사용자 피드백 수집 (설문조사)
+- [ ] 검색 정확도 메트릭 비교 (Phase 1 vs Phase 2)
+- [ ] 성능 지표 확인 (응답 시간, DB 부하, OpenAI API 비용)
+- [ ] A/B 테스트 결과 분석
+- [ ] 필요 시 롤백 또는 개선 조치
+
+### 문제 발생 시 즉시 실행
+```bash
+# 즉시 롤백
+./scripts/rollback_phase2.sh
+
+# 모니터링 확인
+curl http://localhost:9000/api/health
+tail -f /var/log/odin-ai/error.log
+
+# 사용자 공지
+echo "일시적 시스템 점검 중입니다" > maintenance.html
+```
+```
+
+---
+
+### ⚠️ **서비스 운영 중 확장 시 주의사항**
+
+#### **절대 원칙 (Golden Rules)** 🔴
+```
+❌ 기존 테이블/컬럼 삭제 절대 금지
+❌ 기존 API 엔드포인트 변경 금지 (버저닝 사용)
+❌ 운영 DB에서 직접 마이그레이션 금지 (백업 후 실행)
+❌ 배치 처리 중 스키마 변경 금지 (새벽 4시 배포)
+❌ 사용자 데이터 손실 발생 시 즉시 롤백
+```
+
+#### **안전 장치 (Safety Net)** 🟡
+```
+✅ Feature Flag로 언제든 기능 토글 가능
+✅ API 버저닝 (v1, v2, v3) 유지
+✅ 데이터베이스 백업 자동화 (매일 새벽 3시)
+✅ 롤백 스크립트 사전 준비 및 테스트
+✅ Blue-Green 배포 방식 (무중단 배포)
+```
+
+#### **모니터링 필수** 🟢
+```
+✅ 에러율 실시간 모니터링 (Sentry)
+✅ 성능 지표 추적 (응답 시간, DB 부하, CPU/메모리)
+✅ OpenAI API 비용 추적 (월 $500 초과 시 알림)
+✅ 사용자 피드백 수집 채널 (이메일, 채팅)
+✅ A/B 테스트 결과 분석 (Phase 1 vs Phase 2)
+```
+
+---
+
+### 📊 **Phase별 예상 리스크 및 대응**
+
+| Phase | 리스크 | 확률 | 영향도 | 대응 전략 |
+|-------|--------|------|--------|----------|
+| **Phase 2** | DB 스키마 충돌 | 🟡 중간 | 🔴 높음 | Blue-Green 마이그레이션 |
+| | API 호환성 깨짐 | 🟢 낮음 | 🟡 중간 | API 버저닝 (v1/v2) |
+| | 임베딩 생성 지연 | 🟡 중간 | 🟡 중간 | 비동기 처리, 알림은 즉시 발송 |
+| | ChromaDB 용량 폭발 | 🟢 낮음 | 🟡 중간 | 1000개 제한, 이후 Pinecone 이전 |
+| | OpenAI API 비용 초과 | 🟡 중간 | 🟢 낮음 | 월 $500 상한선, 초과 시 기능 중지 |
+| **Phase 3** | 온톨로지 매핑 오류 | 🟡 중간 | 🟢 낮음 | 수동 검증 + 신뢰도 점수 0.8 이상만 |
+| | 기존 태그 시스템 충돌 | 🟡 중간 | 🟡 중간 | 이중 분류 체계 유지 (태그 + 온톨로지) |
+| | 사용자 UI 혼란 | 🔴 높음 | 🟢 낮음 | 점진적 롤아웃, 튜토리얼 제공 |
+
+---
+
+### 💡 **일론의 최종 조언**
+
+**Phase 1 (지금)**: 디버깅과 안정화에 100% 집중 ✅
+- Excel 22개 실패 해결
+- 알림 필터 정확도 95% 이상
+- 베타 사용자 10명 확보
+
+**Phase 2 (6개월 후)**: 데이터 충분히 쌓인 후 RAG 도입 ✅
+- 1,000개 이상 입찰공고 확보
+- Feature Flag로 안전하게 베타 테스트
+- 하이브리드 검색으로 단계적 전환
+
+**Phase 3 (9개월 후)**: 온톨로지로 차별화된 추천 시스템 ✅
+- 3,000개 이상 입찰공고 분석
+- 수동 온톨로지 50개 개념부터 시작
+- GPT-4 기반 자동 확장
+
+**핵심**: 각 Phase는 이전 Phase의 데이터와 피드백을 기반으로 확장됩니다!
+
+---
+
 ## 📝 최근 작업 기록 (2025-10-30)
 
 ### ✅ 알림 모니터링 시스템 구축 완료
@@ -275,6 +642,284 @@ interface UserDetail {
 2. **Optional Chaining 습관화**: 모든 중첩 객체 접근 시 `?.` 연산자 사용
 3. **배열 처리 패턴**: `array || []` 패턴으로 안전한 map 연산
 4. **단수/복수 불일치 대응**: 백엔드와 프론트엔드 간 명명 규칙 차이 처리
+
+---
+
+## 📋 추후 작업 필요 사항 (2025-11-10 추가)
+
+### 🔍 **1. RFP 다중 파일 처리 여부 확인 필요**
+
+**현재 상황**:
+- ✅ 공고당 대표 RFP 문서 **1개만 수집 및 분석 중**
+- ✅ 1개 문서는 완벽히 처리됨 (텍스트 추출, 정보 추출, 마크다운 변환)
+- ❓ 일부 공고에 **추가 첨부파일**(설계설명서, 공사시방서 등)이 있을 가능성
+
+**확인 필요 사항**:
+1. 나라장터 API가 추가 첨부파일 URL을 제공하는가?
+2. 추가 첨부파일이 있다면 필수 분석 대상인가?
+3. 대표 문서 1개만으로 충분한 정보를 얻을 수 있는가?
+
+**현재 처리 구조**:
+```
+bid_announcements.standard_doc_url  (대표 문서 1개 URL)
+  ↓
+bid_documents (1개 레코드)
+  ↓
+다운로드 → 텍스트 추출 → 정보 추출 ✅
+
+추가 첨부파일 (있다면):
+  ❌ API에서 수집 안 함
+  ❌ 다운로드 안 함
+  ❌ 분석 안 함
+```
+
+**다중 파일 처리가 필요하다면 수정할 파일**:
+- `batch/modules/collector.py` Line 198-214: API에서 모든 첨부파일 URL 수집
+- `bid_documents` 테이블: 공고당 여러 레코드 저장 (이미 가능)
+- `downloader.py`, `processor.py`: 수정 불필요 (이미 여러 파일 처리 가능)
+
+**우선순위**: 🟡 중간 (현재 1개 문서로도 충분히 작동 중)
+
+**다음 액션**:
+1. 나라장터에서 실제 공고 페이지 확인 (추가 첨부파일 존재 여부)
+2. API 응답 구조 분석 (attachDocUrl1, attachDocUrl2 등의 필드 존재 여부)
+3. 비즈니스 요구사항 확인 (대표 문서만으로 충분한가?)
+
+---
+
+### 🏗️ **2. 업종 요건 매칭 기능 추가**
+
+**현재 상황**:
+- ✅ RFP 문서에서 업종 정보 추출 완료 (86개, 21.9% 커버리지)
+- ✅ `bid_extracted_info` 테이블에 저장됨 (info_category='work_type')
+- ❌ **알림 매칭 시스템에는 미연결** (사용자가 알림 필터에 업종 설정 불가)
+
+**추출된 업종 정보 예시**:
+```
+- "전문공사(실내건축공사업)"
+- "종합공사"
+- "전문공사"
+```
+
+**필요한 작업**:
+
+#### Backend 작업
+1. **DB 스키마 수정**
+   ```sql
+   -- 옵션 A: bid_announcements 테이블에 컬럼 추가
+   ALTER TABLE bid_announcements ADD COLUMN work_type TEXT;
+
+   -- 또는 옵션 B: 매칭 시 JOIN 쿼리 사용 (컬럼 추가 불필요)
+   ```
+
+2. **processor.py 수정** (옵션 A 선택 시)
+   ```python
+   # batch/modules/processor.py
+   # 추출한 work_type을 bid_announcements 테이블에 업데이트
+   def _extract_information(self, document):
+       # ... 기존 코드 ...
+
+       # work_type 추출 후
+       if work_type_value:
+           self.session.execute(
+               "UPDATE bid_announcements SET work_type = %s WHERE bid_notice_no = %s",
+               (work_type_value, document.bid_notice_no)
+           )
+   ```
+
+3. **notification_matcher.py 수정**
+   ```python
+   # batch/modules/notification_matcher.py Line 178-224
+   def _is_bid_matching_rule(self, bid, rule):
+       # ... 기존 코드 (지역, 금액, 키워드 매칭) ...
+
+       # 6. 업종 매칭 추가
+       if 'work_types' in conditions and conditions['work_types']:
+           if bid.get('work_type'):
+               if not any(wt in bid['work_type'] for wt in conditions['work_types']):
+                   return False
+   ```
+
+4. **alert_rules 테이블 conditions 구조**
+   ```json
+   {
+     "keywords": ["도로", "포장"],
+     "min_price": 50000000,
+     "max_price": 200000000,
+     "regions": ["경기도", "서울특별시"],
+     "work_types": ["실내건축공사업", "종합공사"]  // 신규 추가
+   }
+   ```
+
+#### Frontend 작업
+5. **알림 설정 화면 (Notifications.tsx)**
+   ```typescript
+   // 업종 선택 UI 추가
+   <FormControl>
+     <FormLabel>업종 필터</FormLabel>
+     <Select multiple value={workTypes} onChange={handleWorkTypeChange}>
+       <MenuItem value="종합공사">종합공사</MenuItem>
+       <MenuItem value="전문공사">전문공사</MenuItem>
+       <MenuItem value="실내건축공사업">실내건축공사업</MenuItem>
+       <MenuItem value="토목공사업">토목공사업</MenuItem>
+       // ... 더 많은 업종
+     </Select>
+   </FormControl>
+   ```
+
+**우선순위**: 🟢 높음 (사용자 가치 높음, 작업 난이도 낮음)
+
+**예상 작업 시간**: 1-2시간
+
+**비즈니스 가치**:
+- 현재: 지역 + 금액 2개 조건만 매칭
+- 완료 후: 지역 + 금액 + **업종** 3개 조건 매칭 → **정확도 대폭 향상**
+
+---
+
+### 👤 **3. 유사 경험 보유 매칭 기능 (사용자 히스토리 시스템)**
+
+**현재 상황**:
+- ✅ RFP 자격요건 텍스트 추출 완료 (367개, 93.6% 커버리지)
+- ❌ 자격요건 내 "유사 공사 실적" 요구사항 파싱 불가 (정규식 한계)
+- ❌ **사용자의 과거 실적/경험 데이터 없음**
+
+**자격요건 예시**:
+```
+참가자격
+가. 지방자치단체를 당사자로 하는 계약에 관한 법률...
+나. 최근 5년 이내 유사 공사 실적 1억원 이상 1건 이상
+다. 건축기사 1명 이상 보유
+라. 신용평가등급 BB+ 이상
+```
+
+**필요한 시스템**:
+
+#### 1. 사용자 프로필 확장
+```sql
+-- 새 테이블: user_experiences (사용자 실적 관리)
+CREATE TABLE user_experiences (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    project_name TEXT NOT NULL,
+    project_type TEXT,  -- "도로공사", "건축공사" 등
+    contract_amount BIGINT,  -- 계약 금액
+    contract_date DATE,
+    completion_date DATE,
+    client_name TEXT,
+    role TEXT,  -- "원도급", "하도급" 등
+    description TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 새 테이블: user_certifications (자격증 관리)
+CREATE TABLE user_certifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    cert_name TEXT NOT NULL,  -- "건축기사", "토목기사" 등
+    cert_number TEXT,
+    issue_date DATE,
+    expiry_date DATE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 새 테이블: user_licenses (면허/등록 관리)
+CREATE TABLE user_licenses (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    license_type TEXT NOT NULL,  -- "종합공사업", "전문공사업" 등
+    license_number TEXT,
+    issue_date DATE,
+    valid_until DATE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### 2. 자격요건 구조화 (Phase 3: LLM 통합 필요)
+```python
+# 자격요건 텍스트를 GPT-4로 구조화
+requirements_text = "최근 5년 이내 유사 공사 실적 1억원 이상 1건 이상"
+
+# GPT-4 프롬프트
+prompt = """
+다음 자격요건 텍스트를 JSON으로 구조화하세요:
+{requirements_text}
+
+출력 형식:
+{
+  "experience_required": true,
+  "min_experience_years": 5,
+  "min_project_amount": 100000000,
+  "min_project_count": 1,
+  "certifications": [],
+  "licenses": []
+}
+"""
+
+# 구조화된 데이터를 bid_extracted_info에 저장
+```
+
+#### 3. 사용자-입찰 매칭 점수 계산
+```python
+def calculate_match_score(user_profile, bid_requirements):
+    score = 0
+
+    # 1. 유사 경험 매칭 (40점)
+    user_experiences = get_user_experiences(user_profile.id, years=5)
+    if bid_requirements.get('min_project_count'):
+        matching_projects = [
+            exp for exp in user_experiences
+            if exp.contract_amount >= bid_requirements['min_project_amount']
+        ]
+        if len(matching_projects) >= bid_requirements['min_project_count']:
+            score += 40
+
+    # 2. 자격증 매칭 (30점)
+    user_certs = get_user_certifications(user_profile.id)
+    if all(req_cert in user_certs for req_cert in bid_requirements['certifications']):
+        score += 30
+
+    # 3. 면허 매칭 (20점)
+    user_licenses = get_user_licenses(user_profile.id)
+    if bid_requirements['license_type'] in user_licenses:
+        score += 20
+
+    # 4. 지역/금액 매칭 (10점)
+    # 기존 로직
+
+    return score  # 0-100점
+```
+
+#### 4. Frontend: 사용자 프로필 페이지 확장
+```typescript
+// 새 페이지: /profile/experiences
+// - 과거 프로젝트 입력/관리
+// - 자격증 등록
+// - 면허/등록증 관리
+// - AI 매칭 점수 확인
+
+// 알림 설정 시:
+"이 입찰은 귀하의 프로필과 87% 일치합니다"
+✅ 지역: 경기도 (일치)
+✅ 금액: 1억 5천만원 (범위 내)
+✅ 업종: 실내건축공사업 (보유 면허)
+⚠️ 경험: 유사 실적 1건 필요 (현재 0건)
+```
+
+**우선순위**: 🔴 낮음 (구현 복잡도 높음, Phase 3 작업)
+
+**예상 작업 시간**: 1-2주
+
+**선행 작업**:
+1. Phase 3: LLM 통합 (자격요건 구조화)
+2. 사용자 프로필 시스템 확장 (DB 스키마, API, UI)
+3. 매칭 알고리즘 개발 및 테스트
+
+**비즈니스 가치**:
+- 사용자가 자신의 프로필을 상세히 입력하면
+- AI가 자동으로 **입찰 적합도 점수** 계산
+- "이 입찰에 참여할 자격이 있는가?" 자동 판단
+- 입찰 성공률 예측 가능
 
 ---
 
