@@ -169,6 +169,146 @@ result = matcher.process_new_bids(since_hours=168)  # ✅ 1주일 명시
 
 ---
 
+### ✅ **버그 #1 추가 수정: 두 형식 모두 지원** (2025-11-10)
+
+**발견일**: 2025-11-10
+**심각도**: 🟡 **개선** - 이전 수정이 불완전했음
+**수정일**: 2025-11-10
+**상태**: ✅ 완전 수정 완료
+
+#### 문제 재발견
+- **2025-10-30 수정**: `price_min/price_max` → `min_price/max_price`로 변경
+- **재발견 문제**: DB에 **두 가지 형식이 혼재**되어 있음
+  - User 96, 98: `price_min`, `price_max` (구형식)
+  - User 109, 110, 111: `min_price`, `max_price` (신형식)
+- **결과**: 이전 수정으로 User 96, 98의 가격 필터가 작동 안 함
+
+#### 최종 해결책
+```python
+# notification_matcher.py Line 195-207 (최종 수정)
+# 두 가지 형식 모두 지원
+if bid['estimated_price']:
+    # 최소 가격 체크 (min_price 또는 price_min)
+    min_price = conditions.get('min_price') or conditions.get('price_min')
+    if min_price:
+        if bid['estimated_price'] < min_price:
+            return False
+
+    # 최대 가격 체크 (max_price 또는 price_max)
+    max_price = conditions.get('max_price') or conditions.get('price_max')
+    if max_price:
+        if bid['estimated_price'] > max_price:
+            return False
+```
+
+#### 검증 결과
+```sql
+-- User 96 (구형식): price_min=1000000000
+-- User 98 (구형식): price_min=10000000, price_max=10000000000
+-- User 110 (신형식): min_price=50000000, max_price=200000000
+-- User 111 (신형식): min_price=20000000, max_price=100000000
+
+-- 모든 형식 정상 작동 확인 ✅
+```
+
+#### 교훈
+- **하위 호환성 고려**: 기존 데이터 마이그레이션 없이 코드로 해결
+- **완전한 검증**: 모든 사용자의 다양한 데이터 형식 확인 필요
+
+---
+
+### ❌ **버그 #3: TypeScript 타입 중복 정의** (2025-11-10)
+
+**발견일**: 2025-11-10
+**심각도**: 🟠 **중대** - 컴파일 에러 발생
+**수정일**: 2025-11-10
+**상태**: ✅ 수정 완료
+
+#### 문제 상황
+- **파일**: `frontend/src/pages/BidDetail.tsx`
+- **증상**: `'BidDetail' is already defined` 컴파일 에러
+- **원인**: Line 33의 `interface BidDetail`과 Line 52의 `const BidDetail` 이름 충돌
+
+#### 수정 내역
+```typescript
+// BEFORE (Line 33)
+interface BidDetail {
+  bid_notice_no: string;
+  title: string;
+  ...
+}
+
+// AFTER
+interface BidDetailData {  // ✅ 이름 변경
+  bid_notice_no: string;
+  title: string;
+  ...
+}
+
+// Line 63 also updated
+return response.data as BidDetailData;  // ✅
+```
+
+#### 검증 결과
+- ✅ `npm run build`: "Compiled with warnings" (에러 없음)
+- ✅ 경고는 unused imports만 남음 (치명적이지 않음)
+
+---
+
+### ❌ **버그 #4: 관리자 통계 API 컬럼명 오류** (2025-11-10)
+
+**발견일**: 2025-11-10
+**심각도**: 🔴 **치명적** - 통계 API 완전 작동 불가
+**수정일**: 2025-11-10
+**상태**: ✅ 수정 완료
+
+#### 문제 상황
+- **파일**: `backend/api/admin_statistics.py`
+- **증상**: `column "publish_date" does not exist` SQL 에러
+- **원인**: 코드에서 존재하지 않는 `publish_date` 컬럼 참조
+- **실제 컬럼**: `announcement_date`
+
+#### 영향받은 쿼리
+```sql
+-- Line 120, 122, 126 (bid_collection)
+DATE_TRUNC('{date_trunc}', publish_date)::date as stat_date  -- ❌
+WHERE publish_date >= %s AND publish_date <= %s  -- ❌
+
+-- Line 150, 202, 225 (category_distribution, user_growth 등)
+WHERE publish_date >= %s  -- ❌
+WHERE ba.publish_date >= %s  -- ❌
+```
+
+#### 수정 내역
+```bash
+# 모든 publish_date를 announcement_date로 일괄 변경
+sed -i.bak 's/publish_date/announcement_date/g' backend/api/admin_statistics.py
+```
+
+#### 검증 결과
+```json
+// GET /api/admin/statistics/bid-collection?days=7
+{
+  "stats": [
+    {
+      "date": "2025-10-30",
+      "total_collected": 467,
+      "new_bids": 467,
+      "total_amount": 229971406438
+    }
+  ],
+  "summary": {...},
+  "period": {...}
+}
+```
+- ✅ 통계 API 6개 엔드포인트 모두 정상 작동
+
+#### 교훈
+- **스키마 문서화 필요**: DB 컬럼명을 문서화하여 불일치 방지
+- **자동 테스트**: API 엔드포인트 자동 테스트로 런타임 에러 사전 발견
+
+---
+
 ## 🚀 향후 확장 계획 (2025-11-10 추가)
 
 ### **확장 로드맵: Phase 1 → Phase 2 → Phase 3**
