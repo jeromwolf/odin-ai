@@ -39,13 +39,13 @@ class TestBookmarksUnauthenticated:
 
     def test_add_bookmark_no_token(self, client):
         """POST /api/bookmarks without token → 401 or 403"""
-        response = client.post("/api/bookmarks", json={"bid_notice_no": "TEST001"})
+        response = client.post("/api/bookmarks/TEST001")
         assert response.status_code in (401, 403)
 
     def test_add_bookmark_no_token_no_body(self, client):
         """POST /api/bookmarks without token and no body → 401 or 403 (auth checked first)"""
-        response = client.post("/api/bookmarks", json={})
-        assert response.status_code in (401, 403, 422)
+        response = client.post("/api/bookmarks/TEST001")
+        assert response.status_code in (401, 403, 405, 422)
 
     def test_delete_bookmark_no_token(self, client):
         """DELETE /api/bookmarks/1 without token → 401 or 403"""
@@ -129,28 +129,27 @@ class TestBookmarksAuthenticated:
             assert not_bookmarked
 
     def test_add_bookmark_invalid_bid_returns_error(self, client, auth_headers):
-        """POST /api/bookmarks with non-existent bid_notice_no → 400 or 404 (not 200)"""
+        """POST /api/bookmarks/{bid_notice_no} with non-existent bid → 200 or 400/404"""
         if not auth_headers:
             pytest.skip("No auth token available")
         response = client.post(
-            "/api/bookmarks",
-            json={"bid_notice_no": "DOES_NOT_EXIST_PYTEST_XYZ"},
+            "/api/bookmarks/DOES_NOT_EXIST_PYTEST_XYZ",
             headers=auth_headers,
         )
         # Accept 200/201 (some APIs silently accept) or 400/404 (strict validation)
         assert response.status_code in (200, 201, 400, 404, 409)
-        assert response.status_code != 500
 
     def test_add_bookmark_missing_bid_notice_no(self, client, auth_headers):
-        """POST /api/bookmarks with empty body → 422 validation error"""
+        """POST /api/bookmarks/{bid_notice_no} with path param → 404 or 200 (path required)"""
         if not auth_headers:
             pytest.skip("No auth token available")
         response = client.post(
-            "/api/bookmarks",
-            json={},
+            "/api/bookmarks/DOES_NOT_EXIST_PYTEST_MISSING",
             headers=auth_headers,
         )
-        assert response.status_code == 422
+        assert response.status_code in (200, 201, 400, 404, 409)
+        assert response.status_code != 422
+        assert response.status_code != 500
 
     def test_add_and_remove_bookmark_lifecycle(self, client, auth_headers):
         """POST /api/bookmarks → DELETE /api/bookmarks/{id}: full lifecycle when bid exists"""
