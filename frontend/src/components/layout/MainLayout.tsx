@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -62,6 +62,29 @@ const adminMenuItems = [
 const MainLayout: React.FC = () => {
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const response = await fetch(
+          `${process.env.REACT_APP_API_URL || 'http://localhost:9000'}/api/notifications/?status=unread&limit=1`,
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setUnreadCount(data.total || 0);
+        }
+      } catch {
+        // 알림 조회 실패 시 0으로 유지
+      }
+    };
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 60000); // 1분마다 갱신
+    return () => clearInterval(interval);
+  }, []);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
@@ -78,12 +101,10 @@ const MainLayout: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    console.log('로그아웃 버튼 클릭됨');
     try {
       await logout();
-      console.log('로그아웃 성공');
-    } catch (error) {
-      console.error('로그아웃 에러:', error);
+    } catch {
+      // 로그아웃 실패 시에도 메뉴 닫기
     }
     handleMenuClose();
   };
@@ -131,8 +152,8 @@ const MainLayout: React.FC = () => {
             Odin-AI
           </Typography>
 
-          <IconButton color="inherit" sx={{ mr: 2 }}>
-            <Badge badgeContent={4} color="secondary">
+          <IconButton color="inherit" sx={{ mr: 2 }} onClick={() => navigate('/notifications')}>
+            <Badge badgeContent={unreadCount} color="secondary" invisible={unreadCount === 0}>
               <Notifications />
             </Badge>
           </IconButton>

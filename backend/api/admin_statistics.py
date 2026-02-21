@@ -2,11 +2,12 @@
 관리자 웹 - 통계 분석 API
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, date, timedelta
 from database import get_db_connection
+from api.admin_auth import get_current_admin
 import logging
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,8 @@ class NotificationStatsResponse(BaseModel):
 async def get_bid_collection_stats(
     start_date: Optional[date] = Query(None, description="시작 날짜"),
     end_date: Optional[date] = Query(None, description="종료 날짜"),
-    group_by: str = Query("day", description="day/week/month")
+    group_by: str = Query("day", description="day/week/month"),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """
     입찰공고 수집 통계
@@ -107,12 +109,9 @@ async def get_bid_collection_stats(
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # 그룹핑 기준 설정
-            date_trunc = {
-                'day': 'day',
-                'week': 'week',
-                'month': 'month'
-            }.get(group_by, 'day')
+            # SQL Injection 방어: whitelist만 허용
+            VALID_TRUNCS = {'day', 'week', 'month'}
+            date_trunc = group_by if group_by in VALID_TRUNCS else 'day'
 
             # 수집 통계 조회
             query = f"""
@@ -171,13 +170,14 @@ async def get_bid_collection_stats(
 
     except Exception as e:
         logger.error(f"입찰공고 수집 통계 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/category-distribution", response_model=CategoryDistributionResponse)
 async def get_category_distribution(
     start_date: Optional[date] = Query(None, description="시작 날짜"),
-    end_date: Optional[date] = Query(None, description="종료 날짜")
+    end_date: Optional[date] = Query(None, description="종료 날짜"),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """
     카테고리별 입찰 분포
@@ -251,13 +251,14 @@ async def get_category_distribution(
 
     except Exception as e:
         logger.error(f"카테고리별 분포 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/user-growth", response_model=UserGrowthResponse)
 async def get_user_growth_stats(
     start_date: Optional[date] = Query(None, description="시작 날짜"),
-    end_date: Optional[date] = Query(None, description="종료 날짜")
+    end_date: Optional[date] = Query(None, description="종료 날짜"),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """
     사용자 증가 추이
@@ -291,12 +292,12 @@ async def get_user_growth_stats(
                 ),
                 daily_active AS (
                     SELECT
-                        last_login_at::date as date,
+                        last_login::date as date,
                         COUNT(DISTINCT id) as active_users
                     FROM users
-                    WHERE last_login_at IS NOT NULL
-                      AND last_login_at::date >= %s AND last_login_at::date <= %s
-                    GROUP BY last_login_at::date
+                    WHERE last_login IS NOT NULL
+                      AND last_login::date >= %s AND last_login::date <= %s
+                    GROUP BY last_login::date
                 )
                 SELECT
                     ds.date,
@@ -325,7 +326,7 @@ async def get_user_growth_stats(
                     COUNT(*) as total_users,
                     COUNT(*) FILTER (WHERE created_at >= %s) as new_users_period,
                     COUNT(*) FILTER (WHERE is_active = true) as active_users,
-                    COUNT(*) FILTER (WHERE last_login_at >= NOW() - INTERVAL '30 days') as recent_active
+                    COUNT(*) FILTER (WHERE last_login >= NOW() - INTERVAL '30 days') as recent_active
                 FROM users
             """, (start_date,))
             summary_row = cursor.fetchone()
@@ -348,13 +349,14 @@ async def get_user_growth_stats(
 
     except Exception as e:
         logger.error(f"사용자 증가 통계 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/notifications", response_model=NotificationStatsResponse)
 async def get_notification_stats(
     start_date: Optional[date] = Query(None, description="시작 날짜"),
-    end_date: Optional[date] = Query(None, description="종료 날짜")
+    end_date: Optional[date] = Query(None, description="종료 날짜"),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """
     알림 발송 통계
@@ -454,4 +456,4 @@ async def get_notification_stats(
 
     except Exception as e:
         logger.error(f"알림 발송 통계 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")

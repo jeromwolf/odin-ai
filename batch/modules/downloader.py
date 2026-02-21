@@ -7,7 +7,7 @@
 import requests
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from loguru import logger
@@ -140,7 +140,7 @@ class DocumentDownloader:
                 document.storage_path = str(file_path)
                 document.download_status = 'completed'
                 document.file_size = len(response.content)
-                document.downloaded_at = datetime.now()
+                document.downloaded_at = datetime.now(timezone.utc)
 
                 # 파일 확장자 업데이트 (없으면)
                 if not document.file_extension and '.' in file_name:

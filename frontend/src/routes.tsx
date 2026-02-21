@@ -5,6 +5,7 @@ import { CircularProgress, Box } from '@mui/material';
 import MainLayout from './components/layout/MainLayout';
 import AuthLayout from './components/layout/AuthLayout';
 import PrivateRoute from './components/auth/PrivateRoute';
+import AdminPrivateRoute from './components/auth/AdminPrivateRoute';
 
 // Lazy load pages
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -57,15 +58,17 @@ const AppRoutes = () => {
 
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="batch" element={<AdminBatchMonitoring />} />
-          <Route path="system" element={<AdminSystemMonitoring />} />
-          <Route path="notifications" element={<AdminNotificationMonitoring />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="logs" element={<AdminLogs />} />
-          <Route path="statistics" element={<AdminStatistics />} />
+        <Route path="/admin" element={<AdminPrivateRoute />}>
+          <Route element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="batch" element={<AdminBatchMonitoring />} />
+            <Route path="system" element={<AdminSystemMonitoring />} />
+            <Route path="notifications" element={<AdminNotificationMonitoring />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="logs" element={<AdminLogs />} />
+            <Route path="statistics" element={<AdminStatistics />} />
+          </Route>
         </Route>
 
         {/* Private Routes */}

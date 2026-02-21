@@ -2,11 +2,12 @@
 관리자 웹 - 사용자 관리 API
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from datetime import datetime
 from database import get_db_connection
+from api.admin_auth import get_current_admin
 import logging
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,8 @@ async def get_users(
     search: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100)
+    limit: int = Query(20, ge=1, le=100),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """사용자 목록 조회"""
     try:
@@ -95,11 +97,14 @@ async def get_users(
 
     except Exception as e:
         logger.error(f"사용자 목록 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/{user_id}", response_model=UserDetailResponse)
-async def get_user_detail(user_id: int):
+async def get_user_detail(
+    user_id: int,
+    current_admin: dict = Depends(get_current_admin)
+):
     """사용자 상세 정보"""
     try:
         with get_db_connection() as conn:
@@ -148,11 +153,15 @@ async def get_user_detail(user_id: int):
         raise
     except Exception as e:
         logger.error(f"사용자 상세 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.patch("/{user_id}")
-async def update_user(user_id: int, is_active: Optional[bool] = None):
+async def update_user(
+    user_id: int,
+    is_active: Optional[bool] = None,
+    current_admin: dict = Depends(get_current_admin)
+):
     """사용자 계정 관리 (활성화/비활성화)"""
     try:
         with get_db_connection() as conn:
@@ -164,16 +173,20 @@ async def update_user(user_id: int, is_active: Optional[bool] = None):
                     (is_active, user_id)
                 )
                 conn.commit()
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
 
             return {"success": True, "message": "사용자 정보가 업데이트되었습니다"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"사용자 업데이트 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/statistics/summary")
-async def get_user_statistics():
+async def get_user_statistics(current_admin: dict = Depends(get_current_admin)):
     """사용자 통계 요약"""
     try:
         with get_db_connection() as conn:
@@ -200,4 +213,4 @@ async def get_user_statistics():
 
     except Exception as e:
         logger.error(f"사용자 통계 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")

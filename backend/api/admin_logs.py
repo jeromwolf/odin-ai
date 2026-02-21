@@ -2,11 +2,12 @@
 관리자 웹 - 로그 조회 API
 """
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, date
 from database import get_db_connection
+from api.admin_auth import get_current_admin
 import logging
 import zipfile
 import io
@@ -41,7 +42,8 @@ async def get_logs(
     level: Optional[str] = Query(None),
     keyword: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=200)
+    limit: int = Query(50, ge=1, le=200),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """로그 검색 및 조회"""
     try:
@@ -99,11 +101,14 @@ async def get_logs(
 
     except Exception as e:
         logger.error(f"로그 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/download/{log_date}")
-async def download_logs(log_date: date):
+async def download_logs(
+    log_date: date,
+    current_admin: dict = Depends(get_current_admin)
+):
     """로그 파일 다운로드 (ZIP)"""
     try:
         log_dir = Path("logs")
@@ -136,13 +141,14 @@ async def download_logs(log_date: date):
         raise
     except Exception as e:
         logger.error(f"로그 다운로드 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/errors/statistics")
 async def get_error_statistics(
     start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None)
+    end_date: Optional[date] = Query(None),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """에러 로그 통계"""
     try:
@@ -206,4 +212,4 @@ async def get_error_statistics(
 
     except Exception as e:
         logger.error(f"에러 통계 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")

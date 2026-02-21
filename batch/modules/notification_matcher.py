@@ -14,6 +14,17 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 
+try:
+    import sys
+    # Add backend to path for ontology service import
+    backend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'backend')
+    if backend_path not in sys.path:
+        sys.path.insert(0, backend_path)
+    from services.ontology_service import expand_search_terms
+    ONTOLOGY_AVAILABLE = True
+except ImportError:
+    ONTOLOGY_AVAILABLE = False
+
 
 class NotificationMatcher:
     """알림 매칭 및 발송 처리 클래스"""
@@ -23,6 +34,7 @@ class NotificationMatcher:
         self.processed_count = 0
         self.notification_count = 0
         self.email_sent_count = 0
+        self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     def process_new_bids(self, since_hours: int = 168) -> Dict[str, Any]:
         """
@@ -185,9 +197,21 @@ class NotificationMatcher:
             title_and_org = f"{bid['title']} {bid['organization_name']}".lower()
 
             for keyword in conditions['keywords']:
+                # Direct match first
                 if keyword.lower() in title_and_org:
                     keywords_matched = True
                     break
+                # Ontology expansion match
+                if ONTOLOGY_AVAILABLE and not keywords_matched:
+                    try:
+                        expanded = expand_search_terms(keyword)
+                        for expanded_kw in expanded:
+                            if expanded_kw.lower() in title_and_org:
+                                logger.debug(f"온톨로지 확장 매칭: '{keyword}' → '{expanded_kw}' (입찰: {bid.get('title', '')[:50]})")
+                                keywords_matched = True
+                                break
+                    except Exception:
+                        pass  # Silently fall back to direct match
 
             if not keywords_matched:
                 return False
@@ -474,7 +498,7 @@ class NotificationMatcher:
                         <p style="margin: 8px 0;">🏷️ <strong>태그:</strong> {', '.join(bid.get('tags', [])[:5])}</p>
                     </div>
                     <div style="text-align: center; margin-top: 15px;">
-                        <a href="http://localhost:3000/bids/{bid['bid_notice_no']}"
+                        <a href="{self.frontend_url}/bids/{bid['bid_notice_no']}"
                            style="background: #1976d2; color: white; padding: 10px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-size: 14px;">
                             📋 상세보기
                         </a>
@@ -573,12 +597,12 @@ class NotificationMatcher:
                     </div>
                     <p style="margin: 0 0 10px 0; font-size: 14px;"><strong>ODIN-AI 공공입찰 정보 분석 플랫폼</strong></p>
                     <p style="margin: 0 0 5px 0; font-size: 13px;">
-                        🔧 <a href="http://localhost:3000/notifications" style="color: #1976d2;">알림 설정 관리</a> |
-                        📊 <a href="http://localhost:3000/dashboard" style="color: #1976d2;">대시보드</a> |
-                        🔍 <a href="http://localhost:3000/search" style="color: #1976d2;">입찰 검색</a>
+                        🔧 <a href="{self.frontend_url}/notifications" style="color: #1976d2;">알림 설정 관리</a> |
+                        📊 <a href="{self.frontend_url}/dashboard" style="color: #1976d2;">대시보드</a> |
+                        🔍 <a href="{self.frontend_url}/search" style="color: #1976d2;">입찰 검색</a>
                     </p>
                     <p style="margin: 0; font-size: 12px; color: #999;">
-                        이메일 알림을 받고 싶지 않으시면 <a href="http://localhost:3000/notifications" style="color: #999;">알림 설정</a>에서 해당 규칙을 비활성화하거나 삭제할 수 있습니다.
+                        이메일 알림을 받고 싶지 않으시면 <a href="{self.frontend_url}/notifications" style="color: #999;">알림 설정</a>에서 해당 규칙을 비활성화하거나 삭제할 수 있습니다.
                     </p>
                 </div>
             </div>
@@ -671,7 +695,7 @@ class NotificationMatcher:
                         <p><strong>🏷️ 태그:</strong> {', '.join(bid.get('tags', [])[:5])}</p>
                     </div>
                     <p style="text-align: center;">
-                        <a href="http://localhost:3000/bids/{bid['bid_notice_no']}" class="btn">
+                        <a href="{self.frontend_url}/bids/{bid['bid_notice_no']}" class="btn">
                             📋 상세보기
                         </a>
                     </p>
@@ -679,7 +703,7 @@ class NotificationMatcher:
                 </div>
                 <div class="footer">
                     <p>ODIN-AI 공공입찰 정보 분석 플랫폼</p>
-                    <p>알림 설정을 변경하려면 <a href="http://localhost:3000/notifications">여기</a>를 클릭하세요.</p>
+                    <p>알림 설정을 변경하려면 <a href="{self.frontend_url}/notifications">여기</a>를 클릭하세요.</p>
                 </div>
             </div>
         </body>
@@ -693,7 +717,9 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
 
     load_dotenv()
-    db_url = os.getenv('DATABASE_URL', 'postgresql://blockmeta@localhost:5432/odin_db')
+    db_url = os.getenv('DATABASE_URL')
+    if not db_url:
+        raise RuntimeError("DATABASE_URL 환경변수가 설정되지 않았습니다")
 
     matcher = NotificationMatcher(db_url)
     result = matcher.process_new_bids(since_hours=24)  # 최근 24시간

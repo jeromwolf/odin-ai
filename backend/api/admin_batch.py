@@ -7,7 +7,9 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime, date
 from database import get_db_connection
+from api.admin_auth import get_current_admin
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +106,8 @@ async def get_batch_executions(
     batch_type: Optional[str] = Query(None, description="배치 타입"),
     status: Optional[str] = Query(None, description="상태"),
     page: int = Query(1, ge=1, description="페이지 번호"),
-    limit: int = Query(20, ge=1, le=100, description="페이지당 항목 수")
+    limit: int = Query(20, ge=1, le=100, description="페이지당 항목 수"),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """
     배치 실행 이력 조회
@@ -192,11 +195,14 @@ async def get_batch_executions(
 
     except Exception as e:
         logger.error(f"배치 실행 이력 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/executions/{execution_id}", response_model=BatchExecutionDetailResponse)
-async def get_batch_execution_detail(execution_id: int):
+async def get_batch_execution_detail(
+    execution_id: int,
+    current_admin: dict = Depends(get_current_admin)
+):
     """
     배치 실행 상세 정보 조회
 
@@ -289,14 +295,15 @@ async def get_batch_execution_detail(execution_id: int):
         raise
     except Exception as e:
         logger.error(f"배치 실행 상세 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/statistics", response_model=List[BatchStatisticsResponse])
 async def get_batch_statistics(
     start_date: Optional[date] = Query(None, description="시작 날짜"),
     end_date: Optional[date] = Query(None, description="종료 날짜"),
-    batch_type: Optional[str] = Query(None, description="배치 타입 (전체일 경우 생략)")
+    batch_type: Optional[str] = Query(None, description="배치 타입 (전체일 경우 생략)"),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """
     배치 실행 통계
@@ -374,11 +381,14 @@ async def get_batch_statistics(
 
     except Exception as e:
         logger.error(f"배치 통계 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.post("/execute", response_model=BatchManualRunResponse)
-async def execute_batch_manual(request: BatchManualRunRequest):
+async def execute_batch_manual(
+    request: BatchManualRunRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
     """
     배치 수동 실행
 
@@ -401,39 +411,50 @@ async def execute_batch_manual(request: BatchManualRunRequest):
 
         # 환경변수 설정
         env = os.environ.copy()
-        env['DATABASE_URL'] = "postgresql://blockmeta@localhost:5432/odin_db"
+        db_url = os.getenv('DATABASE_URL')
+        if not db_url:
+            raise HTTPException(status_code=500, detail="DATABASE_URL 환경변수가 설정되지 않았습니다")
+        env['DATABASE_URL'] = db_url
         env['BATCH_START_DATE'] = start_date
         env['BATCH_END_DATE'] = end_date
         env['ENABLE_NOTIFICATION'] = "true" if request.enable_notification else "false"
-        env['BID_API_KEY'] = "6h2l2VPWSfA2vG3xSFr7gf6iwaZT2dmzcoCOzklLnOIJY6sw17lrwHNQ3WxPdKMDIN%2FmMlv2vBTWTIzBDPKVdw%3D%3D"
+        env['BID_API_KEY'] = os.getenv('BID_API_KEY', '')
         if request.test_mode:
             env['TEST_MODE'] = "true"
 
-        # 배치 프로그램 경로
-        batch_script = "/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai/batch/production_batch.py"
-        venv_python = "/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai/venv_test/bin/python3"
+        # 배치 프로그램 경로 (이 파일의 위치를 기준으로 프로젝트 루트 계산)
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        batch_script = os.path.join(project_root, 'batch', 'production_batch.py')
+        venv_python = os.path.join(project_root, 'venv_test', 'bin', 'python3')
+        # 가상환경이 없으면 시스템 python3 사용
+        if not os.path.exists(venv_python):
+            import shutil
+            venv_python = shutil.which('python3') or 'python3'
 
         # 로그 파일 경로 설정 (타임스탬프 포함)
         timestamp = dt.now().strftime('%Y%m%d_%H%M%S')
-        log_dir = Path("/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai/backend/logs")
+        log_dir = Path(project_root) / 'backend' / 'logs'
         log_dir.mkdir(exist_ok=True)
 
         stdout_log = log_dir / f"batch_{timestamp}_stdout.log"
         stderr_log = log_dir / f"batch_{timestamp}_stderr.log"
 
         # 로그 파일 오픈 (배치 종료까지 유지)
-        stdout_file = open(stdout_log, 'w', buffering=1)
-        stderr_file = open(stderr_log, 'w', buffering=1)
+        stdout_fh = open(stdout_log, 'w', buffering=1)
+        stderr_fh = open(stderr_log, 'w', buffering=1)
 
         # 백그라운드로 배치 실행 (로그 파일로 출력)
         process = subprocess.Popen(
             [venv_python, batch_script],
             env=env,
-            stdout=stdout_file,
-            stderr=stderr_file,
+            stdout=stdout_fh,
+            stderr=stderr_fh,
             start_new_session=True,
-            cwd="/Users/blockmeta/Library/CloudStorage/GoogleDrive-jeromwolf@gmail.com/내 드라이브/KellyGoogleSpace/odin-ai"
+            cwd=project_root
         )
+        # 파일 핸들을 프로세스 객체에 첨부 (서브프로세스 종료 시 GC가 닫을 수 있도록 참조 유지)
+        process._stdout_fh = stdout_fh
+        process._stderr_fh = stderr_fh
 
         task_id = process.pid
 
@@ -448,7 +469,7 @@ async def execute_batch_manual(request: BatchManualRunRequest):
 
     except Exception as e:
         logger.error(f"배치 수동 실행 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 # ============================================

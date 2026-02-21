@@ -6,7 +6,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -395,7 +395,7 @@ class AlertEngine:
         await self._process_daily_notifications()
 
         # 주간 알림 처리 (월요일에만)
-        if datetime.now().weekday() == 0:  # 월요일
+        if datetime.now(timezone.utc).weekday() == 0:  # 월요일
             await self._process_weekly_notifications()
 
     async def _process_daily_notifications(self):
@@ -436,7 +436,7 @@ class AlertEngine:
         """일일 요약 알림 발송"""
         template_data = {
             'count': count,
-            'date': datetime.now().strftime('%Y년 %m월 %d일'),
+            'date': datetime.now(timezone.utc).strftime('%Y년 %m월 %d일'),
             'bid_notices': bid_notices[:10],  # 최대 10개만
             'dashboard_url': 'http://localhost:3000/dashboard'
         }

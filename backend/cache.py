@@ -6,9 +6,12 @@ Redis 캐싱 시스템
 import redis
 import json
 import hashlib
+import logging
 from typing import Optional, Any, Dict
 from datetime import timedelta
 import os
+
+logger = logging.getLogger(__name__)
 
 class RedisCache:
     def __init__(self):
@@ -29,12 +32,12 @@ class RedisCache:
             # 연결 테스트
             self.client.ping()
             self.enabled = True
-            print("✅ Redis 캐시 연결 성공")
+            logger.info("Redis cache connection successful")
         except (redis.ConnectionError, redis.TimeoutError) as e:
-            print(f"⚠️ Redis 연결 실패 (캐싱 비활성화): {e}")
+            logger.warning(f"Redis connection failed (caching disabled): {e}")
             self.enabled = False
         except Exception as e:
-            print(f"⚠️ Redis 초기화 실패: {e}")
+            logger.warning(f"Redis initialization failed: {e}")
             self.enabled = False
 
     def _make_key(self, prefix: str, params: Dict[str, Any]) -> str:
@@ -57,13 +60,13 @@ class RedisCache:
             data = self.client.get(key)
 
             if data:
-                print(f"🎯 캐시 히트: {prefix}")
+                logger.debug(f"Cache hit: {prefix}")
                 return json.loads(data)
             else:
-                print(f"💭 캐시 미스: {prefix}")
+                logger.debug(f"Cache miss: {prefix}")
                 return None
         except Exception as e:
-            print(f"캐시 조회 에러: {e}")
+            logger.error(f"Cache retrieval error: {e}")
             return None
 
     def set(self, prefix: str, params: Dict[str, Any], data: Dict, ttl_seconds: int = 300):
@@ -77,10 +80,10 @@ class RedisCache:
 
             # TTL과 함께 저장
             self.client.setex(key, ttl_seconds, json_data)
-            print(f"💾 캐시 저장: {prefix} (TTL: {ttl_seconds}초)")
+            logger.debug(f"Cache saved: {prefix} (TTL: {ttl_seconds}s)")
             return True
         except Exception as e:
-            print(f"캐시 저장 에러: {e}")
+            logger.error(f"Cache save error: {e}")
             return False
 
     def delete(self, prefix: str, params: Dict[str, Any]) -> bool:
@@ -92,10 +95,10 @@ class RedisCache:
             key = self._make_key(prefix, params)
             result = self.client.delete(key)
             if result:
-                print(f"🗑️ 캐시 삭제: {prefix}")
+                logger.debug(f"Cache deleted: {prefix}")
             return bool(result)
         except Exception as e:
-            print(f"캐시 삭제 에러: {e}")
+            logger.error(f"Cache deletion error: {e}")
             return False
 
     def flush_pattern(self, pattern: str) -> int:
@@ -107,11 +110,11 @@ class RedisCache:
             keys = self.client.keys(f"{pattern}:*")
             if keys:
                 deleted = self.client.delete(*keys)
-                print(f"🗑️ {deleted}개 캐시 삭제 (패턴: {pattern})")
+                logger.debug(f"{deleted} cache entries deleted (pattern: {pattern})")
                 return deleted
             return 0
         except Exception as e:
-            print(f"패턴 캐시 삭제 에러: {e}")
+            logger.error(f"Pattern cache deletion error: {e}")
             return 0
 
     def get_stats(self) -> Dict[str, Any]:
@@ -137,8 +140,8 @@ class RedisCache:
                 "db_size": self.client.dbsize()
             }
         except Exception as e:
-            print(f"캐시 통계 조회 에러: {e}")
-            return {"enabled": False, "error": str(e)}
+            logger.error(f"Cache statistics retrieval error: {e}")
+            return {"enabled": False, "error": "cache error"}
 
     def _calculate_hit_rate(self, hits: int, misses: int) -> float:
         """캐시 히트율 계산"""

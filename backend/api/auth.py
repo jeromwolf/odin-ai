@@ -2,10 +2,11 @@
 사용자 인증 API
 """
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, Request, status
 from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import html
 import logging
 from database import get_db_connection
 from auth.security import (
@@ -17,6 +18,7 @@ from auth.security import (
     decode_token
 )
 from auth.dependencies import get_current_user, get_current_user_optional, User
+from middleware.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +100,6 @@ async def register(user_data: UserRegister):
                 )
 
             # XSS 방어를 위한 HTML 이스케이프
-            import html
             safe_full_name = html.escape(user_data.full_name) if user_data.full_name else None
             safe_company = html.escape(user_data.company) if user_data.company else None
 
@@ -125,7 +126,6 @@ async def register(user_data: UserRegister):
             ))
 
             user_record = cursor.fetchone()
-            conn.commit()
 
             # 이메일 인증 토큰 생성 (실제로는 이메일 전송 필요)
             verification_token = create_email_verification_token()
@@ -137,13 +137,12 @@ async def register(user_data: UserRegister):
             cursor.execute(token_query, (
                 user_record[0],
                 verification_token,
-                datetime.utcnow() + timedelta(hours=24)
+                datetime.now(timezone.utc) + timedelta(hours=24)
             ))
             conn.commit()
 
             # TODO: 이메일 발송 로직 추가
             logger.info(f"회원가입 성공: {user_data.email}")
-            logger.info(f"인증 토큰: {verification_token}")  # 개발용 로그
 
             return UserResponse(
                 id=user_record[0],
@@ -166,14 +165,11 @@ async def register(user_data: UserRegister):
         )
 
 
+@limiter.limit("5/minute")
 @router.post("/login", response_model=TokenResponse)
-async def login(credentials: UserLogin):
+async def login(request: Request, credentials: UserLogin):
     """로그인"""
     try:
-        # XSS 방어를 위한 HTML 이스케이프
-        import html
-        safe_email = html.escape(str(credentials.email))
-
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
@@ -219,12 +215,12 @@ async def login(credentials: UserLogin):
             cursor.execute(session_query, (
                 user[0],
                 refresh_token,
-                datetime.utcnow() + timedelta(days=7)
+                datetime.now(timezone.utc) + timedelta(days=7)
             ))
 
             # 마지막 로그인 시간 업데이트
             update_query = "UPDATE users SET last_login = %s WHERE id = %s"
-            cursor.execute(update_query, (datetime.utcnow(), user[0]))
+            cursor.execute(update_query, (datetime.now(timezone.utc), user[0]))
             conn.commit()
 
             return TokenResponse(
@@ -274,7 +270,7 @@ async def refresh_token(token_data: TokenRefresh):
             """
             cursor.execute(session_query, (
                 token_data.refresh_token,
-                datetime.utcnow()
+                datetime.now(timezone.utc)
             ))
 
             if not cursor.fetchone():
@@ -295,7 +291,7 @@ async def refresh_token(token_data: TokenRefresh):
             """
             cursor.execute(update_query, (
                 new_refresh_token,
-                datetime.utcnow() + timedelta(days=7),
+                datetime.now(timezone.utc) + timedelta(days=7),
                 token_data.refresh_token
             ))
             conn.commit()

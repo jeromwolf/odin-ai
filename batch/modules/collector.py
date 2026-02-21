@@ -7,7 +7,7 @@ API 수집 모듈
 import requests
 import urllib.parse
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from loguru import logger
@@ -54,7 +54,7 @@ class APICollector:
         """
         # 날짜 설정
         if end_date is None:
-            end_date = datetime.now()
+            end_date = datetime.now(timezone.utc)
         if start_date is None:
             start_date = end_date - timedelta(days=7)
 
@@ -190,7 +190,7 @@ class APICollector:
                         standard_doc_url=item.get('stdNtceDocUrl'),
                         status='active',
                         collection_status='completed',
-                        collected_at=datetime.now()
+                        collected_at=datetime.now(timezone.utc)
                     )
                     self.session.add(announcement)
 

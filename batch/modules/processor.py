@@ -6,7 +6,7 @@
 
 import asyncio
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from loguru import logger
@@ -17,6 +17,18 @@ import zipfile
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# 온톨로지 서비스 임포트 (선택적)
+try:
+    import sys as _sys
+    import os as _os
+    _backend_path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), 'backend')
+    if _backend_path not in _sys.path:
+        _sys.path.insert(0, _backend_path)
+    from services.ontology_service import classify_bid as ontology_classify
+    ONTOLOGY_AVAILABLE = True
+except ImportError:
+    ONTOLOGY_AVAILABLE = False
 
 from src.database.models import (
     BidAnnouncement, BidDocument, BidExtractedInfo, BidSchedule,
@@ -177,7 +189,7 @@ class DocumentProcessorModule:
                     field_value=value,
                     confidence_score=0.9,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -199,7 +211,7 @@ class DocumentProcessorModule:
                     field_value=match.strip(),
                     confidence_score=0.85,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -216,7 +228,7 @@ class DocumentProcessorModule:
                 field_value=qualification_text[:500],
                 confidence_score=0.8,
                 extraction_method='keyword_search',
-                extracted_at=datetime.now()
+                extracted_at=datetime.now(timezone.utc)
             )
             self.session.add(info)
             extracted_count += 1
@@ -246,7 +258,7 @@ class DocumentProcessorModule:
                     field_value=str(value),
                     confidence_score=0.9,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -268,7 +280,7 @@ class DocumentProcessorModule:
                     field_value=match.strip(),
                     confidence_score=0.85,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -290,7 +302,7 @@ class DocumentProcessorModule:
                     field_value=match.strip(),
                     confidence_score=0.85,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -312,7 +324,7 @@ class DocumentProcessorModule:
                     field_value=match.strip(),
                     confidence_score=0.9,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -335,7 +347,7 @@ class DocumentProcessorModule:
                     field_value=value,
                     confidence_score=0.85,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -357,7 +369,7 @@ class DocumentProcessorModule:
                     field_value=match.strip(),
                     confidence_score=0.85,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -382,7 +394,7 @@ class DocumentProcessorModule:
                 field_value=', '.join(found_conditions),
                 confidence_score=0.9,
                 extraction_method='keyword_match',
-                extracted_at=datetime.now()
+                extracted_at=datetime.now(timezone.utc)
             )
             self.session.add(info)
             extracted_count += 1
@@ -402,7 +414,7 @@ class DocumentProcessorModule:
                     field_value=match.strip(),
                     confidence_score=0.9,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -425,7 +437,7 @@ class DocumentProcessorModule:
                     field_value=match.strip(),
                     confidence_score=0.85,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -446,7 +458,7 @@ class DocumentProcessorModule:
                     field_value=match.strip(),
                     confidence_score=0.8,
                     extraction_method='regex',
-                    extracted_at=datetime.now()
+                    extracted_at=datetime.now(timezone.utc)
                 )
                 self.session.add(info)
                 extracted_count += 1
@@ -487,6 +499,7 @@ class DocumentProcessorModule:
 
         # 제목과 본문을 분리하여 가중치 적용
         title = ""
+        announcement = None
         if hasattr(document, 'bid_notice_no'):
             # 제목 가져오기 (announcement 테이블에서)
             announcement = self.session.query(BidAnnouncement).filter_by(
@@ -510,9 +523,50 @@ class DocumentProcessorModule:
             if score > 0:
                 assigned_tags.append((tag_name, score))
 
-        # 점수 기준으로 정렬하고 상위 3개만 선택
+        # 점수 기준으로 정렬하고 상위 8개까지 선택 (온톨로지 태그 포함 고려)
         assigned_tags.sort(key=lambda x: x[1], reverse=True)
-        assigned_tags = assigned_tags[:3]
+        assigned_tags = assigned_tags[:8]
+
+        # 온톨로지 기반 추가 분류
+        if ONTOLOGY_AVAILABLE:
+            try:
+                # announcement 에서 기관명 확보 (위에서 이미 조회했으므로 재사용)
+                organization_name = ""
+                if announcement and hasattr(announcement, 'organization_name'):
+                    organization_name = announcement.organization_name or ""
+
+                # 기존 태그 이름 집합 (중복 방지용)
+                existing_tag_names = {tag_name for tag_name, _ in assigned_tags}
+
+                ontology_results = ontology_classify(
+                    title=title,
+                    organization_name=organization_name,
+                    extracted_text=document.extracted_text[:2000] if document.extracted_text else ""
+                )
+                for result in ontology_results:
+                    ont_tag_name = result['concept_name']
+                    if ont_tag_name not in existing_tag_names:
+                        assigned_tags.append((ont_tag_name, 0))
+                        existing_tag_names.add(ont_tag_name)
+
+                # bid_ontology_mappings 테이블에 저장
+                if ontology_results:
+                    for result in ontology_results:
+                        try:
+                            self.session.execute(text("""
+                                INSERT INTO bid_ontology_mappings (bid_notice_no, concept_id, confidence, source)
+                                VALUES (:bid_notice_no, :concept_id, :confidence, 'auto')
+                                ON CONFLICT (bid_notice_no, concept_id) DO UPDATE
+                                SET confidence = EXCLUDED.confidence
+                            """), {
+                                'bid_notice_no': document.bid_notice_no,
+                                'concept_id': result['concept_id'],
+                                'confidence': result['confidence'],
+                            })
+                        except Exception as e:
+                            logger.warning(f"온톨로지 매핑 저장 실패: {e}")
+            except Exception as e:
+                logger.warning(f"온톨로지 분류 실패 (기존 태그 사용): {e}")
 
         tag_count = 0
         for tag_name, _ in assigned_tags:

@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 from auth.dependencies import get_current_user, User
 from database import get_db_connection
@@ -193,34 +193,7 @@ async def create_subscription(
 
     except Exception as e:
         logger.error(f"구독 신청 실패: {e}")
-        # 테이블이 없으면 생성
-        try:
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS user_subscriptions (
-                        id SERIAL PRIMARY KEY,
-                        user_id INTEGER NOT NULL,
-                        plan_id VARCHAR(50) NOT NULL,
-                        status VARCHAR(20) DEFAULT 'active',
-                        payment_method VARCHAR(50),
-                        started_at TIMESTAMP DEFAULT NOW(),
-                        cancelled_at TIMESTAMP,
-                        next_billing_date TIMESTAMP,
-                        created_at TIMESTAMP DEFAULT NOW(),
-                        updated_at TIMESTAMP DEFAULT NOW()
-                    )
-                """)
-                conn.commit()
-
-                # 다시 시도
-                return await create_subscription(subscription, user)
-        except:
-            return {
-                "success": True,
-                "message": "구독이 성공적으로 신청되었습니다 (시뮬레이션)",
-                "plan": plan
-            }
+        raise HTTPException(status_code=500, detail="구독 신청 중 오류가 발생했습니다")
 
 
 @router.get("/current")
@@ -253,8 +226,9 @@ async def get_current_subscription(user: User = Depends(get_current_user)):
                     }
                 }
 
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"구독 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail="구독 조회 중 오류가 발생했습니다")
 
     # 구독이 없으면 Free 플랜
     free_plan = SUBSCRIPTION_PLANS[0]
@@ -291,7 +265,7 @@ async def checkout(
         )
 
     # 유료 플랜 결제 시뮬레이션
-    payment_id = f"pay_sim_{user.id}_{request.plan_id}_{datetime.now().timestamp()}"
+    payment_id = f"pay_sim_{user.id}_{request.plan_id}_{datetime.now(timezone.utc).timestamp()}"
 
     return {
         "success": True,
@@ -327,17 +301,11 @@ async def cancel_subscription(user: User = Depends(get_current_user)):
                     "message": "구독이 취소되었습니다"
                 }
             else:
-                return {
-                    "success": False,
-                    "message": "활성 구독이 없습니다"
-                }
+                raise HTTPException(status_code=404, detail="활성 구독이 없습니다")
 
     except Exception as e:
         logger.error(f"구독 취소 실패: {e}")
-        return {
-            "success": True,
-            "message": "구독이 취소되었습니다 (시뮬레이션)"
-        }
+        raise HTTPException(status_code=500, detail="구독 취소 중 오류가 발생했습니다")
 
 
 @router.get("/usage")
@@ -347,18 +315,35 @@ async def get_usage_stats(user: User = Depends(get_current_user)):
     subscription = await get_current_subscription(user)
     plan = subscription["subscription"]["plan"]
 
-    # 실제 사용량은 DB에서 조회해야 하지만 여기서는 시뮬레이션
+    # 실제 사용량을 DB에서 조회
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM user_bookmarks WHERE user_id = %s",
+                (user.id,)
+            )
+            bookmarks_used = cursor.fetchone()[0]
+
+            cursor.execute(
+                "SELECT COUNT(*) FROM alert_rules WHERE user_id = %s AND is_active = true",
+                (user.id,)
+            )
+            alerts_used = cursor.fetchone()[0]
+
+    # TODO: API 호출 추적 테이블이 없으므로 0으로 설정
+    api_calls_used = 0
+
     usage = {
         "bookmarks": {
-            "used": 5,
+            "used": bookmarks_used,
             "limit": plan["max_bookmarks"] if plan["max_bookmarks"] > 0 else "무제한"
         },
         "alerts": {
-            "used": 2,
+            "used": alerts_used,
             "limit": plan["max_alerts"] if plan["max_alerts"] > 0 else "무제한"
         },
         "api_calls": {
-            "used": 45,
+            "used": api_calls_used,
             "limit": plan["api_calls_per_month"] if plan["api_calls_per_month"] > 0 else "무제한"
         }
     }

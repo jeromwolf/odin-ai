@@ -2,7 +2,7 @@
 결제 처리 API (토스페이먼츠)
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from typing import Optional, Dict, Any
 from datetime import datetime
 from database import get_db_connection
@@ -21,15 +21,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
 # 토스페이먼츠 설정 (실제 사용시 환경변수로 관리)
-TOSS_CLIENT_KEY = os.getenv("TOSS_CLIENT_KEY", "test_ck_demo_key")
-TOSS_SECRET_KEY = os.getenv("TOSS_SECRET_KEY", "test_sk_demo_key")
+TOSS_CLIENT_KEY = os.getenv("TOSS_CLIENT_KEY", "")
+TOSS_SECRET_KEY = os.getenv("TOSS_SECRET_KEY", "")
 TOSS_API_URL = "https://api.tosspayments.com/v1"
 USE_TEST_MODE = os.getenv("PAYMENT_TEST_MODE", "true").lower() == "true"
-
-# 테스트 모드 설정
-if USE_TEST_MODE:
-    TOSS_CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq"  # 토스페이먼츠 테스트 키
-    TOSS_SECRET_KEY = "test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R"
 
 # Authorization 헤더 생성
 def get_auth_header():
@@ -121,7 +116,6 @@ async def request_payment(
             ))
 
             payment_id = cursor.fetchone()[0]
-            conn.commit()
 
             # 토스페이먼츠 결제 요청 데이터
             payment_data = {
@@ -230,7 +224,6 @@ async def confirm_payment(
                         SET status = 'failed', failed_at = NOW()
                         WHERE id = %s
                     """, (payment[0],))
-                    conn.commit()
                     raise HTTPException(status_code=400, detail="결제 승인 실패")
 
                 approval_status = "completed"
@@ -387,13 +380,13 @@ async def payment_webhook(
     except Exception as e:
         logger.error(f"웹훅 처리 실패: {e}")
         # 웹훅은 실패해도 200 반환 (재시도 방지)
-        return {"received": False, "error": str(e)}
+        return {"received": False, "error": "처리 중 오류 발생"}
 
 
 @router.get("/history")
 async def get_payment_history(
     user: User = Depends(get_current_user),
-    limit: int = 10
+    limit: int = Query(10, ge=1, le=100)
 ):
     """결제 내역 조회"""
     try:

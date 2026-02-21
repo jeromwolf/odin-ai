@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from database import get_db_connection
 from auth.dependencies import get_current_user_optional, get_current_user, User
 import logging
@@ -14,198 +14,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
-@router.get("/stats")
-async def get_dashboard_stats(user: User = Depends(get_current_user)):
-    """대시보드 전체 통계"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-
-            # 전체 입찰 수
-            cursor.execute("SELECT COUNT(*) FROM bid_announcements")
-            total_bids = cursor.fetchone()[0]
-
-            # 활성 입찰 수
-            cursor.execute("""
-                SELECT COUNT(*) FROM bid_announcements
-                WHERE bid_end_date >= NOW()
-            """)
-            active_bids = cursor.fetchone()[0]
-
-            # 총 예정가격
-            cursor.execute("""
-                SELECT COALESCE(SUM(estimated_price), 0)
-                FROM bid_announcements
-                WHERE estimated_price IS NOT NULL
-            """)
-            total_price = cursor.fetchone()[0]
-
-            # 평균 예정가격
-            cursor.execute("""
-                SELECT COALESCE(AVG(estimated_price), 0)
-                FROM bid_announcements
-                WHERE estimated_price IS NOT NULL
-            """)
-            avg_price = cursor.fetchone()[0]
-
-            return {
-                "total_bids": total_bids,
-                "active_bids": active_bids,
-                "total_price": float(total_price),
-                "average_price": float(avg_price),
-                "last_updated": datetime.now().isoformat()
-            }
-
-    except Exception as e:
-        logger.error(f"대시보드 통계 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail="대시보드 통계 조회 실패")
-
-
-@router.get("/active-bids")
-async def get_active_bids(user: User = Depends(get_current_user)):
-    """활성 입찰 수 조회"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT COUNT(*) FROM bid_announcements
-                WHERE bid_end_date >= NOW()
-            """)
-            count = cursor.fetchone()[0]
-            return {"active_bids": count}
-    except Exception as e:
-        logger.error(f"활성 입찰 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail="활성 입찰 조회 실패")
-
-
-@router.get("/total-price")
-async def get_total_price(user: User = Depends(get_current_user)):
-    """총 예정가격 조회"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT COALESCE(SUM(estimated_price), 0)
-                FROM bid_announcements
-                WHERE estimated_price IS NOT NULL
-            """)
-            total = cursor.fetchone()[0]
-            return {"total_price": float(total)}
-    except Exception as e:
-        logger.error(f"총 예정가격 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail="총 예정가격 조회 실패")
-
-
-@router.get("/statistics")
-async def get_dashboard_statistics(days: int = Query(7, ge=1, le=30)):
-    """대시보드 통계 데이터 (차트용)"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-
-            # 1. 일별 입찰 통계 (최근 N일)
-            cursor.execute("""
-                SELECT
-                    DATE(created_at) as date,
-                    COUNT(*) as count
-                FROM bid_announcements
-                WHERE created_at >= CURRENT_DATE - INTERVAL '%s days'
-                GROUP BY DATE(created_at)
-                ORDER BY date ASC
-            """, (days,))
-
-            daily_stats = []
-            for row in cursor.fetchall():
-                daily_stats.append({
-                    "date": row[0].isoformat(),
-                    "count": row[1]
-                })
-
-            # 2. 카테고리별 분포 (태그 기반)
-            cursor.execute("""
-                SELECT
-                    t.tag_name as category,
-                    COUNT(DISTINCT btr.bid_notice_no) as count
-                FROM bid_tags t
-                JOIN bid_tag_relations btr ON t.tag_id = btr.tag_id
-                JOIN bid_announcements b ON btr.bid_notice_no = b.bid_notice_no
-                WHERE b.created_at >= CURRENT_DATE - INTERVAL '%s days'
-                GROUP BY t.tag_name
-                ORDER BY count DESC
-                LIMIT 10
-            """, (days,))
-
-            category_distribution = []
-            for row in cursor.fetchall():
-                category_distribution.append({
-                    "category": row[0],
-                    "count": row[1],
-                    "percentage": 0  # 계산은 프론트에서
-                })
-
-            # 퍼센트 계산
-            total = sum(item["count"] for item in category_distribution)
-            if total > 0:
-                for item in category_distribution:
-                    item["percentage"] = round((item["count"] / total) * 100, 1)
-
-            return {
-                "daily_stats": daily_stats,
-                "category_distribution": category_distribution,
-                "period_days": days
-            }
-
-    except Exception as e:
-        logger.error(f"통계 데이터 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail="통계 데이터 조회 실패")
-
-
-@router.get("/closed-bids")
-async def get_closed_bids(user: User = Depends(get_current_user)):
-    """마감 입찰 수 조회"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT COUNT(*) FROM bid_announcements
-                WHERE bid_end_date < NOW()
-            """)
-            count = cursor.fetchone()[0]
-            return {"closed_bids": count}
-    except Exception as e:
-        logger.error(f"마감 입찰 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail="마감 입찰 조회 실패")
-
-
-@router.get("/trends")
-async def get_trends(user: User = Depends(get_current_user)):
-    """일별 추이 데이터"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT
-                    DATE(created_at) as date,
-                    COUNT(*) as count
-                FROM bid_announcements
-                WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
-                GROUP BY DATE(created_at)
-                ORDER BY date
-            """)
-
-            trends = []
-            for row in cursor.fetchall():
-                trends.append({
-                    "date": row[0].isoformat(),
-                    "count": row[1]
-                })
-
-            return {"trends": trends}
-    except Exception as e:
-        logger.error(f"추이 데이터 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail="추이 데이터 조회 실패")
-
-
 @router.get("/overview")
 async def get_dashboard_overview(user: Optional[User] = Depends(get_current_user_optional)):
     """대시보드 개요 데이터 (실제 DB)"""
@@ -213,51 +21,25 @@ async def get_dashboard_overview(user: Optional[User] = Depends(get_current_user
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # 전체 입찰 수
-            cursor.execute("SELECT COUNT(*) FROM bid_announcements")
-            total_bids = cursor.fetchone()[0]
-
-            # 활성 입찰 수 (마감일이 지나지 않은)
+            # 전체/활성/가격/신규/마감임박 통계를 단일 쿼리로 조회
             cursor.execute("""
-                SELECT COUNT(*) FROM bid_announcements
-                WHERE bid_end_date >= NOW()
-            """)
-            active_bids = cursor.fetchone()[0]
-
-            # 마감된 입찰 수
-            expired_bids = total_bids - active_bids
-
-            # 총 예정가격 (null 제외)
-            cursor.execute("""
-                SELECT COALESCE(SUM(estimated_price), 0)
+                SELECT
+                    COUNT(*) as total_bids,
+                    COUNT(*) FILTER (WHERE bid_end_date >= NOW()) as active_bids,
+                    COALESCE(SUM(estimated_price) FILTER (WHERE estimated_price IS NOT NULL), 0) as total_price,
+                    COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as today_new,
+                    COUNT(*) FILTER (WHERE created_at >= date_trunc('week', CURRENT_DATE)) as week_new,
+                    COUNT(*) FILTER (WHERE bid_end_date BETWEEN NOW() AND NOW() + INTERVAL '3 days') as deadline_soon
                 FROM bid_announcements
-                WHERE estimated_price IS NOT NULL
             """)
-            total_price = cursor.fetchone()[0]
-
-            # 평균 경쟁률 (더미 - 향후 실제 데이터로)
-            avg_competition_rate = 7.5
-
-            # 오늘 신규 입찰
-            cursor.execute("""
-                SELECT COUNT(*) FROM bid_announcements
-                WHERE created_at >= CURRENT_DATE
-            """)
-            today_new = cursor.fetchone()[0]
-
-            # 이번 주 신규 입찰
-            cursor.execute("""
-                SELECT COUNT(*) FROM bid_announcements
-                WHERE created_at >= date_trunc('week', CURRENT_DATE)
-            """)
-            week_new = cursor.fetchone()[0]
-
-            # 마감 임박 (3일 이내)
-            cursor.execute("""
-                SELECT COUNT(*) FROM bid_announcements
-                WHERE bid_end_date BETWEEN NOW() AND NOW() + INTERVAL '3 days'
-            """)
-            deadline_soon = cursor.fetchone()[0]
+            row = cursor.fetchone()
+            total_bids = row[0]
+            active_bids = row[1]
+            total_price = row[2]
+            today_new = row[3]
+            week_new = row[4]
+            deadline_soon = row[5]
+            expired_bids = total_bids - active_bids
 
             # 사용자별 통계 (로그인한 경우)
             user_stats = None
@@ -278,16 +60,19 @@ async def get_dashboard_overview(user: Optional[User] = Depends(get_current_user
                 }
 
             return {
-                "total_bids": total_bids,
-                "active_bids": active_bids,
-                "expired_bids": expired_bids,
-                "total_price": float(total_price),
-                "average_competition_rate": avg_competition_rate,
-                "today_new": today_new,
-                "week_new": week_new,
-                "deadline_soon": deadline_soon,
-                "user_stats": user_stats,
-                "last_updated": datetime.now().isoformat()
+                "success": True,
+                "data": {
+                    "total_bids": total_bids,
+                    "active_bids": active_bids,
+                    "expired_bids": expired_bids,
+                    "total_price": float(total_price),
+                    "average_competition_rate": None,
+                    "today_new": today_new,
+                    "week_new": week_new,
+                    "deadline_soon": deadline_soon,
+                    "user_stats": user_stats,
+                    "last_updated": datetime.now(timezone.utc).isoformat()
+                }
             }
 
     except Exception as e:
@@ -402,14 +187,17 @@ async def get_bid_statistics(
                 })
 
             return {
-                "daily_stats": daily_stats,
-                "category_distribution": category_distribution,
-                "organization_stats": organization_stats,
-                "price_distribution": price_distribution,
-                "period": {
-                    "days": days,
-                    "start_date": (datetime.now() - timedelta(days=days)).date().isoformat(),
-                    "end_date": datetime.now().date().isoformat()
+                "success": True,
+                "data": {
+                    "daily_stats": daily_stats,
+                    "category_distribution": category_distribution,
+                    "organization_stats": organization_stats,
+                    "price_distribution": price_distribution,
+                    "period": {
+                        "days": days,
+                        "start_date": (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat(),
+                        "end_date": datetime.now(timezone.utc).date().isoformat()
+                    }
                 }
             }
 
@@ -482,8 +270,8 @@ async def get_approaching_deadlines(
                     deadline["is_bookmarked"] = deadline["bid_id"] in bookmarked_ids
 
             return {
-                "data": deadlines,  # 프론트엔드가 data 필드를 기대함
-                "deadlines": deadlines,
+                "success": True,
+                "data": deadlines,
                 "total": len(deadlines),
                 "filter": {
                     "days": days,
@@ -506,11 +294,12 @@ async def get_recommendations(
             cursor = conn.cursor()
 
             # 사용자 북마크 기반 추천 (간단한 로직)
-            # 1. 사용자가 북마크한 입찰의 기관들 찾기
+            # 1. 사용자가 북마크한 입찰의 기관들 찾기 (bid_announcements JOIN)
             cursor.execute("""
-                SELECT DISTINCT organization_name
-                FROM user_bookmarks
-                WHERE user_id = %s AND organization_name IS NOT NULL
+                SELECT DISTINCT ba.organization_name
+                FROM user_bookmarks ub
+                JOIN bid_announcements ba ON ub.bid_notice_no = ba.bid_notice_no
+                WHERE ub.user_id = %s AND ba.organization_name IS NOT NULL
                 LIMIT 10
             """, (user.id,))
 
@@ -587,7 +376,8 @@ async def get_recommendations(
                     })
 
             return {
-                "recommendations": recommendations[:10],
+                "success": True,
+                "data": recommendations[:10],
                 "total": len(recommendations),
                 "algorithm": "bookmark_based_v1"
             }
@@ -682,10 +472,13 @@ async def get_bid_trends(
                 })
 
             return {
-                "trends": trends,
-                "top_keywords": top_keywords,
-                "period": period,
-                "interval": interval
+                "success": True,
+                "data": {
+                    "trends": trends,
+                    "top_keywords": top_keywords,
+                    "period": period,
+                    "interval": interval
+                }
             }
 
     except Exception as e:

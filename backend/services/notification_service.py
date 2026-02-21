@@ -3,13 +3,14 @@
 이메일, 웹푸시, SMS 알림을 통합 처리하는 서비스
 """
 
+import os
 import smtplib
 import json
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from database import get_db_connection
 
@@ -22,8 +23,8 @@ class NotificationService:
         # 이메일 설정 (환경변수에서 가져와야 함)
         self.smtp_server = "smtp.gmail.com"
         self.smtp_port = 587
-        self.email_user = "your-email@gmail.com"
-        self.email_password = "your-app-password"
+        self.email_user = os.getenv("SMTP_USER", "")
+        self.email_password = os.getenv("SMTP_PASSWORD", "")
 
     async def send_email_notification(
         self,
@@ -206,7 +207,7 @@ class NotificationService:
                     user_id, bid_notice_no, channel, status,
                     subject, content, created_at
                 ) VALUES (%s, 'WEB_NOTIFICATION', 'web', 'sent', %s, %s, %s)
-            """, (user_id, title, message, datetime.now()))
+            """, (user_id, title, message, datetime.now(timezone.utc)))
 
             conn.commit()
 
@@ -214,7 +215,7 @@ class NotificationService:
         """배치 처리 결과 요약 이메일 발송 (관리자용)"""
         admin_emails = ["admin@odin-ai.com"]  # 환경변수에서 가져와야 함
 
-        subject = f"[ODIN-AI] 배치 처리 완료 - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        subject = f"[ODIN-AI] 배치 처리 완료 - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
 
         content = f"""
         <h2>배치 처리 완료 보고서</h2>
@@ -225,7 +226,7 @@ class NotificationService:
             <li>발송된 알림: {batch_stats.get('notifications_sent', 0)}개</li>
             <li>오류 발생: {batch_stats.get('errors', 0)}건</li>
         </ul>
-        <p>처리 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        <p>처리 시간: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}</p>
         """
 
         for admin_email in admin_emails:

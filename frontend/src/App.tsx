@@ -3,12 +3,10 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { Provider } from 'react-redux';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import ko from 'date-fns/locale/ko';
 
-import { store } from './store';
 import { theme } from './styles/theme';
 import AppRoutes from './routes';
 import { AuthProvider } from './contexts/AuthContext';
@@ -30,23 +28,21 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={theme}>
-          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
-            <CssBaseline />
-            <Router>
-              <AuthProvider>
-                <NotificationProvider>
-                  <AppRoutes />
-                </NotificationProvider>
-              </AuthProvider>
-            </Router>
-          </LocalizationProvider>
-        </ThemeProvider>
-        <ReactQueryDevtools initialIsOpen={false} />
-      </QueryClientProvider>
-    </Provider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={theme}>
+        <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
+          <CssBaseline />
+          <Router>
+            <AuthProvider>
+              <NotificationProvider>
+                <AppRoutes />
+              </NotificationProvider>
+            </AuthProvider>
+          </Router>
+        </LocalizationProvider>
+      </ThemeProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

@@ -2,11 +2,12 @@
 관리자 웹 - 시스템 모니터링 API
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import List, Optional, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from database import get_db_connection
+from api.admin_auth import get_current_admin
 import psutil
 import logging
 
@@ -83,7 +84,8 @@ async def get_system_metrics(
     metric_type: Optional[str] = Query(None, description="cpu/memory/disk"),
     start_time: Optional[datetime] = Query(None, description="시작 시간"),
     end_time: Optional[datetime] = Query(None, description="종료 시간"),
-    limit: int = Query(100, ge=1, le=1000, description="최대 데이터 포인트 수")
+    limit: int = Query(100, ge=1, le=1000, description="최대 데이터 포인트 수"),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """
     시스템 메트릭 조회
@@ -162,11 +164,11 @@ async def get_system_metrics(
 
     except Exception as e:
         logger.error(f"시스템 메트릭 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/status", response_model=SystemStatusResponse)
-async def get_system_status():
+async def get_system_status(current_admin: dict = Depends(get_current_admin)):
     """
     실시간 시스템 상태 조회
 
@@ -176,7 +178,7 @@ async def get_system_status():
     """
     try:
         # CPU 사용률
-        cpu_percent = psutil.cpu_percent(interval=1)
+        cpu_percent = psutil.cpu_percent(interval=0)
 
         # 메모리 사용률
         memory = psutil.virtual_memory()
@@ -237,18 +239,19 @@ async def get_system_status():
             disk_total_gb=round(disk_total_gb, 2),
             db_status=db_status,
             db_connections=db_connections,
-            timestamp=datetime.now()
+            timestamp=datetime.now(timezone.utc)
         )
 
     except Exception as e:
         logger.error(f"시스템 상태 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/api-performance", response_model=APIPerformanceResponse)
 async def get_api_performance(
     start_time: Optional[datetime] = Query(None, description="시작 시간"),
-    end_time: Optional[datetime] = Query(None, description="종료 시간")
+    end_time: Optional[datetime] = Query(None, description="종료 시간"),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """
     API 성능 통계
@@ -259,7 +262,7 @@ async def get_api_performance(
     try:
         # 기본값 설정
         if not end_time:
-            end_time = datetime.now()
+            end_time = datetime.now(timezone.utc)
         if not start_time:
             start_time = end_time - timedelta(hours=1)
 
@@ -306,13 +309,14 @@ async def get_api_performance(
 
     except Exception as e:
         logger.error(f"API 성능 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/notifications/status", response_model=NotificationStatusResponse)
 async def get_notification_status(
     start_time: Optional[datetime] = Query(None, description="시작 시간"),
-    end_time: Optional[datetime] = Query(None, description="종료 시간")
+    end_time: Optional[datetime] = Query(None, description="종료 시간"),
+    current_admin: dict = Depends(get_current_admin)
 ):
     """
     알림 발송 현황
@@ -324,7 +328,7 @@ async def get_notification_status(
     try:
         # 기본값: 오늘
         if not end_time:
-            end_time = datetime.now()
+            end_time = datetime.now(timezone.utc)
         if not start_time:
             start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -384,4 +388,4 @@ async def get_notification_status(
 
     except Exception as e:
         logger.error(f"알림 발송 현황 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")

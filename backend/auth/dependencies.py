@@ -5,7 +5,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from database import get_db_connection
 from .security import decode_token
 import logging
@@ -79,7 +79,7 @@ async def get_current_user_optional(
 
             # 마지막 로그인 시간 업데이트
             update_query = "UPDATE users SET last_login = %s WHERE id = %s"
-            cursor.execute(update_query, (datetime.utcnow(), user_id))
+            cursor.execute(update_query, (datetime.now(timezone.utc), user_id))
             conn.commit()
 
             return user

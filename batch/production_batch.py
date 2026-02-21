@@ -17,7 +17,8 @@ try:
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-from datetime import datetime
+import psycopg2
+from datetime import datetime, timezone
 from pathlib import Path
 from loguru import logger
 try:
@@ -25,6 +26,33 @@ try:
     load_dotenv()
 except ImportError:
     pass  # dotenv 없으면 환경변수만 사용
+
+# PostgreSQL advisory lock ID for batch (중복 실행 방지)
+BATCH_LOCK_ID = 999999
+
+
+def acquire_batch_lock(conn):
+    """배치 중복 실행 방지를 위한 advisory lock 획득
+
+    Returns:
+        True  - lock 획득 성공 (이 프로세스가 실행을 계속해도 됨)
+        False - 다른 배치가 이미 실행 중
+    """
+    cursor = conn.cursor()
+    cursor.execute("SELECT pg_try_advisory_lock(%s)", (BATCH_LOCK_ID,))
+    acquired = cursor.fetchone()[0]
+    cursor.close()
+    return acquired
+
+
+def release_batch_lock(conn):
+    """Advisory lock 해제"""
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT pg_advisory_unlock(%s)", (BATCH_LOCK_ID,))
+        cursor.close()
+    except Exception as e:
+        logger.warning(f"⚠️ Advisory lock 해제 실패: {e}")
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,6 +63,11 @@ from batch.modules.downloader import DocumentDownloader
 from batch.modules.processor import DocumentProcessorModule
 from batch.modules.notification_matcher import NotificationMatcher
 from batch.modules.email_reporter import EmailReporter
+try:
+    from batch.modules.embedding_generator import EmbeddingGenerator
+    EMBEDDING_AVAILABLE = True
+except ImportError:
+    EMBEDDING_AVAILABLE = False
 
 # 로거 설정
 log_dir = Path("logs")
@@ -64,7 +97,8 @@ class ProductionBatch:
             'tags_created': 0,
             'attachments': 0,
             'notifications_created': 0,
-            'emails_sent': 0
+            'emails_sent': 0,
+            'embeddings_generated': 0
         }
 
         # 새로 수집된 공고 ID 저장
@@ -72,6 +106,7 @@ class ProductionBatch:
 
         # 알림 실행 여부 (환경변수로 제어)
         self.enable_notification = os.getenv('ENABLE_NOTIFICATION', 'true').lower() == 'true'
+        self.enable_embedding = os.getenv('ENABLE_EMBEDDING', 'false').lower() == 'true'
 
     def run(self):
         """배치 실행 메인 함수"""
@@ -82,85 +117,109 @@ class ProductionBatch:
         logger.info(f"🗂️ DB/파일 초기화: {self.db_file_init}")
         logger.info("="*60)
 
-        # 배치 실행 시작 로그 기록
-        self._log_batch_start()
+        # --- Advisory lock: 중복 실행 방지 ---
+        lock_conn = psycopg2.connect(self.db_url)
+        if not acquire_batch_lock(lock_conn):
+            logger.warning("⚠️ 다른 배치 프로세스가 이미 실행 중입니다. 종료합니다.")
+            lock_conn.close()
+            sys.exit(0)
 
         try:
-            # 1. DB/파일 완전 초기화 (DB_FILE_INIT=true인 경우)
-            if self.db_file_init:
-                logger.info("🗂️ DB_FILE_INIT=true: 완전 초기화 진행")
-                self._complete_initialization()
+            # 배치 실행 시작 로그 기록
+            self._log_batch_start()
 
-            # 2. 테스트 모드 처리 (기존 유지)
-            elif self.test_mode:
-                logger.info("🧪 테스트 모드: DB 초기화 진행")
-                self._initialize_test_mode()
-
-            # 2. API 데이터 수집
-            logger.info("\n" + "="*40)
-            logger.info("📡 Phase 1: API 데이터 수집")
-            logger.info("="*40)
-            self._run_collector()
-
-            # 3. 파일 다운로드
-            logger.info("\n" + "="*40)
-            logger.info("📥 Phase 2: 파일 다운로드")
-            logger.info("="*40)
-            self._run_downloader()
-
-            # 4. 문서 처리
-            logger.info("\n" + "="*40)
-            logger.info("🔧 Phase 3: 문서 처리")
-            logger.info("="*40)
-            self._run_processor()
-
-            # 5. 알림 매칭 (ENABLE_NOTIFICATION=true인 경우만)
-            if self.enable_notification:
-                logger.info("\n" + "="*40)
-                logger.info("🔔 Phase 4: 알림 매칭")
-                logger.info("="*40)
-                self._run_notification_matcher()
-            else:
-                logger.info("\n⏭️ Phase 4: 알림 매칭 건너뜀 (ENABLE_NOTIFICATION=false)")
-
-            # 6. 이메일 보고서 발송
-            logger.info("\n" + "="*40)
-            logger.info("📧 Phase 5: 보고서 발송")
-            logger.info("="*40)
-            self._send_report()
-
-            # 7. 이벤트 발행 (Redis Pub/Sub)
-            logger.info("\n" + "="*40)
-            logger.info("📢 Phase 6: 이벤트 발행")
-            logger.info("="*40)
-            self._publish_event()
-
-            # 7. 최종 통계
-            self._print_final_stats()
-
-        except Exception as e:
-            logger.error(f"❌ 배치 실행 중 오류 발생: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-
-            # 배치 실패 로그 기록
-            self._log_batch_failed(str(e))
-
-            # 오류 발생 시에도 보고서 발송 시도
             try:
-                self.stats['error'] = str(e)
+                # 1. DB/파일 완전 초기화 (DB_FILE_INIT=true인 경우)
+                if self.db_file_init:
+                    logger.info("🗂️ DB_FILE_INIT=true: 완전 초기화 진행")
+                    self._complete_initialization()
+
+                # 2. 테스트 모드 처리 (기존 유지)
+                elif self.test_mode:
+                    logger.info("🧪 테스트 모드: DB 초기화 진행")
+                    self._initialize_test_mode()
+
+                # 2. API 데이터 수집
+                logger.info("\n" + "="*40)
+                logger.info("📡 Phase 1: API 데이터 수집")
+                logger.info("="*40)
+                self._run_collector()
+
+                # 3. 파일 다운로드
+                logger.info("\n" + "="*40)
+                logger.info("📥 Phase 2: 파일 다운로드")
+                logger.info("="*40)
+                self._run_downloader()
+
+                # 4. 문서 처리
+                logger.info("\n" + "="*40)
+                logger.info("🔧 Phase 3: 문서 처리")
+                logger.info("="*40)
+                self._run_processor()
+
+                # 4.5. 임베딩 생성 (ENABLE_EMBEDDING=true인 경우만)
+                if self.enable_embedding and EMBEDDING_AVAILABLE:
+                    logger.info("\n" + "="*40)
+                    logger.info("🧠 Phase 3.5: 임베딩 생성")
+                    logger.info("="*40)
+                    self._run_embedding_generator()
+                elif self.enable_embedding and not EMBEDDING_AVAILABLE:
+                    logger.warning("⚠️ Phase 3.5: 임베딩 모듈 로드 실패 - 건너뜀")
+                else:
+                    logger.info("\n⏭️ Phase 3.5: 임베딩 생성 건너뜀 (ENABLE_EMBEDDING=false)")
+
+                # 5. 알림 매칭 (ENABLE_NOTIFICATION=true인 경우만)
+                if self.enable_notification:
+                    logger.info("\n" + "="*40)
+                    logger.info("🔔 Phase 4: 알림 매칭")
+                    logger.info("="*40)
+                    self._run_notification_matcher()
+                else:
+                    logger.info("\n⏭️ Phase 4: 알림 매칭 건너뜀 (ENABLE_NOTIFICATION=false)")
+
+                # 6. 이메일 보고서 발송
+                logger.info("\n" + "="*40)
+                logger.info("📧 Phase 5: 보고서 발송")
+                logger.info("="*40)
                 self._send_report()
-            except:
-                pass
+
+                # 7. 이벤트 발행 (Redis Pub/Sub)
+                logger.info("\n" + "="*40)
+                logger.info("📢 Phase 6: 이벤트 발행")
+                logger.info("="*40)
+                self._publish_event()
+
+                # 7. 최종 통계
+                self._print_final_stats()
+
+            except Exception as e:
+                logger.error(f"❌ 배치 실행 중 오류 발생: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+
+                # 배치 실패 로그 기록
+                self._log_batch_failed(str(e))
+
+                # 오류 발생 시에도 보고서 발송 시도
+                try:
+                    self.stats['error'] = str(e)
+                    self._send_report()
+                except:
+                    pass
+
+            finally:
+                elapsed = time.time() - self.start_time
+                logger.info(f"\n⏱️ 총 실행 시간: {elapsed:.1f}초")
+                logger.info("🏁 배치 종료")
+
+                # 배치 완료 로그 기록 (성공한 경우만)
+                if not hasattr(self, '_batch_failed'):
+                    self._log_batch_complete()
 
         finally:
-            elapsed = time.time() - self.start_time
-            logger.info(f"\n⏱️ 총 실행 시간: {elapsed:.1f}초")
-            logger.info("🏁 배치 종료")
-
-            # 배치 완료 로그 기록 (성공한 경우만)
-            if not hasattr(self, '_batch_failed'):
-                self._log_batch_complete()
+            # Advisory lock 해제 (항상 실행)
+            release_batch_lock(lock_conn)
+            lock_conn.close()
 
     def _complete_initialization(self):
         """DB_FILE_INIT=true: 완전 초기화 (테이블 DROP + 파일 삭제)"""
@@ -268,14 +327,14 @@ class ProductionBatch:
             collector = APICollector(self.db_url)
 
             # 날짜 설정 (환경변수 또는 오늘 날짜)
-            from datetime import datetime
+            from datetime import datetime, timezone
             start_str = os.getenv('BATCH_START_DATE')
             end_str = os.getenv('BATCH_END_DATE')
 
             if start_str:
                 start_date = datetime.strptime(start_str, '%Y-%m-%d')
             else:
-                start_date = datetime.now()
+                start_date = datetime.now(timezone.utc)
 
             if end_str:
                 end_date = datetime.strptime(end_str, '%Y-%m-%d')
@@ -408,6 +467,28 @@ class ProductionBatch:
 
         except Exception as e:
             logger.error(f"❌ 문서 처리 오류: {e}")
+
+    def _run_embedding_generator(self):
+        """임베딩 생성 실행"""
+        try:
+            generator = EmbeddingGenerator(self.db_url)
+
+            embed_limit = 20 if self.test_mode else None
+            result = generator.generate_embeddings(limit=embed_limit)
+
+            self.stats['embeddings_generated'] = result.get('embeddings_generated', 0)
+
+            logger.info(f"✅ 임베딩 생성 완료:")
+            logger.info(f"   - 처리 문서: {result.get('documents_processed', 0)}건")
+            logger.info(f"   - 생성 청크: {result.get('chunks_created', 0)}개")
+            logger.info(f"   - 생성 임베딩: {result.get('embeddings_generated', 0)}개")
+            logger.info(f"   - 스킵: {result.get('documents_skipped', 0)}건")
+            logger.info(f"   - 실패: {result.get('documents_failed', 0)}건")
+
+        except Exception as e:
+            logger.error(f"❌ 임베딩 생성 오류: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def _run_notification_matcher(self):
         """알림 매칭 실행"""
@@ -543,6 +624,9 @@ class ProductionBatch:
         if self.enable_notification:
             logger.info(f"  🔔 알림 생성: {self.stats['notifications_created']}개")
             logger.info(f"  📧 이메일 발송: {self.stats['emails_sent']}개")
+
+        if self.enable_embedding:
+            logger.info(f"  🧠 임베딩 생성: {self.stats['embeddings_generated']}개")
 
         # 성공률 계산
         total_attempts = self.stats['downloaded'] + self.stats['failed']
@@ -706,7 +790,7 @@ def main():
         python batch/production_batch.py 2025-09-20 2025-09-25  # 날짜 범위
     """
     import argparse
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     parser = argparse.ArgumentParser(description='ODIN-AI 배치 프로세스')
     parser.add_argument('start_date', nargs='?', help='시작 날짜 (YYYY-MM-DD)', default=None)
@@ -731,7 +815,7 @@ def main():
             print(f"❌ 잘못된 날짜 형식: {args.start_date} (YYYY-MM-DD 형식 필요)")
             sys.exit(1)
     else:
-        start_date = datetime.now()
+        start_date = datetime.now(timezone.utc)
 
     if args.end_date:
         try:

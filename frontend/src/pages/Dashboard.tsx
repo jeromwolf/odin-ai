@@ -308,7 +308,7 @@ const Dashboard: React.FC = () => {
               <Button
                 size="small"
                 endIcon={<ArrowForward />}
-                onClick={() => navigate('/bids')}
+                onClick={() => navigate('/search')}
               >
                 전체보기
               </Button>
@@ -321,7 +321,7 @@ const Dashboard: React.FC = () => {
                   <ListItem
                     key={bid.id || bid.bid_id}
                     button
-                    onClick={() => navigate(`/bids/${bid.id || bid.bid_id}`)}
+                    onClick={() => navigate(`/search?q=${encodeURIComponent(bid.title)}`)}
                   >
                     <ListItemText
                       primary={bid.title}
@@ -361,7 +361,7 @@ const Dashboard: React.FC = () => {
                   <ListItem
                     key={bid.id || bid.bid_id}
                     button
-                    onClick={() => navigate(`/bids/${bid.id || bid.bid_id}`)}
+                    onClick={() => navigate(`/search?q=${encodeURIComponent(bid.title)}`)}
                   >
                     <ListItemText
                       primary={

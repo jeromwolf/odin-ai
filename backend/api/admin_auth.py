@@ -2,22 +2,23 @@
 관리자 웹 - 인증 및 권한 관리 API
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from database import get_db_connection
-import jwt
-import bcrypt
+from jose import JWTError, jwt
 import logging
 import hashlib
+import html
+import json
 
 logger = logging.getLogger(__name__)
 
 # JWT 설정
-SECRET_KEY = "your-secret-key-change-in-production"  # TODO: 환경변수로 관리
-ALGORITHM = "HS256"
+from auth.security import SECRET_KEY, ALGORITHM, verify_password, get_password_hash
+from middleware.rate_limit import limiter
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8시간
 
 router = APIRouter(prefix="/api/admin/auth", tags=["admin-auth"])
@@ -54,26 +55,16 @@ class AdminInfo(BaseModel):
 # Helper Functions
 # ============================================
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """JWT 토큰 생성"""
+def create_admin_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """관리자 JWT 토큰 생성"""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "type": "admin_access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """비밀번호 검증"""
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-
-
-def get_password_hash(password: str) -> str:
-    """비밀번호 해싱"""
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 def safe_user_id(user_id: int) -> str:
@@ -123,21 +114,20 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
                 "role": role
             }
 
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="토큰이 만료되었습니다")
-    except jwt.JWTError:
+    except JWTError:
         raise HTTPException(status_code=401, detail="토큰이 유효하지 않습니다")
     except Exception as e:
         logger.error(f"인증 처리 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 # ============================================
 # API Endpoints
 # ============================================
 
+@limiter.limit("5/minute")
 @router.post("/login", response_model=AdminLoginResponse)
-async def admin_login(request: AdminLoginRequest):
+async def admin_login(request: Request, login_data: AdminLoginRequest):
     """
     관리자 로그인
 
@@ -151,18 +141,18 @@ async def admin_login(request: AdminLoginRequest):
 
             # 사용자 조회
             cursor.execute("""
-                SELECT id, email, username, full_name, hashed_password, is_active
+                SELECT id, email, username, full_name, hashed_password, is_active, is_superuser
                 FROM users
                 WHERE email = %s
-            """, (request.email,))
+            """, (login_data.email,))
 
             row = cursor.fetchone()
 
             if not row:
-                logger.warning(f"로그인 실패: 존재하지 않는 이메일 ({request.email})")
+                logger.warning(f"로그인 실패: 존재하지 않는 이메일 ({html.escape(str(login_data.email))})")
                 raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다")
 
-            user_id, email, username, full_name, hashed_password, is_active = row
+            user_id, email, username, full_name, hashed_password, is_active, is_superuser = row
 
             # 계정 활성화 확인
             if not is_active:
@@ -170,18 +160,20 @@ async def admin_login(request: AdminLoginRequest):
                 raise HTTPException(status_code=403, detail="비활성화된 계정입니다")
 
             # 비밀번호 검증
-            if not verify_password(request.password, hashed_password):
+            if not verify_password(login_data.password, hashed_password):
                 logger.warning(f"로그인 실패: 잘못된 비밀번호 (user_hash: {safe_user_id(user_id)})")
                 raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다")
 
-            # TODO: 실제로는 별도 admin_users 테이블이나 role 컬럼이 필요
-            # 여기서는 임시로 특정 이메일을 관리자로 간주
-            admin_emails = ["admin@blockmeta.com", "kelly@blockmeta.com"]
-            role = "super_admin" if email in admin_emails else "admin"
+            # 관리자 권한 확인 (is_superuser 컬럼 기반)
+            if not is_superuser:
+                logger.warning(f"로그인 실패: 관리자 권한 없음 (user_hash: {safe_user_id(user_id)})")
+                raise HTTPException(status_code=403, detail="관리자 권한이 없습니다")
+
+            role = "super_admin" if is_superuser else "admin"
 
             # JWT 토큰 생성
             access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-            access_token = create_access_token(
+            access_token = create_admin_access_token(
                 data={"sub": user_id, "email": email, "role": role},
                 expires_delta=access_token_expires
             )
@@ -192,13 +184,13 @@ async def admin_login(request: AdminLoginRequest):
                 SET last_login = NOW()
                 WHERE id = %s
             """, (user_id,))
-            conn.commit()
 
             # 관리자 활동 로그 기록
+            login_details = json.dumps({"description": "관리자 로그인 성공", "email": email})
             cursor.execute("""
                 INSERT INTO admin_activity_logs (admin_user_id, action, details)
                 VALUES (%s, %s, %s::jsonb)
-            """, (user_id, 'login', f'{{"description": "관리자 로그인 성공", "email": "{email}"}}'))
+            """, (user_id, 'login', login_details))
             conn.commit()
 
             logger.info(f"관리자 로그인 성공 (user_hash: {safe_user_id(user_id)}, role: {role})")
@@ -219,7 +211,7 @@ async def admin_login(request: AdminLoginRequest):
         raise
     except Exception as e:
         logger.error(f"로그인 처리 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.post("/logout")
@@ -235,10 +227,11 @@ async def admin_logout(current_admin: dict = Depends(get_current_admin)):
             cursor = conn.cursor()
 
             # 관리자 활동 로그 기록
+            logout_details = json.dumps({"description": "관리자 로그아웃", "email": current_admin["email"]})
             cursor.execute("""
                 INSERT INTO admin_activity_logs (admin_user_id, action, details)
                 VALUES (%s, %s, %s::jsonb)
-            """, (current_admin["id"], 'logout', f'{{"description": "관리자 로그아웃", "email": "{current_admin["email"]}"}}'))
+            """, (current_admin["id"], 'logout', logout_details))
             conn.commit()
 
             logger.info(f"관리자 로그아웃 (user_hash: {safe_user_id(current_admin['id'])})")
@@ -247,7 +240,7 @@ async def admin_logout(current_admin: dict = Depends(get_current_admin)):
 
     except Exception as e:
         logger.error(f"로그아웃 처리 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/me", response_model=AdminInfo)
@@ -285,13 +278,13 @@ async def get_current_admin_info(current_admin: dict = Depends(get_current_admin
         raise
     except Exception as e:
         logger.error(f"관리자 정보 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
 @router.get("/activity-logs")
 async def get_admin_activity_logs(
     current_admin: dict = Depends(get_current_admin),
-    limit: int = 50
+    limit: int = Query(50, ge=1, le=500)
 ):
     """
     관리자 활동 로그 조회
@@ -342,4 +335,4 @@ async def get_admin_activity_logs(
 
     except Exception as e:
         logger.error(f"활동 로그 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")

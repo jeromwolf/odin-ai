@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from database import get_db_connection
-from auth.dependencies import get_current_user, get_current_user_optional, User
+from auth.dependencies import get_current_user, User
 from pydantic import BaseModel
 import logging
 import json
@@ -51,118 +51,12 @@ class NotificationSettings(BaseModel):
     phone_number: Optional[str]
 
 
-@router.post("/rules")
-async def create_notification_rule(
-    rule: AlertRule,
-    user: User = Depends(get_current_user)
-):
-    """알림 규칙 생성"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-
-            # 규칙 생성
-            cursor.execute("""
-                INSERT INTO alert_rules (
-                    user_id, rule_name, description, conditions,
-                    notification_channels, notification_timing,
-                    notification_time, notification_day
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """, (
-                user.id,
-                rule.rule_name,
-                rule.description,
-                json.dumps(rule.conditions),
-                json.dumps(rule.notification_channels),
-                rule.notification_timing,
-                rule.notification_time,
-                rule.notification_day
-            ))
-
-            rule_id = cursor.fetchone()[0]
-            conn.commit()
-
-            return {
-                "success": True,
-                "message": "알림 규칙이 생성되었습니다",
-                "rule_id": rule_id
-            }
-
-    except Exception as e:
-        logger.error(f"알림 규칙 생성 실패: {e}")
-        return {"success": False, "error": str(e)}
-
-
-@router.put("/rules/{rule_id}")
-async def update_notification_rule(
-    rule_id: int,
-    rule_update: AlertRuleUpdate,
-    user: User = Depends(get_current_user)
-):
-    """알림 규칙 수정"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-
-            # 권한 확인
-            cursor.execute("SELECT user_id FROM alert_rules WHERE id = %s", (rule_id,))
-            result = cursor.fetchone()
-
-            if not result:
-                raise HTTPException(status_code=404, detail="규칙을 찾을 수 없습니다")
-
-            if result[0] != user.id:
-                raise HTTPException(status_code=403, detail="수정 권한이 없습니다")
-
-            # 업데이트 쿼리 생성
-            update_fields = []
-            params = []
-
-            if rule_update.rule_name is not None:
-                update_fields.append("rule_name = %s")
-                params.append(rule_update.rule_name)
-
-            if rule_update.description is not None:
-                update_fields.append("description = %s")
-                params.append(rule_update.description)
-
-            if rule_update.conditions is not None:
-                update_fields.append("conditions = %s")
-                params.append(json.dumps(rule_update.conditions))
-
-            if rule_update.is_active is not None:
-                update_fields.append("is_active = %s")
-                params.append(rule_update.is_active)
-
-            if update_fields:
-                update_fields.append("updated_at = NOW()")
-                params.append(rule_id)
-
-                query = f"""
-                    UPDATE alert_rules
-                    SET {', '.join(update_fields)}
-                    WHERE id = %s
-                """
-
-                cursor.execute(query, params)
-                conn.commit()
-
-            return {"success": True, "message": "알림 규칙이 수정되었습니다"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"알림 규칙 수정 실패: {e}")
-        return {"success": False, "error": str(e)}
-
-
 @router.get("/")
 async def get_notifications(
     user: User = Depends(get_current_user),
     status_filter: Optional[str] = Query(None, regex="^(unread|read|all)$"),
     page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100)
+    limit: int = Query(20, ge=1, le=100)
 ):
     """알림 목록 조회"""
     try:
@@ -186,7 +80,7 @@ async def get_notifications(
 
             # 정렬 및 페이지네이션
             query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
-            params.extend([size, (page - 1) * size])
+            params.extend([limit, (page - 1) * limit])
 
             cursor.execute(query, params)
 
@@ -204,10 +98,13 @@ async def get_notifications(
                     "read_at": row[8].isoformat() if row[8] else None
                 })
 
-            # 전체 개수
-            cursor.execute("""
-                SELECT COUNT(*) FROM notifications WHERE user_id = %s
-            """, (user.id,))
+            # 전체 개수 (status_filter 적용)
+            count_query = "SELECT COUNT(*) FROM notifications WHERE user_id = %s"
+            count_params = [user.id]
+            if status_filter and status_filter != "all":
+                count_query += " AND status = %s"
+                count_params.append(status_filter)
+            cursor.execute(count_query, count_params)
             total = cursor.fetchone()[0]
 
             return {
@@ -215,12 +112,13 @@ async def get_notifications(
                 "data": notifications,
                 "total": total,
                 "page": page,
-                "size": size
+                "limit": limit,
+                "total_pages": (total + limit - 1) // limit
             }
 
     except Exception as e:
         logger.error(f"알림 목록 조회 실패: {e}")
-        return {"success": True, "data": [], "total": 0, "page": page, "size": size}
+        raise HTTPException(status_code=500, detail="알림 목록 조회 실패")
 
 
 @router.get("/rules")
@@ -228,7 +126,7 @@ async def get_alert_rules(
     user: User = Depends(get_current_user),
     is_active: Optional[bool] = None,
     page: int = Query(1, ge=1),
-    size: int = Query(10, ge=1, le=100)
+    limit: int = Query(10, ge=1, le=100)
 ):
     """알림 규칙 목록 조회"""
     try:
@@ -253,7 +151,7 @@ async def get_alert_rules(
             total = cursor.fetchone()[0]
 
             # 페이징 조회
-            params.extend([(page - 1) * size, size])
+            params.extend([(page - 1) * limit, limit])
             cursor.execute(f"""
                 SELECT
                     id,
@@ -300,11 +198,12 @@ async def get_alert_rules(
                 })
 
             return {
-                "rules": rules,
+                "success": True,
+                "data": rules,
                 "total": total,
                 "page": page,
-                "size": size,
-                "pages": (total + size - 1) // size
+                "limit": limit,
+                "total_pages": (total + limit - 1) // limit
             }
 
     except Exception as e:
@@ -550,7 +449,7 @@ async def get_notification_history(
     notification_type: Optional[str] = None,
     status: Optional[str] = None,
     page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100)
+    limit: int = Query(20, ge=1, le=100)
 ):
     """알림 발송 이력 조회"""
     try:
@@ -579,7 +478,7 @@ async def get_notification_history(
             total = cursor.fetchone()[0]
 
             # 페이징 조회
-            params.extend([(page - 1) * size, size])
+            params.extend([(page - 1) * limit, limit])
             cursor.execute(f"""
                 SELECT
                     id,
@@ -616,10 +515,12 @@ async def get_notification_history(
                 })
 
             return {
-                "notifications": notifications,
+                "success": True,
+                "data": notifications,
                 "total": total,
                 "page": page,
-                "size": size
+                "limit": limit,
+                "total_pages": (total + limit - 1) // limit
             }
 
     except Exception as e:
@@ -628,10 +529,9 @@ async def get_notification_history(
 
 
 @router.get("/settings")
-async def get_notification_settings(user: User = Depends(get_current_user_optional)):
+async def get_notification_settings(user: User = Depends(get_current_user)):
     """알림 설정 조회"""
-    # 개발 환경에서는 기본 사용자 ID 사용
-    user_id = user.id if user else "100"
+    user_id = user.id
 
     try:
         with get_db_connection() as conn:
@@ -654,13 +554,12 @@ async def get_notification_settings(user: User = Depends(get_current_user_option
 
             # 설정이 없으면 기본값으로 생성
             if not row:
-                default_email = user.email if user else "demo@example.com"
+                default_email = user.email
                 cursor.execute("""
                     INSERT INTO user_notification_settings (user_id, email_address)
                     VALUES (%s, %s)
                     RETURNING *
                 """, (user_id, default_email))
-                conn.commit()
 
                 cursor.execute("""
                     SELECT
