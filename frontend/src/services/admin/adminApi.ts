@@ -143,6 +143,11 @@ class AdminApiClient {
     return response.data;
   }
 
+  async getBatchProgress(executionId: number) {
+    const response = await this.client.get(`/api/admin/batch/progress/${executionId}`);
+    return response.data;
+  }
+
   // ============================================
   // 시스템 모니터링 API
   // ============================================

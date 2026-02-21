@@ -12,6 +12,12 @@ import logging
 from datetime import datetime, timedelta, timezone
 from database import get_db_connection
 
+try:
+    from cache import get_cached_or_fetch, CACHE_TTL
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -377,58 +383,65 @@ async def get_trending_recommendations(
 ):
     """인기 트렌딩 추천"""
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute("""
-                WITH trending_bids AS (
+        cache_params = {"endpoint": "trending", "limit": limit, "days": days}
+
+        def fetch_trending():
+            with get_db_connection() as conn:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                cursor.execute("""
+                    WITH trending_bids AS (
+                        SELECT
+                            ubi.bid_notice_no,
+                            COUNT(*) as interaction_count,
+                            AVG(ubi.interaction_score) as avg_score,
+                            COUNT(DISTINCT ubi.user_id) as unique_users
+                        FROM user_bid_interactions ubi
+                        WHERE ubi.created_at > NOW() - INTERVAL %s
+                        GROUP BY ubi.bid_notice_no
+                        HAVING COUNT(*) >= 3
+                        ORDER BY
+                            unique_users DESC,
+                            interaction_count DESC,
+                            avg_score DESC
+                        LIMIT %s
+                    )
                     SELECT
-                        ubi.bid_notice_no,
-                        COUNT(*) as interaction_count,
-                        AVG(ubi.interaction_score) as avg_score,
-                        COUNT(DISTINCT ubi.user_id) as unique_users
-                    FROM user_bid_interactions ubi
-                    WHERE ubi.created_at > NOW() - INTERVAL %s
-                    GROUP BY ubi.bid_notice_no
-                    HAVING COUNT(*) >= 3
-                    ORDER BY
-                        unique_users DESC,
-                        interaction_count DESC,
-                        avg_score DESC
-                    LIMIT %s
-                )
-                SELECT
-                    ba.bid_notice_no,
-                    ba.title,
-                    ba.organization_name,
-                    ba.estimated_price,
-                    ba.bid_end_date,
-                    tb.interaction_count,
-                    tb.unique_users,
-                    (tb.unique_users * 20 + tb.interaction_count * 5 + tb.avg_score * 10) as trend_score
-                FROM trending_bids tb
-                JOIN bid_announcements ba ON tb.bid_notice_no = ba.bid_notice_no
-                WHERE ba.bid_end_date > NOW()
-                ORDER BY trend_score DESC
-            """, (f"{days} days", limit))
+                        ba.bid_notice_no,
+                        ba.title,
+                        ba.organization_name,
+                        ba.estimated_price,
+                        ba.bid_end_date,
+                        tb.interaction_count,
+                        tb.unique_users,
+                        (tb.unique_users * 20 + tb.interaction_count * 5 + tb.avg_score * 10) as trend_score
+                    FROM trending_bids tb
+                    JOIN bid_announcements ba ON tb.bid_notice_no = ba.bid_notice_no
+                    WHERE ba.bid_end_date > NOW()
+                    ORDER BY trend_score DESC
+                """, (f"{days} days", limit))
 
-            recommendations = []
-            for row in cursor.fetchall():
-                recommendations.append(RecommendationResponse(
-                    bid_notice_no=row["bid_notice_no"],
-                    title=row["title"],
-                    organization=row["organization_name"] or "",
-                    estimated_price=row["estimated_price"],
-                    bid_end_date=row["bid_end_date"],
-                    recommendation_score=float(row["trend_score"]),
-                    recommendation_type="trending",
-                    recommendation_reasons={
-                        "interaction_count": row["interaction_count"],
-                        "unique_users": row["unique_users"],
-                        "trending_days": days
-                    }
-                ))
+                recommendations = []
+                for row in cursor.fetchall():
+                    recommendations.append({
+                        "bid_notice_no": row["bid_notice_no"],
+                        "title": row["title"],
+                        "organization": row["organization_name"] or "",
+                        "estimated_price": row["estimated_price"],
+                        "bid_end_date": row["bid_end_date"].isoformat() if row["bid_end_date"] else None,
+                        "recommendation_score": float(row["trend_score"]),
+                        "recommendation_type": "trending",
+                        "recommendation_reasons": {
+                            "interaction_count": row["interaction_count"],
+                            "unique_users": row["unique_users"],
+                            "trending_days": days
+                        }
+                    })
 
-            return recommendations
+                return recommendations
+
+        if CACHE_AVAILABLE:
+            return get_cached_or_fetch("recommendations", cache_params, fetch_trending, CACHE_TTL.get("recommendations", 180))
+        return fetch_trending()
 
     except Exception as e:
         logger.error(f"[get_trending_recommendations] 실패: {e}")
@@ -441,53 +454,60 @@ async def get_similar_bids(
 ):
     """유사한 입찰 추천"""
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            # 유사도 기반 추천
-            cursor.execute("""
-                WITH similar_bids AS (
+        cache_params = {"endpoint": "similar", "bid_notice_no": bid_notice_no, "limit": limit}
+
+        def fetch_similar():
+            with get_db_connection() as conn:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                # 유사도 기반 추천
+                cursor.execute("""
+                    WITH similar_bids AS (
+                        SELECT
+                            CASE
+                                WHEN bs.bid_notice_no_1 = %s THEN bs.bid_notice_no_2
+                                ELSE bs.bid_notice_no_1
+                            END as similar_bid_id,
+                            bs.overall_similarity
+                        FROM bid_similarities bs
+                        WHERE (bs.bid_notice_no_1 = %s OR bs.bid_notice_no_2 = %s)
+                            AND bs.overall_similarity > 0.5
+                        ORDER BY bs.overall_similarity DESC
+                        LIMIT %s
+                    )
                     SELECT
-                        CASE
-                            WHEN bs.bid_notice_no_1 = %s THEN bs.bid_notice_no_2
-                            ELSE bs.bid_notice_no_1
-                        END as similar_bid_id,
-                        bs.overall_similarity
-                    FROM bid_similarities bs
-                    WHERE (bs.bid_notice_no_1 = %s OR bs.bid_notice_no_2 = %s)
-                        AND bs.overall_similarity > 0.5
-                    ORDER BY bs.overall_similarity DESC
-                    LIMIT %s
-                )
-                SELECT
-                    ba.bid_notice_no,
-                    ba.title,
-                    ba.organization_name,
-                    ba.estimated_price,
-                    ba.bid_end_date,
-                    sb.overall_similarity
-                FROM similar_bids sb
-                JOIN bid_announcements ba ON sb.similar_bid_id = ba.bid_notice_no
-                WHERE ba.bid_end_date > NOW()
-                ORDER BY sb.overall_similarity DESC
-            """, (bid_notice_no, bid_notice_no, bid_notice_no, limit))
+                        ba.bid_notice_no,
+                        ba.title,
+                        ba.organization_name,
+                        ba.estimated_price,
+                        ba.bid_end_date,
+                        sb.overall_similarity
+                    FROM similar_bids sb
+                    JOIN bid_announcements ba ON sb.similar_bid_id = ba.bid_notice_no
+                    WHERE ba.bid_end_date > NOW()
+                    ORDER BY sb.overall_similarity DESC
+                """, (bid_notice_no, bid_notice_no, bid_notice_no, limit))
 
-            recommendations = []
-            for row in cursor.fetchall():
-                recommendations.append(RecommendationResponse(
-                    bid_notice_no=row["bid_notice_no"],
-                    title=row["title"],
-                    organization=row["organization_name"] or "",
-                    estimated_price=row["estimated_price"],
-                    bid_end_date=row["bid_end_date"],
-                    recommendation_score=float(row["overall_similarity"] * 100),
-                    recommendation_type="similar",
-                    recommendation_reasons={
-                        "similar_to": bid_notice_no,
-                        "similarity_score": row["overall_similarity"]
-                    }
-                ))
+                recommendations = []
+                for row in cursor.fetchall():
+                    recommendations.append({
+                        "bid_notice_no": row["bid_notice_no"],
+                        "title": row["title"],
+                        "organization": row["organization_name"] or "",
+                        "estimated_price": row["estimated_price"],
+                        "bid_end_date": row["bid_end_date"].isoformat() if row["bid_end_date"] else None,
+                        "recommendation_score": float(row["overall_similarity"] * 100),
+                        "recommendation_type": "similar",
+                        "recommendation_reasons": {
+                            "similar_to": bid_notice_no,
+                            "similarity_score": row["overall_similarity"]
+                        }
+                    })
 
-            return recommendations
+                return recommendations
+
+        if CACHE_AVAILABLE:
+            return get_cached_or_fetch("recommendations", cache_params, fetch_similar, CACHE_TTL.get("recommendations", 180))
+        return fetch_similar()
 
     except Exception as e:
         logger.error(f"[get_similar_bids] 실패: {e}")

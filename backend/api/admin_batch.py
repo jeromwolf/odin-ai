@@ -472,6 +472,96 @@ async def execute_batch_manual(
         raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다")
 
 
+@router.get("/progress/{execution_id}")
+async def get_batch_progress(execution_id: int):
+    """실행 중인 배치의 단계별 진행률 조회"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # 배치 실행 정보 조회
+            cursor.execute("""
+                SELECT id, batch_type, status, start_time, end_time,
+                       total_items, success_items, failed_items
+                FROM batch_execution_logs
+                WHERE id = %s
+            """, (execution_id,))
+            row = cursor.fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="배치 실행 정보를 찾을 수 없습니다")
+
+            columns = ['id', 'batch_type', 'status', 'start_time', 'end_time',
+                       'total_items', 'success_items', 'failed_items']
+            execution = dict(zip(columns, row))
+
+            # datetime 직렬화
+            for key in ['start_time', 'end_time']:
+                if execution[key] is not None:
+                    execution[key] = execution[key].isoformat()
+
+            # 최신 로그 메시지 조회 (batch_detail_logs에는 phase 컬럼 없음 - message로 추론)
+            cursor.execute("""
+                SELECT message, created_at
+                FROM batch_detail_logs
+                WHERE execution_id = %s
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (execution_id,))
+            latest_log = cursor.fetchone()
+
+            # 모든 단계 목록
+            phases = [
+                {"phase": 1, "name": "API 데이터 수집", "key": "collector"},
+                {"phase": 2, "name": "파일 다운로드", "key": "downloader"},
+                {"phase": 3, "name": "문서 처리", "key": "processor"},
+                {"phase": 4, "name": "알림 매칭", "key": "notification"},
+                {"phase": 5, "name": "보고서 발송", "key": "reporter"},
+            ]
+
+            # 단계 키워드 → phase 번호 매핑 (메시지에서 추론)
+            phase_keywords = {
+                1: ["수집", "collector", "api", "공고"],
+                2: ["다운로드", "download", "downloader", "파일"],
+                3: ["처리", "processor", "문서", "변환", "추출"],
+                4: ["알림", "notification", "matcher", "이메일"],
+                5: ["보고서", "reporter", "report", "완료"],
+            }
+
+            current_phase = 0
+            current_message = ""
+            if latest_log:
+                current_message = latest_log[0] or ""
+                msg_lower = current_message.lower()
+                for phase_num, keywords in phase_keywords.items():
+                    if any(kw in msg_lower for kw in keywords):
+                        current_phase = phase_num
+
+            # 완료된 배치는 모든 단계 완료
+            if execution['status'] == 'success':
+                current_phase = 5
+
+            for p in phases:
+                if p["phase"] < current_phase:
+                    p["status"] = "completed"
+                elif p["phase"] == current_phase:
+                    p["status"] = "running" if execution['status'] == 'running' else "completed"
+                else:
+                    p["status"] = "pending"
+
+            return {
+                "execution": execution,
+                "phases": phases,
+                "current_phase": current_phase,
+                "current_message": current_message,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"배치 진행률 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================
 # Helper Functions
 # ============================================

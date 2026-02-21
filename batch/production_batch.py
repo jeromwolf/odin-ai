@@ -183,6 +183,21 @@ class ProductionBatch:
                 logger.info("="*40)
                 self._send_report()
 
+                # 6.5. 일일 다이제스트 발송 (ENABLE_DAILY_DIGEST=true인 경우만)
+                if os.getenv('ENABLE_DAILY_DIGEST', 'false').lower() == 'true':
+                    logger.info("\n" + "="*40)
+                    logger.info("📬 Phase 5.5: 일일 다이제스트 발송")
+                    logger.info("="*40)
+                    try:
+                        from batch.modules.daily_digest import DailyDigestSender
+                        digest = DailyDigestSender(self.db_url)
+                        digest_result = digest.run(hours=24)
+                        logger.info(f"✅ Phase 5.5 완료: 다이제스트 {digest_result}")
+                    except Exception as e:
+                        logger.error(f"❌ Phase 5.5 실패: {e}")
+                else:
+                    logger.info("\n⏭️ Phase 5.5: 일일 다이제스트 건너뜀 (ENABLE_DAILY_DIGEST=false)")
+
                 # 7. 이벤트 발행 (Redis Pub/Sub)
                 logger.info("\n" + "="*40)
                 logger.info("📢 Phase 6: 이벤트 발행")

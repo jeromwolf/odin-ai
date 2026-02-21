@@ -31,6 +31,10 @@ import {
   Checkbox,
   FormControlLabel,
   Divider,
+  Stepper,
+  Step,
+  StepLabel,
+  LinearProgress,
 } from '@mui/material';
 import {
   Refresh,
@@ -85,6 +89,9 @@ const BatchMonitoring: React.FC = () => {
   const [enableNotification, setEnableNotification] = useState<boolean>(true);
   const [executeLoading, setExecuteLoading] = useState(false);
 
+  // 진행률 표시
+  const [progressData, setProgressData] = useState<any>(null);
+
   // 자동 새로고침 상태
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
@@ -119,6 +126,26 @@ const BatchMonitoring: React.FC = () => {
   useEffect(() => {
     loadExecutions();
   }, [loadExecutions]);
+
+  // 실행 중인 배치 진행률 조회
+  const loadProgress = useCallback(async (executionId: number) => {
+    try {
+      const data = await adminApi.getBatchProgress(executionId);
+      setProgressData(data);
+    } catch {
+      setProgressData(null);
+    }
+  }, []);
+
+  // 실행 중인 배치가 있으면 진행률 자동 조회
+  useEffect(() => {
+    const runningBatch = executions.find((e) => e.status === 'running');
+    if (runningBatch) {
+      loadProgress(runningBatch.id);
+    } else {
+      setProgressData(null);
+    }
+  }, [executions, loadProgress]);
 
   // 자동 새로고침 (5초마다)
   useEffect(() => {
@@ -295,6 +322,30 @@ const BatchMonitoring: React.FC = () => {
           </Grid>
         </Grid>
       </Paper>
+
+      {/* 실행 중인 배치 진행률 */}
+      {progressData && (
+        <Paper sx={{ p: 3, mb: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            실행 중인 배치 진행률
+          </Typography>
+          <Stepper activeStep={progressData.current_phase - 1} alternativeLabel>
+            {progressData.phases.map((phase: any) => (
+              <Step key={phase.phase} completed={phase.status === 'completed'}>
+                <StepLabel error={phase.status === 'failed'}>
+                  {phase.name}
+                </StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+          {progressData.current_message && (
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 2, textAlign: 'center' }}>
+              {progressData.current_message}
+            </Typography>
+          )}
+          <LinearProgress sx={{ mt: 2 }} />
+        </Paper>
+      )}
 
       {/* 배치 실행 이력 테이블 */}
       <Paper>

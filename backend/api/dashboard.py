@@ -9,6 +9,12 @@ from database import get_db_connection
 from auth.dependencies import get_current_user_optional, get_current_user, User
 import logging
 
+try:
+    from cache import get_cached_or_fetch, CACHE_TTL
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -18,62 +24,69 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 async def get_dashboard_overview(user: Optional[User] = Depends(get_current_user_optional)):
     """대시보드 개요 데이터 (실제 DB)"""
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
+        cache_params = {"endpoint": "overview", "user_id": user.id if user else "anonymous"}
 
-            # 전체/활성/가격/신규/마감임박 통계를 단일 쿼리로 조회
-            cursor.execute("""
-                SELECT
-                    COUNT(*) as total_bids,
-                    COUNT(*) FILTER (WHERE bid_end_date >= NOW()) as active_bids,
-                    COALESCE(SUM(estimated_price) FILTER (WHERE estimated_price IS NOT NULL), 0) as total_price,
-                    COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as today_new,
-                    COUNT(*) FILTER (WHERE created_at >= date_trunc('week', CURRENT_DATE)) as week_new,
-                    COUNT(*) FILTER (WHERE bid_end_date BETWEEN NOW() AND NOW() + INTERVAL '3 days') as deadline_soon
-                FROM bid_announcements
-            """)
-            row = cursor.fetchone()
-            total_bids = row[0]
-            active_bids = row[1]
-            total_price = row[2]
-            today_new = row[3]
-            week_new = row[4]
-            deadline_soon = row[5]
-            expired_bids = total_bids - active_bids
+        def fetch_overview():
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
 
-            # 사용자별 통계 (로그인한 경우)
-            user_stats = None
-            if user:
+                # 전체/활성/가격/신규/마감임박 통계를 단일 쿼리로 조회
                 cursor.execute("""
                     SELECT
-                        COUNT(*) as bookmark_count,
-                        COUNT(CASE WHEN b.bid_end_date >= NOW() THEN 1 END) as active_bookmarks
-                    FROM user_bookmarks ub
-                    LEFT JOIN bid_announcements b ON ub.bid_id = b.bid_notice_no
-                    WHERE ub.user_id = %s
-                """, (user.id,))
-                user_row = cursor.fetchone()
-                user_stats = {
-                    "bookmarks": user_row[0],
-                    "active_bookmarks": user_row[1],
-                    "alerts": 0  # 알림 시스템 구현 후
+                        COUNT(*) as total_bids,
+                        COUNT(*) FILTER (WHERE bid_end_date >= NOW()) as active_bids,
+                        COALESCE(SUM(estimated_price) FILTER (WHERE estimated_price IS NOT NULL), 0) as total_price,
+                        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as today_new,
+                        COUNT(*) FILTER (WHERE created_at >= date_trunc('week', CURRENT_DATE)) as week_new,
+                        COUNT(*) FILTER (WHERE bid_end_date BETWEEN NOW() AND NOW() + INTERVAL '3 days') as deadline_soon
+                    FROM bid_announcements
+                """)
+                row = cursor.fetchone()
+                total_bids = row[0]
+                active_bids = row[1]
+                total_price = row[2]
+                today_new = row[3]
+                week_new = row[4]
+                deadline_soon = row[5]
+                expired_bids = total_bids - active_bids
+
+                # 사용자별 통계 (로그인한 경우)
+                user_stats = None
+                if user:
+                    cursor.execute("""
+                        SELECT
+                            COUNT(*) as bookmark_count,
+                            COUNT(CASE WHEN b.bid_end_date >= NOW() THEN 1 END) as active_bookmarks
+                        FROM user_bookmarks ub
+                        LEFT JOIN bid_announcements b ON ub.bid_id = b.bid_notice_no
+                        WHERE ub.user_id = %s
+                    """, (user.id,))
+                    user_row = cursor.fetchone()
+                    user_stats = {
+                        "bookmarks": user_row[0],
+                        "active_bookmarks": user_row[1],
+                        "alerts": 0  # 알림 시스템 구현 후
+                    }
+
+                return {
+                    "success": True,
+                    "data": {
+                        "total_bids": total_bids,
+                        "active_bids": active_bids,
+                        "expired_bids": expired_bids,
+                        "total_price": float(total_price),
+                        "average_competition_rate": None,
+                        "today_new": today_new,
+                        "week_new": week_new,
+                        "deadline_soon": deadline_soon,
+                        "user_stats": user_stats,
+                        "last_updated": datetime.now(timezone.utc).isoformat()
+                    }
                 }
 
-            return {
-                "success": True,
-                "data": {
-                    "total_bids": total_bids,
-                    "active_bids": active_bids,
-                    "expired_bids": expired_bids,
-                    "total_price": float(total_price),
-                    "average_competition_rate": None,
-                    "today_new": today_new,
-                    "week_new": week_new,
-                    "deadline_soon": deadline_soon,
-                    "user_stats": user_stats,
-                    "last_updated": datetime.now(timezone.utc).isoformat()
-                }
-            }
+        if CACHE_AVAILABLE:
+            return get_cached_or_fetch("dashboard", cache_params, fetch_overview, CACHE_TTL.get("dashboard", 60))
+        return fetch_overview()
 
     except Exception as e:
         logger.error(f"대시보드 개요 조회 실패: {e}")
@@ -87,119 +100,126 @@ async def get_bid_statistics(
 ):
     """입찰 통계 데이터 (실제 DB)"""
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
+        cache_params = {"endpoint": "statistics", "days": days}
 
-            # 일별 입찰 통계
-            cursor.execute("""
-                SELECT
-                    DATE(created_at) as date,
-                    COUNT(*) as count,
-                    COALESCE(SUM(estimated_price), 0) as total_price
-                FROM bid_announcements
-                WHERE created_at >= CURRENT_DATE - INTERVAL %s
-                GROUP BY DATE(created_at)
-                ORDER BY date ASC
-            """, (f"{days} days",))
+        def fetch_statistics():
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
 
-            daily_stats = []
-            for row in cursor.fetchall():
-                daily_stats.append({
-                    "date": row[0].isoformat(),
-                    "count": row[1],
-                    "total_price": float(row[2])
-                })
+                # 일별 입찰 통계
+                cursor.execute("""
+                    SELECT
+                        DATE(created_at) as date,
+                        COUNT(*) as count,
+                        COALESCE(SUM(estimated_price), 0) as total_price
+                    FROM bid_announcements
+                    WHERE created_at >= CURRENT_DATE - INTERVAL %s
+                    GROUP BY DATE(created_at)
+                    ORDER BY date ASC
+                """, (f"{days} days",))
 
-            # 카테고리별 분포 (태그 기반)
-            cursor.execute("""
-                SELECT
-                    t.tag_name as category,
-                    COUNT(DISTINCT btr.bid_notice_no) as count
-                FROM bid_tags t
-                JOIN bid_tag_relations btr ON t.tag_id = btr.tag_id
-                GROUP BY t.tag_name
-                ORDER BY count DESC
-                LIMIT 10
-            """)
+                daily_stats = []
+                for row in cursor.fetchall():
+                    daily_stats.append({
+                        "date": row[0].isoformat(),
+                        "count": row[1],
+                        "total_price": float(row[2])
+                    })
 
-            category_distribution = []
-            total_count = 0
-            rows = cursor.fetchall()
+                # 카테고리별 분포 (태그 기반)
+                cursor.execute("""
+                    SELECT
+                        t.tag_name as category,
+                        COUNT(DISTINCT btr.bid_notice_no) as count
+                    FROM bid_tags t
+                    JOIN bid_tag_relations btr ON t.tag_id = btr.tag_id
+                    GROUP BY t.tag_name
+                    ORDER BY count DESC
+                    LIMIT 10
+                """)
 
-            # 전체 개수 계산
-            for row in rows:
-                total_count += row[1]
+                category_distribution = []
+                total_count = 0
+                rows = cursor.fetchall()
 
-            # 퍼센트 계산하여 추가
-            for row in rows:
-                percentage = round((row[1] / total_count * 100), 1) if total_count > 0 else 0
-                category_distribution.append({
-                    "category": row[0],
-                    "count": row[1],
-                    "percentage": percentage
-                })
+                # 전체 개수 계산
+                for row in rows:
+                    total_count += row[1]
 
-            # 기관별 TOP 10
-            cursor.execute("""
-                SELECT
-                    organization_name,
-                    COUNT(*) as count,
-                    COALESCE(SUM(estimated_price), 0) as total_price
-                FROM bid_announcements
-                WHERE organization_name IS NOT NULL
-                GROUP BY organization_name
-                ORDER BY count DESC
-                LIMIT 10
-            """)
+                # 퍼센트 계산하여 추가
+                for row in rows:
+                    percentage = round((row[1] / total_count * 100), 1) if total_count > 0 else 0
+                    category_distribution.append({
+                        "category": row[0],
+                        "count": row[1],
+                        "percentage": percentage
+                    })
 
-            organization_stats = []
-            for row in cursor.fetchall():
-                organization_stats.append({
-                    "organization": row[0],
-                    "count": row[1],
-                    "total_price": float(row[2])
-                })
+                # 기관별 TOP 10
+                cursor.execute("""
+                    SELECT
+                        organization_name,
+                        COUNT(*) as count,
+                        COALESCE(SUM(estimated_price), 0) as total_price
+                    FROM bid_announcements
+                    WHERE organization_name IS NOT NULL
+                    GROUP BY organization_name
+                    ORDER BY count DESC
+                    LIMIT 10
+                """)
 
-            # 가격대별 분포
-            cursor.execute("""
-                SELECT
-                    CASE
-                        WHEN estimated_price < 10000000 THEN '1천만원 미만'
-                        WHEN estimated_price < 50000000 THEN '1천만원~5천만원'
-                        WHEN estimated_price < 100000000 THEN '5천만원~1억원'
-                        WHEN estimated_price < 500000000 THEN '1억원~5억원'
-                        WHEN estimated_price < 1000000000 THEN '5억원~10억원'
-                        ELSE '10억원 이상'
-                    END as price_range,
-                    COUNT(*) as count
-                FROM bid_announcements
-                WHERE estimated_price IS NOT NULL
-                GROUP BY 1
-                ORDER BY
-                    MIN(estimated_price)
-            """)
+                organization_stats = []
+                for row in cursor.fetchall():
+                    organization_stats.append({
+                        "organization": row[0],
+                        "count": row[1],
+                        "total_price": float(row[2])
+                    })
 
-            price_distribution = []
-            for row in cursor.fetchall():
-                price_distribution.append({
-                    "range": row[0],
-                    "count": row[1]
-                })
+                # 가격대별 분포
+                cursor.execute("""
+                    SELECT
+                        CASE
+                            WHEN estimated_price < 10000000 THEN '1천만원 미만'
+                            WHEN estimated_price < 50000000 THEN '1천만원~5천만원'
+                            WHEN estimated_price < 100000000 THEN '5천만원~1억원'
+                            WHEN estimated_price < 500000000 THEN '1억원~5억원'
+                            WHEN estimated_price < 1000000000 THEN '5억원~10억원'
+                            ELSE '10억원 이상'
+                        END as price_range,
+                        COUNT(*) as count
+                    FROM bid_announcements
+                    WHERE estimated_price IS NOT NULL
+                    GROUP BY 1
+                    ORDER BY
+                        MIN(estimated_price)
+                """)
 
-            return {
-                "success": True,
-                "data": {
-                    "daily_stats": daily_stats,
-                    "category_distribution": category_distribution,
-                    "organization_stats": organization_stats,
-                    "price_distribution": price_distribution,
-                    "period": {
-                        "days": days,
-                        "start_date": (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat(),
-                        "end_date": datetime.now(timezone.utc).date().isoformat()
+                price_distribution = []
+                for row in cursor.fetchall():
+                    price_distribution.append({
+                        "range": row[0],
+                        "count": row[1]
+                    })
+
+                return {
+                    "success": True,
+                    "data": {
+                        "daily_stats": daily_stats,
+                        "category_distribution": category_distribution,
+                        "organization_stats": organization_stats,
+                        "price_distribution": price_distribution,
+                        "period": {
+                            "days": days,
+                            "start_date": (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat(),
+                            "end_date": datetime.now(timezone.utc).date().isoformat()
+                        }
                     }
                 }
-            }
+
+        if CACHE_AVAILABLE:
+            return get_cached_or_fetch("dashboard", cache_params, fetch_statistics, CACHE_TTL.get("dashboard", 60))
+        return fetch_statistics()
 
     except Exception as e:
         logger.error(f"통계 조회 실패: {e}")
@@ -394,92 +414,99 @@ async def get_bid_trends(
 ):
     """입찰 트렌드 분석"""
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
+        cache_params = {"endpoint": "trends", "period": period}
 
-            # 기간 설정
-            if period == "day":
-                interval = "1 day"
-                group_by = "hour"
-            elif period == "week":
-                interval = "7 days"
-                group_by = "day"
-            elif period == "month":
-                interval = "30 days"
-                group_by = "day"
-            else:  # year
-                interval = "365 days"
-                group_by = "month"
+        def fetch_trends():
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
 
-            # 트렌드 데이터 조회
-            if group_by == "hour":
+                # 기간 설정
+                if period == "day":
+                    interval = "1 day"
+                    group_by = "hour"
+                elif period == "week":
+                    interval = "7 days"
+                    group_by = "day"
+                elif period == "month":
+                    interval = "30 days"
+                    group_by = "day"
+                else:  # year
+                    interval = "365 days"
+                    group_by = "month"
+
+                # 트렌드 데이터 조회
+                if group_by == "hour":
+                    cursor.execute("""
+                        SELECT
+                            EXTRACT(HOUR FROM created_at) as period,
+                            COUNT(*) as count
+                        FROM bid_announcements
+                        WHERE created_at >= NOW() - INTERVAL %s
+                        GROUP BY EXTRACT(HOUR FROM created_at)
+                        ORDER BY period
+                    """, (interval,))
+                elif group_by == "day":
+                    cursor.execute("""
+                        SELECT
+                            DATE(created_at) as period,
+                            COUNT(*) as count
+                        FROM bid_announcements
+                        WHERE created_at >= NOW() - INTERVAL %s
+                        GROUP BY DATE(created_at)
+                        ORDER BY period
+                    """, (interval,))
+                else:  # month
+                    cursor.execute("""
+                        SELECT
+                            DATE_TRUNC('month', created_at) as period,
+                            COUNT(*) as count
+                        FROM bid_announcements
+                        WHERE created_at >= NOW() - INTERVAL %s
+                        GROUP BY DATE_TRUNC('month', created_at)
+                        ORDER BY period
+                    """, (interval,))
+
+                trends = []
+                for row in cursor.fetchall():
+                    trends.append({
+                        "period": str(row[0]),
+                        "count": row[1]
+                    })
+
+                # 인기 키워드 (태그 기반)
                 cursor.execute("""
                     SELECT
-                        EXTRACT(HOUR FROM created_at) as period,
-                        COUNT(*) as count
-                    FROM bid_announcements
-                    WHERE created_at >= NOW() - INTERVAL %s
-                    GROUP BY EXTRACT(HOUR FROM created_at)
-                    ORDER BY period
-                """, (interval,))
-            elif group_by == "day":
-                cursor.execute("""
-                    SELECT
-                        DATE(created_at) as period,
-                        COUNT(*) as count
-                    FROM bid_announcements
-                    WHERE created_at >= NOW() - INTERVAL %s
-                    GROUP BY DATE(created_at)
-                    ORDER BY period
-                """, (interval,))
-            else:  # month
-                cursor.execute("""
-                    SELECT
-                        DATE_TRUNC('month', created_at) as period,
-                        COUNT(*) as count
-                    FROM bid_announcements
-                    WHERE created_at >= NOW() - INTERVAL %s
-                    GROUP BY DATE_TRUNC('month', created_at)
-                    ORDER BY period
+                        t.tag_name,
+                        COUNT(DISTINCT btr.bid_notice_no) as count
+                    FROM bid_tags t
+                    JOIN bid_tag_relations btr ON t.tag_id = btr.tag_id
+                    JOIN bid_announcements b ON btr.bid_notice_no = b.bid_notice_no
+                    WHERE b.created_at >= NOW() - INTERVAL %s
+                    GROUP BY t.tag_name
+                    ORDER BY count DESC
+                    LIMIT 10
                 """, (interval,))
 
-            trends = []
-            for row in cursor.fetchall():
-                trends.append({
-                    "period": str(row[0]),
-                    "count": row[1]
-                })
+                top_keywords = []
+                for row in cursor.fetchall():
+                    top_keywords.append({
+                        "keyword": row[0],
+                        "count": row[1]
+                    })
 
-            # 인기 키워드 (태그 기반)
-            cursor.execute("""
-                SELECT
-                    t.tag_name,
-                    COUNT(DISTINCT btr.bid_notice_no) as count
-                FROM bid_tags t
-                JOIN bid_tag_relations btr ON t.tag_id = btr.tag_id
-                JOIN bid_announcements b ON btr.bid_notice_no = b.bid_notice_no
-                WHERE b.created_at >= NOW() - INTERVAL %s
-                GROUP BY t.tag_name
-                ORDER BY count DESC
-                LIMIT 10
-            """, (interval,))
-
-            top_keywords = []
-            for row in cursor.fetchall():
-                top_keywords.append({
-                    "keyword": row[0],
-                    "count": row[1]
-                })
-
-            return {
-                "success": True,
-                "data": {
-                    "trends": trends,
-                    "top_keywords": top_keywords,
-                    "period": period,
-                    "interval": interval
+                return {
+                    "success": True,
+                    "data": {
+                        "trends": trends,
+                        "top_keywords": top_keywords,
+                        "period": period,
+                        "interval": interval
+                    }
                 }
-            }
+
+        if CACHE_AVAILABLE:
+            return get_cached_or_fetch("dashboard", cache_params, fetch_trends, CACHE_TTL.get("dashboard", 60))
+        return fetch_trends()
 
     except Exception as e:
         logger.error(f"트렌드 조회 실패: {e}")
