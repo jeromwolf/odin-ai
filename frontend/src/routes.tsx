@@ -20,6 +20,7 @@ const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const NotificationInbox = lazy(() => import('./pages/NotificationInbox'));
 
 // Admin pages
 const AdminLogin = lazy(() => import('./pages/admin/Login'));
@@ -80,6 +81,7 @@ const AppRoutes = () => {
             <Route path="/search" element={<Search />} />
             <Route path="/bookmarks" element={<Bookmarks />} />
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/notification-inbox" element={<NotificationInbox />} />
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />

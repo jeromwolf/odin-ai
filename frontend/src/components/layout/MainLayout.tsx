@@ -153,7 +153,7 @@ const MainLayout: React.FC = () => {
             Odin-AI
           </Typography>
 
-          <IconButton color="inherit" sx={{ mr: 2 }} onClick={() => navigate('/notifications')}>
+          <IconButton color="inherit" sx={{ mr: 2 }} onClick={() => navigate('/notification-inbox')}>
             <Badge badgeContent={unreadCount} color="secondary" invisible={unreadCount === 0}>
               <Notifications />
             </Badge>
