@@ -37,19 +37,24 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS 설정 - 환경변수에서 읽거나 개발 기본값 사용
-_default_origins = "http://localhost:5173,http://localhost:9000,http://localhost:3000,http://localhost:8000,http://localhost:9029"
+_default_origins = "http://localhost:3000,http://localhost:9000"
 CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ORIGINS", _default_origins).split(",")
     if origin.strip()
 ]
+# FRONTEND_URL이 설정된 경우 CORS 허용 목록에 추가
+_frontend_url = os.getenv("FRONTEND_URL", "").strip()
+if _frontend_url and _frontend_url not in CORS_ORIGINS:
+    CORS_ORIGINS.append(_frontend_url)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+    expose_headers=["X-Total-Count"],
 )
 
 # 검색 라우터 추가

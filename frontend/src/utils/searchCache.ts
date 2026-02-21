@@ -137,7 +137,6 @@ class LocalStorageCache {
 
       // 크기 체크
       if (serialized.length > CACHE_CONFIG.maxLocalStorageSize) {
-        console.warn('Cache entry too large for localStorage');
         return false;
       }
 
@@ -264,20 +263,17 @@ class SearchCacheManager {
     // 1. 메모리 캐시 확인
     const memoryResult = this.memoryCache.get(key);
     if (memoryResult) {
-      console.debug('Cache hit: memory', key);
       return memoryResult;
     }
 
     // 2. localStorage 캐시 확인
     const localResult = this.localStorageCache.get<SearchResponse>(key);
     if (localResult) {
-      console.debug('Cache hit: localStorage', key);
       // 메모리 캐시에도 저장
       this.memoryCache.set(key, localResult);
       return localResult;
     }
 
-    console.debug('Cache miss', key);
     return null;
   }
 
@@ -292,8 +288,6 @@ class SearchCacheManager {
 
     // localStorage에도 저장 (실패해도 무시)
     this.localStorageCache.set(key, response);
-
-    console.debug('Cache set', key);
   }
 
   /**
@@ -306,10 +300,8 @@ class SearchCacheManager {
     // localStorage 캐시 클리어
     if (searchType) {
       // 특정 타입만 클리어하는 로직 구현 가능
-      console.debug('Cache invalidated for type:', searchType);
     } else {
       this.localStorageCache.clear();
-      console.debug('All cache invalidated');
     }
   }
 
@@ -407,7 +399,7 @@ export function prefetchRelatedSearches(
 ): void {
   relatedQueries.forEach(query => {
     const params = { ...baseParams, query, page: 1 };
-    prefetchSearchResults(params, searchFn).catch(console.error);
+    prefetchSearchResults(params, searchFn);
   });
 }
 

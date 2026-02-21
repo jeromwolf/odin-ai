@@ -275,7 +275,6 @@ const Dashboard: React.FC = () => {
                   onClick={(data: any, index: number) => {
                     // 클릭한 데이터의 카테고리 이름 가져오기
                     if (data && data.category) {
-                      console.log('Clicked category:', data.category);
                       // 카테고리 클릭 시 검색 페이지로 이동
                       navigate(`/search?q=${encodeURIComponent(data.category)}`);
                     }

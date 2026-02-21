@@ -51,15 +51,12 @@ class SearchService {
         if (error.response) {
           // 서버 응답이 있는 경우
           const errorMessage = error.response.data?.detail || '서버 오류가 발생했습니다.';
-          console.error('API Error:', errorMessage);
           throw new Error(errorMessage);
         } else if (error.request) {
           // 요청은 보냈지만 응답이 없는 경우
-          console.error('No response:', error.request);
           throw new Error('서버에 연결할 수 없습니다.');
         } else {
           // 요청 설정 중 오류 발생
-          console.error('Request error:', error.message);
           throw new Error('요청 중 오류가 발생했습니다.');
         }
       }

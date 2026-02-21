@@ -57,6 +57,7 @@ interface KeywordAlert {
     min: number;
     max: number;
   };
+  workTypes?: string;
   enabled: boolean;
 }
 
@@ -86,6 +87,7 @@ const Notifications: React.FC = () => {
     category: '',
     minPrice: '',
     maxPrice: '',
+    workTypes: '',
   });
 
   const categories = ['건설', '소프트웨어', '토목', '전기', '통신', '용역', '물품', '기계'];
@@ -215,6 +217,7 @@ const Notifications: React.FC = () => {
             category: newKeyword.category,
             min_price: newKeyword.minPrice ? parseInt(newKeyword.minPrice) : undefined,
             max_price: newKeyword.maxPrice ? parseInt(newKeyword.maxPrice) : undefined,
+            work_types: newKeyword.workTypes ? newKeyword.workTypes.split(',').map(s => s.trim()).filter(Boolean) : undefined,
           },
           notification_channels: ["email", "web"],
           notification_timing: "immediate"
@@ -238,7 +241,7 @@ const Notifications: React.FC = () => {
         }
 
         setKeywordAlerts(prev => [...prev, newAlert]);
-        setNewKeyword({ keyword: '', category: '', minPrice: '', maxPrice: '' });
+        setNewKeyword({ keyword: '', category: '', minPrice: '', maxPrice: '', workTypes: '' });
         setOpenAddDialog(false);
         alert('알림 규칙이 저장되었습니다.');
       } catch (error) {
@@ -503,6 +506,17 @@ const Notifications: React.FC = () => {
             <Typography variant="caption" color="text.secondary">
               가격 범위는 선택사항입니다. 설정하지 않으면 모든 가격대의 입찰을 알립니다.
             </Typography>
+
+            <TextField
+              fullWidth
+              label="업종 필터"
+              placeholder="예: 종합공사, 전문공사, 실내건축공사업 (쉼표 구분)"
+              value={newKeyword.workTypes || ''}
+              onChange={(e) => setNewKeyword({ ...newKeyword, workTypes: e.target.value })}
+              size="small"
+              sx={{ mt: 2 }}
+              helperText="알림 받을 업종을 쉼표로 구분하여 입력하세요"
+            />
           </Box>
         </DialogContent>
         <DialogActions>

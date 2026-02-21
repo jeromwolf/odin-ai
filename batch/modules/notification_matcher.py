@@ -124,14 +124,20 @@ class NotificationMatcher:
                     ba.created_at,
                     -- 태그 정보 추가
                     COALESCE(
-                        array_agg(bt.tag_name) FILTER (WHERE bt.tag_name IS NOT NULL),
+                        array_agg(DISTINCT bt.tag_name) FILTER (WHERE bt.tag_name IS NOT NULL),
                         '{}'::text[]
-                    ) as tags
+                    ) as tags,
+                    -- 업종 정보 추가
+                    COALESCE(
+                        array_agg(DISTINCT bei.field_value) FILTER (WHERE bei.info_category = 'work_type' AND bei.field_value IS NOT NULL),
+                        '{}'::text[]
+                    ) as work_types
                 FROM bid_announcements ba
                 LEFT JOIN bid_tag_relations btr ON ba.bid_notice_no = btr.bid_notice_no
                 LEFT JOIN bid_tags bt ON btr.tag_id = bt.tag_id
+                LEFT JOIN bid_extracted_info bei ON ba.bid_notice_no = bei.bid_notice_no AND bei.info_category = 'work_type'
                 WHERE ba.created_at >= NOW() - INTERVAL '%s hours'
-                    AND ba.bid_end_date > NOW()  -- 아직 마감되지 않은 공고만
+                    AND ba.bid_end_date > NOW()
                 GROUP BY ba.bid_notice_no, ba.title, ba.organization_name,
                          ba.department_name, ba.estimated_price, ba.bid_start_date,
                          ba.bid_end_date, ba.bid_method, ba.contract_method,
@@ -245,6 +251,13 @@ class NotificationMatcher:
         if 'regions' in conditions and conditions['regions']:
             if bid['region_restriction']:
                 if not any(region in bid['region_restriction'] for region in conditions['regions']):
+                    return False
+
+        # 6. 업종 매칭
+        if 'work_types' in conditions and conditions['work_types']:
+            bid_work_types = bid.get('work_types', [])
+            if bid_work_types:
+                if not any(wt in ' '.join(bid_work_types) for wt in conditions['work_types']):
                     return False
 
         logger.debug(f"✅ 매칭 성공: 규칙 '{rule['rule_name']}' - 입찰 '{bid['title'][:50]}...'")
