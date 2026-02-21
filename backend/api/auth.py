@@ -19,6 +19,7 @@ from auth.security import (
 )
 from auth.dependencies import get_current_user, get_current_user_optional, User
 from middleware.rate_limit import limiter
+from services.email_service import send_verification_email
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,16 @@ class UserLogin(BaseModel):
 class TokenRefresh(BaseModel):
     """토큰 갱신 요청"""
     refresh_token: str
+
+
+class EmailVerifyRequest(BaseModel):
+    """이메일 인증 요청"""
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    """인증 메일 재발송 요청"""
+    email: EmailStr
 
 
 class TokenResponse(BaseModel):
@@ -141,8 +152,17 @@ async def register(user_data: UserRegister):
             ))
             conn.commit()
 
-            # 이메일 인증: 토큰 생성 완료, 발송은 SMTP 설정 시 활성화 예정
             logger.info(f"회원가입 성공: {user_data.email} (인증토큰: {verification_token[:8]}...)")
+
+            # 이메일 인증 메일 발송 (실패해도 회원가입은 성공으로 처리)
+            try:
+                send_verification_email(
+                    to_email=user_data.email,
+                    token=verification_token,
+                    username=user_data.username
+                )
+            except Exception as email_err:
+                logger.warning(f"인증 메일 발송 실패 (회원가입은 완료됨): {email_err}")
 
             return UserResponse(
                 id=user_record[0],
@@ -353,3 +373,134 @@ async def get_me(current_user: User = Depends(get_current_user)):
         created_at=current_user.created_at,
         role="admin" if current_user.is_superuser else "user"
     )
+
+
+@router.post("/verify-email")
+async def verify_email(request: EmailVerifyRequest):
+    """이메일 인증 토큰 검증"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # 토큰 조회
+            token_query = """
+                SELECT id, user_id, expires_at, used
+                FROM email_verification_tokens
+                WHERE token = %s
+            """
+            cursor.execute(token_query, (request.token,))
+            token_record = cursor.fetchone()
+
+            if not token_record:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="유효하지 않은 인증 토큰입니다"
+                )
+
+            token_id, user_id, expires_at, used = token_record
+
+            if used:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="이미 사용된 인증 토큰입니다"
+                )
+
+            # 만료 확인 (expires_at이 timezone-naive일 수 있으므로 변환)
+            now_utc = datetime.now(timezone.utc)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+            if now_utc > expires_at:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="만료된 인증 토큰입니다. 인증 메일을 재발송해 주세요"
+                )
+
+            # 이메일 인증 완료 처리
+            cursor.execute(
+                "UPDATE users SET email_verified = true WHERE id = %s",
+                (user_id,)
+            )
+            cursor.execute(
+                "UPDATE email_verification_tokens SET used = true WHERE id = %s",
+                (token_id,)
+            )
+            conn.commit()
+
+            logger.info(f"이메일 인증 완료: user_id={user_id}")
+            return {"message": "이메일 인증이 완료되었습니다"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"이메일 인증 실패: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="이메일 인증 처리 중 오류가 발생했습니다"
+        )
+
+
+@limiter.limit("3/minute")
+@router.post("/resend-verification")
+async def resend_verification(request: Request, body: ResendVerificationRequest):
+    """이메일 인증 메일 재발송"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # 사용자 조회
+            cursor.execute(
+                "SELECT id, username, email_verified FROM users WHERE email = %s AND is_active = true",
+                (body.email,)
+            )
+            user = cursor.fetchone()
+
+            # 사용자가 없어도 동일한 응답 반환 (이메일 열거 공격 방지)
+            if not user:
+                return {"message": "인증 메일을 발송했습니다. 메일함을 확인해 주세요"}
+
+            user_id, username, email_verified = user
+
+            if email_verified:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="이미 이메일 인증이 완료된 계정입니다"
+                )
+
+            # 기존 미사용 토큰 만료 처리
+            cursor.execute(
+                "UPDATE email_verification_tokens SET used = true WHERE user_id = %s AND used = false",
+                (user_id,)
+            )
+
+            # 새 토큰 생성
+            new_token = create_email_verification_token()
+            cursor.execute(
+                """
+                INSERT INTO email_verification_tokens (user_id, token, expires_at)
+                VALUES (%s, %s, %s)
+                """,
+                (user_id, new_token, datetime.now(timezone.utc) + timedelta(hours=24))
+            )
+            conn.commit()
+
+        # 이메일 발송 (DB 트랜잭션 완료 후)
+        try:
+            send_verification_email(
+                to_email=body.email,
+                token=new_token,
+                username=username
+            )
+        except Exception as email_err:
+            logger.warning(f"인증 메일 재발송 실패: {email_err}")
+
+        return {"message": "인증 메일을 발송했습니다. 메일함을 확인해 주세요"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"인증 메일 재발송 실패: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="인증 메일 재발송 중 오류가 발생했습니다"
+        )
