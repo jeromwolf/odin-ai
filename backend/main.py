@@ -197,6 +197,14 @@ try:
 except ImportError as e:
     logger.warning(f"RAG 검색 API 라우터 로드 실패: {e}")
 
+# 설정 라우터 추가
+try:
+    from api.settings import router as settings_router
+    app.include_router(settings_router)
+    logger.info("✅ 설정 API 라우터 등록됨")
+except ImportError as e:
+    logger.warning(f"⚠️ 설정 API 라우터 로드 실패: {e}")
+
 
 @app.get("/")
 async def root():

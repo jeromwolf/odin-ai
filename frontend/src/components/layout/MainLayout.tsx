@@ -57,6 +57,7 @@ const adminMenuItems = [
   { text: '사용자 관리', icon: <People />, path: '/admin/users' },
   { text: '로그 조회', icon: <Description />, path: '/admin/logs' },
   { text: '통계 분석', icon: <Assessment />, path: '/admin/statistics' },
+  { text: '알림 모니터링', icon: <Notifications />, path: '/admin/notifications' },
 ];
 
 const MainLayout: React.FC = () => {

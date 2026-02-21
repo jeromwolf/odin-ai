@@ -1,0 +1,110 @@
+name: ODIN-AI CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # Backend checks
+  backend:
+    name: Backend (Python)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: odin_test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Initialize test database schema
+        env:
+          PGPASSWORD: test
+        run: |
+          for f in sql/create_user_tables.sql sql/create_alert_tables.sql sql/create_bookmark_tables.sql sql/create_subscription_tables.sql sql/create_subscription_functions.sql sql/create_ai_recommendation_tables.sql sql/admin_schema.sql sql/create_ontology_tables.sql sql/create_rag_tables.sql sql/search_indexes.sql; do
+            psql -h localhost -U test -d odin_test_db -f "$f" 2>/dev/null || true
+          done
+          echo "Database schema initialized"
+
+      - name: Lint (flake8)
+        run: flake8 backend/ --max-line-length=120 --ignore=E501,W503,E402 --count --show-source --statistics
+
+      - name: Type check (mypy)
+        run: mypy backend/ --ignore-missing-imports --no-error-summary
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/odin_test_db
+          SECRET_KEY: ci-test-secret-key
+          TESTING: 'true'
+        run: |
+          cd backend && python -c "
+          import psycopg2
+          conn = psycopg2.connect('postgresql://test:test@localhost:5432/odin_test_db')
+          cur = conn.cursor()
+          cur.execute('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s', ('public',))
+          count = cur.fetchone()[0]
+          print(f'DB connection OK - {count} tables found')
+          conn.close()
+          "
+          cd ..
+          pytest backend/tests/ -v --tb=short -x
+
+  # Frontend checks
+  frontend:
+    name: Frontend (React/TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: TypeScript type check
+        working-directory: frontend
+        run: npx tsc --noEmit --skipLibCheck
+
+      - name: Lint
+        working-directory: frontend
+        run: npx eslint src/ --ext .ts,.tsx --max-warnings=50
+
+      - name: Build
+        working-directory: frontend
+        env:
+          CI: false  # Don't treat warnings as errors
+        run: npm run build
