@@ -8,10 +8,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from middleware.rate_limit import limiter, _rate_limit_exceeded_handler
+from middleware.logging_middleware import RequestLoggingMiddleware
 from datetime import datetime, timezone
 import logging
+import sys
 import os
 from database import close_pool, get_db_connection
+
+# 구조화된 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)-8s %(name)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +66,8 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
     expose_headers=["X-Total-Count"],
 )
+
+app.add_middleware(RequestLoggingMiddleware)
 
 # 검색 라우터 추가
 try:
