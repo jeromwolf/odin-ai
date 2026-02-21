@@ -330,22 +330,22 @@ class BatchRetryExecutor:
 
     def _retry_api_collection(self, task_data):
         """API 수집 재시도"""
-        from batch.modules.collector import DataCollector
-        collector = DataCollector()
+        from batch.modules.collector import APICollector
+        collector = APICollector()
         # 실제 재시도 로직
         logger.info(f"API 수집 재시도: {task_data}")
 
     def _retry_file_download(self, task_data):
         """파일 다운로드 재시도"""
-        from batch.modules.downloader import FileDownloader
-        downloader = FileDownloader()
+        from batch.modules.downloader import DocumentDownloader
+        downloader = DocumentDownloader()
         # 실제 재시도 로직
         logger.info(f"파일 다운로드 재시도: {task_data}")
 
     def _retry_document_processing(self, task_data):
         """문서 처리 재시도"""
-        from batch.modules.processor import DocumentProcessor
-        processor = DocumentProcessor()
+        from batch.modules.processor import DocumentProcessorModule
+        processor = DocumentProcessorModule()
         # 실제 재시도 로직
         logger.info(f"문서 처리 재시도: {task_data}")
 

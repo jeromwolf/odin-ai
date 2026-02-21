@@ -6,6 +6,7 @@
 
 import json
 import psycopg2
+from psycopg2 import pool
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from loguru import logger
@@ -31,10 +32,24 @@ class NotificationMatcher:
 
     def __init__(self, db_url: str):
         self.db_url = db_url
+        self._pool = pool.ThreadedConnectionPool(minconn=2, maxconn=10, dsn=db_url)
         self.processed_count = 0
         self.notification_count = 0
         self.email_sent_count = 0
         self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+    def _get_conn(self):
+        """커넥션 풀에서 연결 가져오기"""
+        return self._pool.getconn()
+
+    def _put_conn(self, conn):
+        """커넥션 풀에 연결 반환"""
+        self._pool.putconn(conn)
+
+    def close(self):
+        """커넥션 풀 종료"""
+        if self._pool:
+            self._pool.closeall()
 
     def process_new_bids(self, since_hours: int = 168) -> Dict[str, Any]:
         """
@@ -106,7 +121,8 @@ class NotificationMatcher:
 
     def _get_new_bids(self, since_hours: int) -> List[Dict[str, Any]]:
         """최근 N시간 내 새로 수집된 입찰공고 조회"""
-        with psycopg2.connect(self.db_url) as conn:
+        conn = self._get_conn()
+        try:
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -147,10 +163,13 @@ class NotificationMatcher:
 
             columns = [desc[0] for desc in cursor.description]
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        finally:
+            self._put_conn(conn)
 
     def _get_active_alert_rules(self) -> List[Dict[str, Any]]:
         """활성화된 알림 규칙들 조회"""
-        with psycopg2.connect(self.db_url) as conn:
+        conn = self._get_conn()
+        try:
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -182,6 +201,8 @@ class NotificationMatcher:
                     rule['notification_channels'] = json.loads(rule['notification_channels'])
 
             return rules
+        finally:
+            self._put_conn(conn)
 
     def _find_matching_rules(self, bid: Dict[str, Any], alert_rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """특정 입찰공고와 매칭되는 알림 규칙들 찾기"""
@@ -265,7 +286,8 @@ class NotificationMatcher:
 
     def _create_notification(self, rule: Dict[str, Any], bid: Dict[str, Any]) -> int:
         """알림 생성 및 DB 저장"""
-        with psycopg2.connect(self.db_url) as conn:
+        conn = self._get_conn()
+        try:
             cursor = conn.cursor()
 
             # 중복 알림 방지 체크
@@ -327,6 +349,8 @@ class NotificationMatcher:
 
             logger.debug(f"📝 알림 생성 완료: ID {notification_id}, 사용자 {rule['user_id']}")
             return notification_id
+        finally:
+            self._put_conn(conn)
 
     def _generate_notification_message(self, rule: Dict[str, Any], bid: Dict[str, Any]) -> str:
         """알림 메시지 생성"""
@@ -390,7 +414,7 @@ class NotificationMatcher:
             logger.info(f"✅ 배치 이메일 발송 성공: {user_email} ({bid_count}건)")
 
             # notification_send_logs 기록 (실제 스키마에 맞춰 수정)
-            conn = psycopg2.connect(self.db_url)
+            conn = self._get_conn()
             try:
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -404,7 +428,7 @@ class NotificationMatcher:
                 conn.commit()
                 cursor.close()
             finally:
-                conn.close()
+                self._put_conn(conn)
 
             self.email_sent_count += 1
             return 1
@@ -413,7 +437,7 @@ class NotificationMatcher:
             logger.error(f"❌ 배치 이메일 발송 실패: {user_email} - {e}")
 
             # 실패 로그 기록
-            conn = psycopg2.connect(self.db_url)
+            conn = self._get_conn()
             try:
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -428,14 +452,14 @@ class NotificationMatcher:
                 conn.commit()
                 cursor.close()
             finally:
-                conn.close()
+                self._put_conn(conn)
 
             return 0
 
     def _format_price_range(self, conditions: Dict) -> str:
         """가격 범위를 포맷팅"""
-        price_min = conditions.get('price_min')
-        price_max = conditions.get('price_max')
+        price_min = conditions.get('min_price') or conditions.get('price_min')
+        price_max = conditions.get('max_price') or conditions.get('price_max')
 
         if price_min and price_max:
             return f"{price_min:,}원 ~ {price_max:,}원"
@@ -658,7 +682,8 @@ class NotificationMatcher:
                 server.send_message(msg)
 
             # 발송 기록 업데이트
-            with psycopg2.connect(self.db_url) as conn:
+            conn = self._get_conn()
+            try:
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO notification_history (
@@ -666,6 +691,8 @@ class NotificationMatcher:
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
                 """, (rule['user_id'], 'bid_match', 'email', subject, html_content[:500], rule['email'], 'sent'))
                 conn.commit()
+            finally:
+                self._put_conn(conn)
 
             self.email_sent_count += 1
             logger.info(f"📧 이메일 발송 완료: {rule['email']} - {bid['title'][:30]}...")
@@ -736,4 +763,5 @@ if __name__ == "__main__":
 
     matcher = NotificationMatcher(db_url)
     result = matcher.process_new_bids(since_hours=24)  # 최근 24시간
+    matcher.close()
     print(f"알림 매칭 완료: {result}")

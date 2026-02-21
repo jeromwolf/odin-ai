@@ -36,7 +36,9 @@ class APICollector:
         self.session = Session()
 
         # API 설정
-        api_key_encoded = os.getenv('BID_API_KEY', '6h2l2VPWSfA2vG3xSFr7gf6iwaZT2dmzcoCOzklLnOIJY6sw17lrwHNQ3WxPdKMDIN%2FmMlv2vBTWTIzBDPKVdw%3D%3D')
+        api_key_encoded = os.getenv('BID_API_KEY')
+        if not api_key_encoded:
+            raise ValueError("BID_API_KEY 환경변수가 설정되지 않았습니다. .env 파일을 확인하세요.")
         self.api_key = urllib.parse.unquote(api_key_encoded)
         self.api_url = os.getenv('BID_API_URL', 'http://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk')
 

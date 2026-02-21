@@ -193,7 +193,7 @@ const Bookmarks: React.FC = () => {
   };
 
   const handleViewDetail = (bid_notice_no: string) => {
-    navigate(`/bid/${bid_notice_no}`);
+    navigate(`/bids/${bid_notice_no}`);
   };
 
   const handleAddNote = (bookmark: BookmarkItem) => {

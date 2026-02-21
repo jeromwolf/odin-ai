@@ -67,7 +67,7 @@ const MainLayout: React.FC = () => {
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem(process.env.REACT_APP_TOKEN_KEY || 'odin_ai_token');
         if (!token) return;
         const response = await fetch(
           `${process.env.REACT_APP_API_URL || 'http://localhost:9000'}/api/notifications/?status=unread&limit=1`,

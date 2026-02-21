@@ -25,12 +25,26 @@ TOSS_CLIENT_KEY = os.getenv("TOSS_CLIENT_KEY", "")
 TOSS_SECRET_KEY = os.getenv("TOSS_SECRET_KEY", "")
 TOSS_API_URL = "https://api.tosspayments.com/v1"
 USE_TEST_MODE = os.getenv("PAYMENT_TEST_MODE", "true").lower() == "true"
+TOSS_WEBHOOK_SECRET = os.getenv("TOSS_WEBHOOK_SECRET", "")
 
 # Authorization 헤더 생성
 def get_auth_header():
     auth_string = f"{TOSS_SECRET_KEY}:"
     encoded = base64.b64encode(auth_string.encode()).decode()
     return {"Authorization": f"Basic {encoded}"}
+
+def verify_webhook_signature(signature: str, body: bytes) -> bool:
+    """토스페이먼츠 웹훅 서명 검증"""
+    if not TOSS_WEBHOOK_SECRET:
+        logger.warning("TOSS_WEBHOOK_SECRET not configured, skipping signature verification")
+        return True
+    import hmac
+    expected = hmac.new(
+        TOSS_WEBHOOK_SECRET.encode(),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature or "")
 
 # Pydantic 모델
 class PaymentRequest(BaseModel):
@@ -341,10 +355,12 @@ async def payment_webhook(
 ):
     """토스페이먼츠 웹훅 처리"""
     try:
-        # 웹훅 서명 검증 (프로덕션에서 필수)
-        # signature = request.headers.get("Toss-Signature")
-        # if not verify_webhook_signature(signature, await request.body()):
-        #     raise HTTPException(status_code=401, detail="Invalid signature")
+        # 웹훅 서명 검증
+        if not USE_TEST_MODE:
+            signature = request.headers.get("Toss-Signature", "")
+            body = await request.body()
+            if not verify_webhook_signature(signature, body):
+                raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
         with get_db_connection() as conn:
             cursor = conn.cursor()
