@@ -68,3 +68,15 @@ temp/
 /debug_*.py
 /explain_*.py
 /reprocess_*.py
+
+# Playwright E2E test artifacts
+frontend/.auth/
+frontend/playwright-report/
+frontend/test-results/
+
+# OMC orchestration state
+.omc/
+frontend/.omc/
+
+# Logs
+logs/

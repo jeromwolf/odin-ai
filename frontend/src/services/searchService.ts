@@ -14,7 +14,7 @@ import {
 } from '../types/search.types';
 
 // API 베이스 URL (환경변수 또는 proxy 설정 사용)
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:9000';
 
 class SearchService {
   private api: AxiosInstance;
