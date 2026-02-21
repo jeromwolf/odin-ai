@@ -10,8 +10,33 @@ from database import get_db_connection
 from api.admin_auth import get_current_admin
 import logging
 import os
+import threading
+import time
 
 logger = logging.getLogger(__name__)
+
+# 활성 배치 프로세스 레지스트리 (파일 핸들 누수 방지)
+_active_batches = {}
+_cleanup_lock = threading.Lock()
+
+def _cleanup_finished_batches():
+    """완료된 배치 프로세스의 파일 핸들 정리"""
+    while True:
+        time.sleep(30)  # 30초마다 체크
+        with _cleanup_lock:
+            for pid in list(_active_batches.keys()):
+                info = _active_batches[pid]
+                if info['process'].poll() is not None:  # 프로세스 종료됨
+                    try:
+                        info['stdout_fh'].close()
+                        info['stderr_fh'].close()
+                    except Exception:
+                        pass
+                    del _active_batches[pid]
+
+# 클린업 데몬 스레드 시작
+_cleanup_thread = threading.Thread(target=_cleanup_finished_batches, daemon=True)
+_cleanup_thread.start()
 
 router = APIRouter(prefix="/api/admin/batch", tags=["admin-batch"])
 
@@ -452,9 +477,14 @@ async def execute_batch_manual(
             start_new_session=True,
             cwd=project_root
         )
-        # 파일 핸들을 프로세스 객체에 첨부 (서브프로세스 종료 시 GC가 닫을 수 있도록 참조 유지)
-        process._stdout_fh = stdout_fh
-        process._stderr_fh = stderr_fh
+
+        # 파일 핸들 레지스트리에 등록 (자동 정리)
+        with _cleanup_lock:
+            _active_batches[process.pid] = {
+                'process': process,
+                'stdout_fh': stdout_fh,
+                'stderr_fh': stderr_fh,
+            }
 
         task_id = process.pid
 
@@ -473,7 +503,7 @@ async def execute_batch_manual(
 
 
 @router.get("/progress/{execution_id}")
-async def get_batch_progress(execution_id: int):
+async def get_batch_progress(execution_id: int, current_admin: dict = Depends(get_current_admin)):
     """실행 중인 배치의 단계별 진행률 조회"""
     try:
         with get_db_connection() as conn:

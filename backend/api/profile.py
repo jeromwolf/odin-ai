@@ -2,7 +2,7 @@
 프로필 관리 API
 """
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
 import logging
@@ -26,7 +26,7 @@ class UserProfile(BaseModel):
 
 class PasswordChange(BaseModel):
     current_password: str
-    new_password: str
+    new_password: str = Field(..., min_length=8)
 
 class UserActivity(BaseModel):
     total_searches: int = 0
@@ -138,12 +138,13 @@ async def update_profile(profile: UserProfile, current_user: User = Depends(get_
                 UPDATE users
                 SET full_name = %s, email = %s, phone_number = %s,
                     company = %s, department = %s, position = %s,
+                    email_verified = CASE WHEN email != %s THEN false ELSE email_verified END,
                     updated_at = NOW()
                 WHERE id = %s
                 RETURNING *
             """, (profile.name, profile.email, profile.phone,
                   profile.company, profile.department, profile.position,
-                  user_id))
+                  profile.email, user_id))
 
             updated_user = cur.fetchone()
 

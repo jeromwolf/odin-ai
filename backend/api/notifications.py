@@ -560,6 +560,7 @@ async def get_notification_settings(user: User = Depends(get_current_user)):
                     VALUES (%s, %s)
                     RETURNING *
                 """, (user_id, default_email))
+                conn.commit()
 
                 cursor.execute("""
                     SELECT
@@ -625,7 +626,17 @@ async def update_notification_settings(
             update_fields = []
             params = []
 
+            # SQL 컬럼명 화이트리스트 (필드명 인젝션 방지)
+            ALLOWED_SETTINGS_COLUMNS = {
+                'email_enabled', 'sms_enabled', 'web_enabled', 'push_enabled',
+                'alert_match_enabled', 'deadline_reminder_enabled',
+                'daily_digest_enabled', 'weekly_report_enabled',
+                'quiet_hours_enabled', 'email_address', 'phone_number'
+            }
+
             for field, value in settings.dict(exclude_unset=True).items():
+                if field not in ALLOWED_SETTINGS_COLUMNS:
+                    continue
                 update_fields.append(f"{field} = %s")
                 params.append(value)
 

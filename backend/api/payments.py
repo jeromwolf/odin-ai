@@ -39,7 +39,7 @@ def verify_webhook_signature(signature: str, body: bytes) -> bool:
         logger.warning("TOSS_WEBHOOK_SECRET not configured, skipping signature verification")
         return True
     import hmac
-    expected = hmac.new(
+    expected = hmac.HMAC(
         TOSS_WEBHOOK_SECRET.encode(),
         body,
         hashlib.sha256

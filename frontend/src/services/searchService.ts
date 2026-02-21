@@ -32,7 +32,7 @@ class SearchService {
     this.api.interceptors.request.use(
       (config) => {
         // 토큰이 있다면 추가 (추후 인증 구현 시)
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem(process.env.REACT_APP_TOKEN_KEY || 'odin_ai_token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }

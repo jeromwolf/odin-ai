@@ -94,7 +94,7 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, email, username, full_name, is_active
+                SELECT id, email, username, full_name, is_active, is_superuser
                 FROM users
                 WHERE id = %s
             """, (admin_id,))
@@ -106,12 +106,15 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
             if not row[4]:  # is_active
                 raise HTTPException(status_code=403, detail="비활성화된 계정입니다")
 
+            if not row[5]:  # is_superuser
+                raise HTTPException(status_code=403, detail="관리자 권한이 해제되었습니다")
+
             return {
                 "id": row[0],
                 "email": row[1],
                 "username": row[2],
                 "full_name": row[3],
-                "role": role
+                "role": "super_admin" if row[5] else "admin"
             }
 
     except JWTError:
