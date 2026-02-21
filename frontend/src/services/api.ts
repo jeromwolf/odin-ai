@@ -300,6 +300,13 @@ class ApiClient {
     return response.data;
   }
 
+  async updateBookmarkNote(bidNoticeNo: string, note: string) {
+    const response = await this.client.put(`/bookmarks/${bidNoticeNo}/note`, null, {
+      params: { note }
+    });
+    return response.data;
+  }
+
   // Notification Settings API
   async getNotificationSettings() {
     const response = await this.client.get('/notifications/settings');

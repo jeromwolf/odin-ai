@@ -140,8 +140,26 @@ async def get_user_detail(
                 "notification_rules": notification_rule_count
             }
 
-            # 최근 활동 (TODO: user_activity_logs 테이블 필요)
+            # 최근 활동: 북마크 및 알림에서 조회
             recent_activity = []
+            try:
+                cursor.execute("""
+                    (SELECT '북마크 추가' as action, bid_notice_no as detail, created_at
+                     FROM user_bookmarks WHERE user_id = %s ORDER BY created_at DESC LIMIT 5)
+                    UNION ALL
+                    (SELECT '알림 수신' as action, bid_notice_no as detail, created_at
+                     FROM notifications WHERE user_id = %s ORDER BY created_at DESC LIMIT 5)
+                    ORDER BY created_at DESC LIMIT 10
+                """, (user_id, user_id))
+                rows = cursor.fetchall()
+                for row in rows:
+                    recent_activity.append({
+                        "action": row[0],
+                        "detail": row[1],
+                        "timestamp": row[2].isoformat() if row[2] else None
+                    })
+            except Exception:
+                recent_activity = []
 
             return UserDetailResponse(
                 user=user,

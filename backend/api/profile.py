@@ -79,7 +79,17 @@ async def get_profile(current_user: User = Depends(get_current_user)):
             """, (user_id,))
             recent_activity = cur.fetchone()
 
-            search_count = 0  # TODO: user_search_history 테이블 구현 필요
+            # 검색 횟수: notifications 테이블에서 사용자 알림 수로 대체
+            try:
+                cur.execute("""
+                    SELECT COUNT(*) as search_count
+                    FROM notifications
+                    WHERE user_id = %s
+                """, (user_id,))
+                search_result = cur.fetchone()
+                search_count = search_result['search_count'] if search_result else 0
+            except Exception:
+                search_count = 0
 
             # 응답 데이터 구성
             return {

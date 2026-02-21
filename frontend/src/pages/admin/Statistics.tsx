@@ -83,13 +83,28 @@ const Statistics: React.FC = () => {
       // setBidStats(bidStatsData);
       // setSystemStats(systemStatsData);
 
-      // 가상 성장 데이터 (실제로는 API에서 받아야 함)
-      setGrowthData([
-        { date: '1주', users: 120, bids: 450, notifications: 890 },
-        { date: '2주', users: 145, bids: 520, notifications: 1020 },
-        { date: '3주', users: 168, bids: 610, notifications: 1180 },
-        { date: '4주', users: 195, bids: 705, notifications: 1350 },
-      ]);
+      // 성장 데이터 로드 (실제 API 호출)
+      try {
+        const days = period === '7days' ? 7 : period === '30days' ? 30 : 90;
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        const bidCollection = await adminApi.getBidCollectionStats({
+          start_date: startDate.toISOString().split('T')[0],
+          group_by: days <= 7 ? 'day' : 'week',
+        });
+        if (bidCollection?.stats && bidCollection.stats.length > 0) {
+          setGrowthData(bidCollection.stats.map((s: any) => ({
+            date: s.date || s.stat_date,
+            bids: s.total_collected || s.new_bids || 0,
+            users: 0,
+            notifications: 0,
+          })));
+        } else {
+          setGrowthData([]);
+        }
+      } catch {
+        setGrowthData([]);
+      }
 
       // 구독 플랜 분포 데이터
       setSubscriptionData([

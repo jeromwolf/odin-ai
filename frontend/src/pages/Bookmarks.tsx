@@ -202,14 +202,18 @@ const Bookmarks: React.FC = () => {
     setNoteDialogOpen(true);
   };
 
-  const handleSaveNote = () => {
-    // TODO: API 호출하여 노트 저장
+  const handleSaveNote = async () => {
     if (selectedBookmark) {
-      setBookmarks((prev) =>
-        prev.map((item) =>
-          item.id === selectedBookmark.id ? { ...item, note: noteText } : item
-        )
-      );
+      try {
+        await apiClient.updateBookmarkNote(selectedBookmark.bid_notice_no, noteText);
+        setBookmarks((prev) =>
+          prev.map((item) =>
+            item.id === selectedBookmark.id ? { ...item, note: noteText } : item
+          )
+        );
+      } catch (error) {
+        console.error('메모 저장 실패:', error);
+      }
     }
     setNoteDialogOpen(false);
     setSelectedBookmark(null);

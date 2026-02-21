@@ -147,8 +147,29 @@ const Logs: React.FC = () => {
 
   const handleExportLogs = async () => {
     try {
-      alert('로그 내보내기 기능은 준비 중입니다.');
-      // TODO: 실제 CSV/JSON 내보내기 구현
+      if (!logs || logs.length === 0) {
+        setError('내보낼 로그가 없습니다.');
+        return;
+      }
+      const headers = ['시간', '레벨', '메시지', '소스'];
+      const csvContent = [
+        headers.join(','),
+        ...logs.map((log: any) =>
+          [
+            log.timestamp || log.created_at || '',
+            log.level || log.log_level || '',
+            `"${(log.message || '').replace(/"/g, '""')}"`,
+            log.source || log.module || log.category || '',
+          ].join(',')
+        ),
+      ].join('\n');
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `odin-ai-logs-${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
     } catch (err: any) {
       console.error('로그 내보내기 실패:', err);
       setError('로그 내보내기에 실패했습니다.');

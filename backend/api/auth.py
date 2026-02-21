@@ -141,8 +141,8 @@ async def register(user_data: UserRegister):
             ))
             conn.commit()
 
-            # TODO: 이메일 발송 로직 추가
-            logger.info(f"회원가입 성공: {user_data.email}")
+            # 이메일 인증: 토큰 생성 완료, 발송은 SMTP 설정 시 활성화 예정
+            logger.info(f"회원가입 성공: {user_data.email} (인증토큰: {verification_token[:8]}...)")
 
             return UserResponse(
                 id=user_record[0],

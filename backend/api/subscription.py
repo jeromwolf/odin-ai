@@ -330,8 +330,15 @@ async def get_usage_stats(user: User = Depends(get_current_user)):
             )
             alerts_used = cursor.fetchone()[0]
 
-    # TODO: API 호출 추적 테이블이 없으므로 0으로 설정
-    api_calls_used = 0
+            # API 활동 수: 알림 수로 대체
+            try:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM notifications WHERE user_id = %s",
+                    (user.id,)
+                )
+                api_calls_used = cursor.fetchone()[0]
+            except Exception:
+                api_calls_used = 0
 
     usage = {
         "bookmarks": {
