@@ -77,6 +77,7 @@ const Search: React.FC = () => {
       setSearchQuery(query);
       handleSearch(query);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
   const handleBookmarkToggle = async (result: SearchResult, e: React.MouseEvent) => {

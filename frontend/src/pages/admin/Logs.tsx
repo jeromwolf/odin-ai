@@ -33,7 +33,6 @@ import {
 } from '@mui/material';
 import {
   Refresh,
-  FilterList,
   Download,
   Visibility,
   Error as ErrorIcon,
@@ -99,6 +98,7 @@ const Logs: React.FC = () => {
 
   useEffect(() => {
     loadLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, tabValue, logLevel, category, startDate, endDate]);
 
   const loadLogs = async () => {

@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Switch,
   FormControlLabel,
   FormGroup,
-  Divider,
   Card,
   CardContent,
   Chip,
@@ -36,7 +34,6 @@ import {
   Email,
   Add,
   Delete,
-  Edit,
   Schedule,
   TrendingUp,
   Settings,

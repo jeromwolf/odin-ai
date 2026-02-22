@@ -20,7 +20,6 @@ import {
   ListItemText,
   Menu,
   MenuItem,
-  Avatar,
   Chip,
 } from '@mui/material';
 import {

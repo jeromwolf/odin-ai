@@ -26,12 +26,8 @@ import {
   Storage,
   People,
   CheckCircle,
-  Error,
-  Warning,
 } from '@mui/icons-material';
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
   XAxis,

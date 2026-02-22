@@ -18,8 +18,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
-  Chip,
   Paper,
   CircularProgress,
   Snackbar,
@@ -35,7 +33,6 @@ import {
   Email,
   Phone,
   LocationOn,
-  CalendarToday,
   TrendingUp,
   Bookmark,
   Search,
@@ -43,7 +40,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 const Profile: React.FC = () => {
-  const { user } = useAuth();
+  useAuth();
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -35,8 +35,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  Switch,
-  FormControlLabel,
 } from '@mui/material';
 import {
   Visibility,
@@ -44,7 +42,6 @@ import {
   CheckCircle,
   Search,
   Refresh,
-  PersonAdd,
 } from '@mui/icons-material';
 import { adminApi } from '../../services/admin/adminApi';
 
@@ -124,6 +121,7 @@ const Users: React.FC = () => {
   useEffect(() => {
     loadUsers();
     loadUserStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, searchQuery, subscriptionFilter, statusFilter]);
 
   const loadUsers = async () => {

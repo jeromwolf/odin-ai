@@ -26,23 +26,18 @@ import {
   Computer,
   Memory,
   Storage as StorageIcon,
-  Speed,
   CheckCircle,
   Error as ErrorIcon,
 } from '@mui/icons-material';
 import {
   LineChart,
   Line,
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  BarChart,
-  Bar,
 } from 'recharts';
 import { adminApi } from '../../services/admin/adminApi';
 

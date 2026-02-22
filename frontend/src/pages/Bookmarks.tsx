@@ -12,38 +12,27 @@ import {
   InputAdornment,
   Menu,
   MenuItem,
-  Divider,
   Alert,
   CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
   Tooltip,
   Paper,
 } from '@mui/material';
 import {
   Bookmark,
-  BookmarkBorder,
   Search,
-  FilterList,
   Sort,
   Delete,
   Share,
-  Download,
-  FolderOpen,
   Label,
   CalendarToday,
   Business,
   AttachMoney,
-  MoreVert,
   CheckBox,
   CheckBoxOutlineBlank,
-  DeleteForever,
 } from '@mui/icons-material';
 import apiClient from '../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -85,6 +74,7 @@ const Bookmarks: React.FC = () => {
 
   useEffect(() => {
     filterAndSortBookmarks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookmarks, searchQuery, selectedCategory, sortBy]);
 
   const loadBookmarks = async () => {

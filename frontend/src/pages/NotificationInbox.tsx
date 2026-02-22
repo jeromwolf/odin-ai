@@ -67,6 +67,8 @@ const getTypeColor = (type: string): 'primary' | 'warning' | 'error' | 'default'
   return map[type] || 'default';
 };
 
+const statusMap = ['all', 'unread', 'read'];
+
 const NotificationInbox: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +78,6 @@ const NotificationInbox: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const limit = 20;
-
-  const statusMap = ['all', 'unread', 'read'];
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);

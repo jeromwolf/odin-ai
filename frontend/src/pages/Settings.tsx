@@ -22,11 +22,9 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
-  IconButton,
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Chip,
   TextField,
 } from '@mui/material';
 import {
@@ -37,10 +35,8 @@ import {
   Notifications,
   Security,
   Storage,
-  Delete,
   ExpandMore,
   Download,
-  Upload,
   RestoreFromTrash,
   DeleteForever,
   Info,

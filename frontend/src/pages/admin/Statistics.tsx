@@ -34,8 +34,6 @@ import {
 import {
   LineChart,
   Line,
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   PieChart,
@@ -59,8 +57,8 @@ const Statistics: React.FC = () => {
 
   // 통계 데이터
   const [userStats, setUserStats] = useState<any>(null);
-  const [bidStats, setBidStats] = useState<any>(null);
-  const [systemStats, setSystemStats] = useState<any>(null);
+  const [bidStats] = useState<any>(null);
+  const [systemStats] = useState<any>(null);
   const [growthData, setGrowthData] = useState<any[]>([]);
   const [subscriptionData, setSubscriptionData] = useState<any[]>([]);
 
@@ -69,6 +67,7 @@ const Statistics: React.FC = () => {
     // 5분마다 자동 새로고침
     const interval = setInterval(loadStatistics, 300000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
   const loadStatistics = async () => {

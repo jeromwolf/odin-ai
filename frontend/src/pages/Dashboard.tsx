@@ -6,13 +6,10 @@ import {
   CardContent,
   Typography,
   CircularProgress,
-  Alert,
   Chip,
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
-  IconButton,
   Paper,
   Button,
 } from '@mui/material';
@@ -20,19 +17,15 @@ import {
   TrendingUp,
   TrendingDown,
   AccessTime,
-  BookmarkBorder,
   Bookmark,
   ArrowForward,
-  CalendarToday,
   Business,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -58,7 +51,6 @@ interface StatCard {
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [bookmarkedBids, setBookmarkedBids] = useState<Set<string>>(new Set());
 
   // 대시보드 개요 데이터

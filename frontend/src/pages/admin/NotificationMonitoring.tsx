@@ -26,7 +26,6 @@ import {
 } from '@mui/material';
 import {
   Mail,
-  MailOutline,
   Error as ErrorIcon,
   CheckCircle,
   Warning as WarningIcon,
@@ -40,8 +39,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  BarChart,
-  Bar,
 } from 'recharts';
 import { adminApi } from '../../services/admin/adminApi';
 
@@ -83,10 +80,12 @@ const NotificationMonitoring: React.FC = () => {
 
   useEffect(() => {
     loadNotificationsList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificationPage]);
 
   useEffect(() => {
     loadEmailLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emailLogsPage]);
 
   const loadNotificationData = async () => {
