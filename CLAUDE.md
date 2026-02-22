@@ -676,7 +676,71 @@ echo "일시적 시스템 점검 중입니다" > maintenance.html
 
 ---
 
-## 📝 최근 작업 기록 (2025-11-10)
+## 📝 최근 작업 기록 (2026-02-22)
+
+### ✅ 2026년 실시간 데이터 수집 및 E2E 테스트 완료
+
+#### 🎯 주요 성과
+- **공공데이터포털 API 키 갱신**: 만료된 API 키 교체, 새 인증키로 2026년 데이터 수집 성공 ✅
+- **9건 신규 입찰공고 수집**: 2026-02-22 당일 공고 전량 수집 및 문서 처리 완료 ✅
+- **관리자 JWT 인증 버그 수정**: `sub` 클레임 타입 불일치 해결로 관리자 API 정상화 ✅
+- **Playwright E2E 59/59 통과**: 모든 테스트 100% 성공, 38개 스크린샷 최신 데이터로 갱신 ✅
+
+#### 🔧 관리자 JWT 인증 버그 수정 (admin_auth.py)
+
+**문제**: 관리자 로그인 후 `/api/admin/auth/me` 호출 시 401 에러
+- `python-jose` JWT 라이브러리가 `sub` 클레임을 문자열로 요구하지만 정수(107)로 저장됨
+- 결과: 모든 관리자 인증 API 호출 실패 → 관리자 페이지 접근 불가
+
+**수정 내역**:
+```python
+# backend/api/admin_auth.py Line 180
+# BEFORE
+data={"sub": user_id, "email": email, "role": role}
+# AFTER
+data={"sub": str(user_id), "email": email, "role": role}
+
+# Line 84-85
+# BEFORE
+admin_id: int = payload.get("sub")
+# AFTER
+admin_id_raw = payload.get("sub")
+admin_id: int = int(admin_id_raw) if admin_id_raw is not None else None
+```
+
+#### 📊 2026년 수집 데이터
+| 공고번호 | 제목 | 발주기관 | 예정가격 |
+|---------|------|---------|---------|
+| R26BK01347930 | 금학동 주미동 회선동천 소하천 재해복구 | 충남 공주시 | 1.37억 |
+| R26BK01347920 | 우성면 소하천 재해복구 | 충남 공주시 | 1.42억 |
+| R26BK01347911 | 유구읍 오골천 소하천 재해복구 | 충남 공주시 | 1.62억 |
+| R26BK01347908 | 수산업 경영인연합회관 개보수공사 | 충남 보령시 | 0.82억 |
+| R26BK01347807 | 도서발전소 발전기 계획예방정비 | 전북 군산시 | 1.16억 |
+| ... 외 4건 | | | |
+
+- **DB 총 공고**: 476건 (2025: 467건 + 2026: 9건)
+- **등록 사용자**: 112명 (전원 활성)
+
+#### 🧪 E2E 테스트 결과 (59/59 통과)
+- **관리자 페이지** (14건): 대시보드, 배치, 시스템, 사용자, 로그, 알림, 통계
+- **사용자 페이지** (28건): 대시보드, 검색, 북마크, 알림, 프로필, 설정, 구독
+- **인증 플로우** (10건): 로그인, 로그아웃, 회원가입
+- **API 테스트** (7건): 헬스체크, 검색, RAG
+- **38개 스크린샷**: `docs/screenshots/` 디렉토리에 최신 데이터로 갱신
+
+#### 🔧 E2E 스펙 파일 수정 (7개 관리자 스펙)
+- `setupAdminAuth` (토큰 주입) 방식으로 통일
+- 로그인 페이지 리다이렉트 시 자동 재인증 fallback 추가
+- 수정 파일: `admin-dashboard.spec.ts`, `admin-batch.spec.ts`, `admin-system.spec.ts`, `admin-users.spec.ts`, `admin-logs.spec.ts`, `admin-statistics.spec.ts`, `admin-notifications.spec.ts`
+
+#### 💡 교훈
+1. **JWT sub 클레임은 반드시 문자열**: `python-jose`는 JWT 표준에 따라 `sub`를 문자열로 강제
+2. **사용자 인증과 관리자 인증 코드 일관성**: `auth.py`는 `str(user_id)` 사용했지만 `admin_auth.py`는 누락
+3. **E2E 테스트로 인증 버그 조기 발견**: 스크린샷 비교로 로그인 페이지 렌더링 문제 즉시 감지
+
+---
+
+## 📝 이전 작업 기록 (2025-11-10)
 
 ### ✅ 통합 테스트 Phase 0 + Phase 2 완료
 

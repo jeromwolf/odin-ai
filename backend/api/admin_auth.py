@@ -81,7 +81,8 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
     try:
         token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        admin_id: int = payload.get("sub")
+        admin_id_raw = payload.get("sub")
+        admin_id: int = int(admin_id_raw) if admin_id_raw is not None else None
         role: str = payload.get("role")
 
         if admin_id is None:
@@ -177,7 +178,7 @@ async def admin_login(request: Request, login_data: AdminLoginRequest):
             # JWT 토큰 생성
             access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = create_admin_access_token(
-                data={"sub": user_id, "email": email, "role": role},
+                data={"sub": str(user_id), "email": email, "role": role},
                 expires_delta=access_token_expires
             )
 

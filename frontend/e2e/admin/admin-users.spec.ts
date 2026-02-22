@@ -1,17 +1,25 @@
 import { test, expect } from '@playwright/test';
 import { setupAdminAuth } from '../helpers/auth';
 import { captureScreenshot } from '../helpers/screenshot';
-import { waitForPageReady, waitForTableData } from '../helpers/common';
+import { waitForTableData } from '../helpers/common';
 
 test.describe('Admin User Management', () => {
   test.beforeEach(async ({ page }) => {
     await setupAdminAuth(page);
     await page.goto('/admin/users');
-    await waitForPageReady(page);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
   });
 
   test('should display user management page with stats', async ({ page }) => {
-    await page.waitForTimeout(3000);
+    const url = page.url();
+    if (url.includes('/admin/login')) {
+      const { adminLoginViaUI } = await import('../helpers/auth');
+      await adminLoginViaUI(page);
+      await page.goto('/admin/users');
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(3000);
+    }
     const cards = page.locator('.MuiCard-root, .MuiPaper-root');
     const count = await cards.count();
     expect(count).toBeGreaterThan(0);
