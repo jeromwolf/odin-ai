@@ -20,6 +20,17 @@ CREATE INDEX IF NOT EXISTS idx_bid_announcements_title_fts
 ON bid_announcements
 USING gin(to_tsvector('simple', title));
 
+-- 제목 트라이그램 인덱스 (ILIKE %keyword% 성능 향상, 한국어 부분 매칭 지원)
+-- pg_trgm 확장 필요: CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_bid_announcements_title_trgm
+ON bid_announcements
+USING gin(title gin_trgm_ops);
+
+-- 기관명 트라이그램 인덱스 (ILIKE %keyword% 성능 향상)
+CREATE INDEX IF NOT EXISTS idx_bid_announcements_orgname_trgm
+ON bid_announcements
+USING gin(organization_name gin_trgm_ops);
+
 -- 기관명 검색 인덱스
 CREATE INDEX IF NOT EXISTS idx_bid_announcements_organization
 ON bid_announcements

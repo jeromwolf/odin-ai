@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 from datetime import datetime, timezone
 from database import get_db_connection
+from psycopg2.extras import RealDictCursor
 import logging
 
 try:
@@ -50,27 +51,34 @@ def _build_search_where(
         if ONTOLOGY_AVAILABLE:
             expanded = expand_search_terms(q)
             if expanded:
-                # Build OR conditions for each expanded keyword
                 like_conditions = []
-                for keyword in expanded[:10]:  # Limit to 10 expanded terms
-                    like_conditions.append("(b.title ILIKE %s OR b.organization_name ILIKE %s OR t.tag_name ILIKE %s)")
+                for keyword in expanded[:10]:
+                    # ILIKE: 부분 매칭 (한국어 형태소 대응, pg_trgm GIN 인덱스 활용)
+                    # FTS: 전체 단어 매칭 (GIN FTS 인덱스 활용)
+                    like_conditions.append(
+                        "(b.title ILIKE %s OR b.organization_name ILIKE %s "
+                        "OR t.tag_name ILIKE %s "
+                        "OR to_tsvector('simple', b.title) @@ plainto_tsquery('simple', %s))"
+                    )
                     kw = f"%{keyword}%"
-                    params.extend([kw, kw, kw])
+                    params.extend([kw, kw, kw, keyword])
                 conditions.append("(" + " OR ".join(like_conditions) + ")")
             else:
-                # No ontology match - use original keyword
                 conditions.append(
-                    "(b.title ILIKE %s OR b.organization_name ILIKE %s OR t.tag_name ILIKE %s)"
+                    "(b.title ILIKE %s OR b.organization_name ILIKE %s "
+                    "OR t.tag_name ILIKE %s "
+                    "OR to_tsvector('simple', b.title) @@ plainto_tsquery('simple', %s))"
                 )
                 search_term = f"%{q}%"
-                params.extend([search_term, search_term, search_term])
+                params.extend([search_term, search_term, search_term, q])
         else:
-            # Ontology not available - use original
             conditions.append(
-                "(b.title ILIKE %s OR b.organization_name ILIKE %s OR t.tag_name ILIKE %s)"
+                "(b.title ILIKE %s OR b.organization_name ILIKE %s "
+                "OR t.tag_name ILIKE %s "
+                "OR to_tsvector('simple', b.title) @@ plainto_tsquery('simple', %s))"
             )
             search_term = f"%{q}%"
-            params.extend([search_term, search_term, search_term])
+            params.extend([search_term, search_term, search_term, q])
 
     if start_date:
         conditions.append("b.bid_start_date >= %s")
@@ -115,7 +123,7 @@ def _search_bids_from_db(
     """DB에서 직접 입찰 공고를 검색하는 내부 함수."""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # WHERE 절 공통 구성 (데이터 쿼리와 카운트 쿼리에서 공유)
             where_sql, base_params = _build_search_where(
@@ -131,6 +139,20 @@ def _search_bids_from_db(
                 """
             else:
                 data_from = "FROM bid_announcements b"
+
+            # 키워드 검색 시 FTS 관련도 점수로 정렬, 그 외에는 최신순
+            if q:
+                # ts_rank: FTS 매칭 점수, similarity: pg_trgm 유사도 (0~1)
+                # 두 점수를 결합하여 관련도 순으로 정렬
+                rank_select = """,
+                    ts_rank(to_tsvector('simple', b.title), plainto_tsquery('simple', %s)) AS fts_rank,
+                    similarity(b.title, %s) AS trgm_rank"""
+                rank_params = [q, q]
+                order_by = "ORDER BY (fts_rank * 2 + trgm_rank) DESC, b.created_at DESC"
+            else:
+                rank_select = ""
+                rank_params = []
+                order_by = "ORDER BY b.created_at DESC"
 
             data_query = f"""
                 SELECT DISTINCT
@@ -148,17 +170,18 @@ def _search_bids_from_db(
                     b.created_at,
                     CASE WHEN b.bid_end_date >= NOW() THEN EXTRACT(DAY FROM b.bid_end_date - NOW())::int ELSE NULL END as remaining_days,
                     CASE WHEN b.bid_end_date >= NOW() THEN 'active' ELSE 'closed' END as computed_status
+                    {rank_select}
                 {data_from}
                 WHERE {where_sql}
-                ORDER BY b.created_at DESC
+                {order_by}
                 LIMIT %s OFFSET %s
             """
 
-            cursor.execute(data_query, base_params + [limit, (page - 1) * limit])
+            cursor.execute(data_query, rank_params + base_params + [limit, (page - 1) * limit])
             rows = cursor.fetchall()
 
             # bid_notice_no 목록 추출
-            bid_nos = [row[0] for row in rows]
+            bid_nos = [row['bid_notice_no'] for row in rows]
 
             # extracted_info를 한 번에 조회 (N+1 → 1 쿼리)
             extracted_map = {}
@@ -170,45 +193,45 @@ def _search_bids_from_db(
                     AND info_category IN ('requirements', 'contract_details', 'prices')
                 """, (bid_nos,))
                 for info_row in cursor.fetchall():
-                    bno = info_row[0]
-                    cat = info_row[1]
+                    bno = info_row['bid_notice_no']
+                    cat = info_row['info_category']
                     if bno not in extracted_map:
                         extracted_map[bno] = {}
                     if cat not in extracted_map[bno]:
                         extracted_map[bno][cat] = {}
-                    extracted_map[bno][cat][info_row[2]] = info_row[3]
+                    extracted_map[bno][cat][info_row['field_name']] = info_row['field_value']
 
             # tags를 한 번에 조회 (N+1 → 1 쿼리)
             tags_map = {}
             if bid_nos:
                 cursor.execute("""
-                    SELECT btr.bid_notice_no, ARRAY_AGG(t.tag_name)
+                    SELECT btr.bid_notice_no, ARRAY_AGG(t.tag_name) AS tag_names
                     FROM bid_tags t
                     JOIN bid_tag_relations btr ON t.tag_id = btr.tag_id
                     WHERE btr.bid_notice_no = ANY(%s)
                     GROUP BY btr.bid_notice_no
                 """, (bid_nos,))
                 for tag_row in cursor.fetchall():
-                    tags_map[tag_row[0]] = tag_row[1] if tag_row[1] else []
+                    tags_map[tag_row['bid_notice_no']] = tag_row['tag_names'] if tag_row['tag_names'] else []
 
             # 결과 조합
             results = []
             for row in rows:
-                bid_notice_no = row[0]
+                bid_notice_no = row['bid_notice_no']
 
                 results.append({
-                    "bid_notice_no": row[0],
-                    "title": row[1],
-                    "organization_name": row[2],
-                    "department_name": row[3],
-                    "estimated_price": row[4],
-                    "bid_start_date": row[5].isoformat() if row[5] else None,
-                    "bid_end_date": row[6].isoformat() if row[6] else None,
-                    "status": row[7] or row[13],
-                    "bid_method": row[8],
-                    "contract_method": row[9],
-                    "region_restriction": row[10],
-                    "remaining_days": row[12],
+                    "bid_notice_no": row['bid_notice_no'],
+                    "title": row['title'],
+                    "organization_name": row['organization_name'],
+                    "department_name": row['department_name'],
+                    "estimated_price": row['estimated_price'],
+                    "bid_start_date": row['bid_start_date'].isoformat() if row['bid_start_date'] else None,
+                    "bid_end_date": row['bid_end_date'].isoformat() if row['bid_end_date'] else None,
+                    "status": row['status'] or row['computed_status'],
+                    "bid_method": row['bid_method'],
+                    "contract_method": row['contract_method'],
+                    "region_restriction": row['region_restriction'],
+                    "remaining_days": row['remaining_days'],
                     "tags": tags_map.get(bid_notice_no, []),
                     "extracted_info": extracted_map.get(bid_notice_no, {})
                 })
@@ -216,7 +239,7 @@ def _search_bids_from_db(
             # 전체 개수 조회 - 데이터 쿼리와 동일한 WHERE 절 재사용
             if q:
                 count_query = f"""
-                    SELECT COUNT(DISTINCT b.bid_notice_no)
+                    SELECT COUNT(DISTINCT b.bid_notice_no) AS total_count
                     FROM bid_announcements b
                     LEFT JOIN bid_tag_relations btr ON b.bid_notice_no = btr.bid_notice_no
                     LEFT JOIN bid_tags t ON btr.tag_id = t.tag_id
@@ -224,12 +247,12 @@ def _search_bids_from_db(
                 """
             else:
                 count_query = f"""
-                    SELECT COUNT(*) FROM bid_announcements b
+                    SELECT COUNT(*) AS total_count FROM bid_announcements b
                     WHERE {where_sql}
                 """
 
             cursor.execute(count_query, base_params)
-            total = cursor.fetchone()[0]
+            total = cursor.fetchone()['total_count']
 
             return {
                 "success": True,
@@ -295,7 +318,7 @@ async def list_bids(
     """입찰 목록 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # SQL Injection 방어: whitelist 매핑
             SORT_COLUMNS = {
@@ -329,16 +352,16 @@ async def list_bids(
             results = []
             for row in cursor.fetchall():
                 results.append({
-                    "bid_notice_no": row[0],
-                    "title": row[1],
-                    "organization_name": row[2],
-                    "estimated_price": row[3],
-                    "bid_end_date": row[4].isoformat() if row[4] else None,
-                    "created_at": row[5].isoformat() if row[5] else None
+                    "bid_notice_no": row['bid_notice_no'],
+                    "title": row['title'],
+                    "organization_name": row['organization_name'],
+                    "estimated_price": row['estimated_price'],
+                    "bid_end_date": row['bid_end_date'].isoformat() if row['bid_end_date'] else None,
+                    "created_at": row['created_at'].isoformat() if row['created_at'] else None
                 })
 
-            cursor.execute("SELECT COUNT(*) FROM bid_announcements")
-            total = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) AS total_count FROM bid_announcements")
+            total = cursor.fetchone()['total_count']
 
             return {
                 "success": True,
@@ -359,7 +382,7 @@ async def get_bid_detail(bid_notice_no: str):
     """입찰 상세 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 SELECT
@@ -390,22 +413,22 @@ async def get_bid_detail(bid_notice_no: str):
             return {
                 "success": True,
                 "data": {
-                    "bid_notice_no": row[0],
-                    "title": row[1],
-                    "organization_name": row[2],
-                    "department_name": row[3],
-                    "estimated_price": row[4],
-                    "bid_start_date": row[5].isoformat() if row[5] else None,
-                    "bid_end_date": row[6].isoformat() if row[6] else None,
-                    "announcement_date": row[7].isoformat() if row[7] else None,
-                    "bid_method": row[8],
-                    "contract_method": row[9],
-                    "officer_name": row[10],
-                    "officer_phone": row[11],
-                    "officer_email": row[12],
-                    "detail_page_url": row[13],
-                    "created_at": row[14].isoformat() if row[14] else None,
-                    "updated_at": row[15].isoformat() if row[15] else None
+                    "bid_notice_no": row['bid_notice_no'],
+                    "title": row['title'],
+                    "organization_name": row['organization_name'],
+                    "department_name": row['department_name'],
+                    "estimated_price": row['estimated_price'],
+                    "bid_start_date": row['bid_start_date'].isoformat() if row['bid_start_date'] else None,
+                    "bid_end_date": row['bid_end_date'].isoformat() if row['bid_end_date'] else None,
+                    "announcement_date": row['announcement_date'].isoformat() if row['announcement_date'] else None,
+                    "bid_method": row['bid_method'],
+                    "contract_method": row['contract_method'],
+                    "officer_name": row['officer_name'],
+                    "officer_phone": row['officer_phone'],
+                    "officer_email": row['officer_email'],
+                    "detail_page_url": row['detail_page_url'],
+                    "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                    "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None
                 }
             }
 
