@@ -8,6 +8,7 @@ from typing import List, Optional
 from datetime import datetime
 from database import get_db_connection
 from api.admin_auth import get_current_admin
+from psycopg2.extras import RealDictCursor
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ async def get_users(
     """사용자 목록 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             where_clauses = []
             params = []
@@ -69,8 +70,8 @@ async def get_users(
             where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
             # 총 개수
-            cursor.execute(f"SELECT COUNT(*) FROM users WHERE {where_sql}", params)
-            total = cursor.fetchone()[0]
+            cursor.execute(f"SELECT COUNT(*) AS count FROM users WHERE {where_sql}", params)
+            total = cursor.fetchone()["count"]
 
             # 데이터 조회
             offset = (page - 1) * limit
@@ -87,10 +88,10 @@ async def get_users(
             users = []
             for row in cursor.fetchall():
                 users.append(UserResponse(
-                    id=row[0], email=row[1], username=row[2],
-                    full_name=row[3], company=row[4], is_active=row[5],
-                    email_verified=row[6], created_at=row[7],
-                    last_login=row[8]
+                    id=row["id"], email=row["email"], username=row["username"],
+                    full_name=row["full_name"], company=row["company"], is_active=row["is_active"],
+                    email_verified=row["email_verified"], created_at=row["created_at"],
+                    last_login=row["last_login"]
                 ))
 
             return UserListResponse(users=users, total=total, page=page)
@@ -108,7 +109,7 @@ async def get_user_detail(
     """사용자 상세 정보"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 사용자 정보
             cursor.execute("""
@@ -122,18 +123,18 @@ async def get_user_detail(
                 raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
 
             user = UserResponse(
-                id=row[0], email=row[1], username=row[2],
-                full_name=row[3], company=row[4], is_active=row[5],
-                email_verified=row[6], created_at=row[7],
-                last_login=row[8]
+                id=row["id"], email=row["email"], username=row["username"],
+                full_name=row["full_name"], company=row["company"], is_active=row["is_active"],
+                email_verified=row["email_verified"], created_at=row["created_at"],
+                last_login=row["last_login"]
             )
 
             # 통계
-            cursor.execute("SELECT COUNT(*) FROM user_bookmarks WHERE user_id = %s", (user_id,))
-            bookmark_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) AS count FROM user_bookmarks WHERE user_id = %s", (user_id,))
+            bookmark_count = cursor.fetchone()["count"]
 
-            cursor.execute("SELECT COUNT(*) FROM alert_rules WHERE user_id = %s", (user_id,))
-            notification_rule_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) AS count FROM alert_rules WHERE user_id = %s", (user_id,))
+            notification_rule_count = cursor.fetchone()["count"]
 
             statistics = {
                 "bookmarks": bookmark_count,
@@ -154,9 +155,9 @@ async def get_user_detail(
                 rows = cursor.fetchall()
                 for row in rows:
                     recent_activity.append({
-                        "action": row[0],
-                        "detail": row[1],
-                        "timestamp": row[2].isoformat() if row[2] else None
+                        "action": row["action"],
+                        "detail": row["detail"],
+                        "timestamp": row["created_at"].isoformat() if row["created_at"] else None
                     })
             except Exception:
                 recent_activity = []
@@ -183,7 +184,7 @@ async def update_user(
     """사용자 계정 관리 (활성화/비활성화)"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             if is_active is not None:
                 cursor.execute(
@@ -208,19 +209,19 @@ async def get_user_statistics(current_admin: dict = Depends(get_current_admin)):
     """사용자 통계 요약"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-            cursor.execute("SELECT COUNT(*) FROM users")
-            total_users = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) AS count FROM users")
+            total_users = cursor.fetchone()["count"]
 
-            cursor.execute("SELECT COUNT(*) FROM users WHERE is_active = true")
-            active_users = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) AS count FROM users WHERE is_active = true")
+            active_users = cursor.fetchone()["count"]
 
             cursor.execute("""
-                SELECT COUNT(*) FROM users
+                SELECT COUNT(*) AS count FROM users
                 WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
             """)
-            new_users_30d = cursor.fetchone()[0]
+            new_users_30d = cursor.fetchone()["count"]
 
             return {
                 "total_users": total_users,

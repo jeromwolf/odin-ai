@@ -8,6 +8,7 @@ from typing import List, Optional, Dict
 from datetime import datetime, date, timedelta
 from database import get_db_connection
 from api.admin_auth import get_current_admin
+from psycopg2.extras import RealDictCursor
 import logging
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,7 @@ async def get_bid_collection_stats(
             start_date = end_date - timedelta(days=30)
 
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # SQL Injection 방어: whitelist만 허용
             VALID_TRUNCS = {'day', 'week', 'month'}
@@ -131,11 +132,11 @@ async def get_bid_collection_stats(
             stats = []
             for row in cursor.fetchall():
                 stats.append(BidCollectionStats(
-                    date=row[0].isoformat(),
-                    total_collected=row[1],
-                    new_bids=row[2],
-                    updated_bids=row[3],
-                    total_amount=row[4]
+                    date=row['stat_date'].isoformat(),
+                    total_collected=row['total_collected'],
+                    new_bids=row['new_bids'],
+                    updated_bids=row['updated_bids'],
+                    total_amount=row['total_amount']
                 ))
 
             # 요약 통계
@@ -152,10 +153,10 @@ async def get_bid_collection_stats(
             summary_row = cursor.fetchone()
 
             summary = {
-                "total_collected": summary_row[0],
-                "new_bids": summary_row[1],
-                "total_amount": summary_row[2],
-                "average_amount": round(summary_row[3], 0)
+                "total_collected": summary_row['total'],
+                "new_bids": summary_row['new'],
+                "total_amount": summary_row['total_amount'],
+                "average_amount": round(summary_row['avg_amount'], 0)
             }
 
             return BidCollectionStatsResponse(
@@ -194,14 +195,14 @@ async def get_category_distribution(
             start_date = end_date - timedelta(days=30)
 
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 전체 건수 조회
             cursor.execute("""
-                SELECT COUNT(*) FROM bid_announcements
+                SELECT COUNT(*) as count FROM bid_announcements
                 WHERE announcement_date >= %s AND announcement_date <= %s
             """, (start_date, end_date))
-            total_bids = cursor.fetchone()[0]
+            total_bids = cursor.fetchone()['count']
 
             if total_bids == 0:
                 return CategoryDistributionResponse(
@@ -231,13 +232,13 @@ async def get_category_distribution(
 
             categories = []
             for row in cursor.fetchall():
-                count = row[1]
+                count = row['count']
                 percentage = (count / total_bids * 100) if total_bids > 0 else 0
                 categories.append(CategoryDistribution(
-                    category=row[0],
+                    category=row['category'],
                     count=count,
                     percentage=round(percentage, 2),
-                    total_amount=row[2]
+                    total_amount=row['total_amount']
                 ))
 
             return CategoryDistributionResponse(
@@ -275,7 +276,7 @@ async def get_user_growth_stats(
             start_date = end_date - timedelta(days=30)
 
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 일별 증가 추이
             query = """
@@ -314,10 +315,10 @@ async def get_user_growth_stats(
             growth = []
             for row in cursor.fetchall():
                 growth.append(UserGrowthStats(
-                    date=row[0].isoformat(),
-                    new_users=row[1],
-                    total_users=row[2],
-                    active_users=row[3]
+                    date=row['date'].isoformat(),
+                    new_users=row['new_users'],
+                    total_users=row['total_users'],
+                    active_users=row['active_users']
                 ))
 
             # 요약 통계
@@ -332,10 +333,10 @@ async def get_user_growth_stats(
             summary_row = cursor.fetchone()
 
             summary = {
-                "total_users": summary_row[0],
-                "new_users_in_period": summary_row[1],
-                "active_users": summary_row[2],
-                "recent_active_users": summary_row[3]
+                "total_users": summary_row['total_users'],
+                "new_users_in_period": summary_row['new_users_period'],
+                "active_users": summary_row['active_users'],
+                "recent_active_users": summary_row['recent_active']
             }
 
             return UserGrowthResponse(
@@ -373,7 +374,7 @@ async def get_notification_stats(
             start_date = end_date - timedelta(days=30)
 
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 일별 알림 통계
             query = """
@@ -403,15 +404,15 @@ async def get_notification_stats(
 
             stats = []
             for row in cursor.fetchall():
-                total_sent = row[1]
-                success_count = row[2]
+                total_sent = row['total_sent']
+                success_count = row['success_count']
                 success_rate = (success_count / total_sent * 100) if total_sent > 0 else 0
 
                 stats.append(NotificationStats(
-                    date=row[0].isoformat(),
+                    date=row['date'].isoformat(),
                     total_sent=total_sent,
                     success_count=success_count,
-                    failed_count=row[3],
+                    failed_count=row['failed_count'],
                     success_rate=round(success_rate, 2)
                 ))
 
@@ -429,19 +430,19 @@ async def get_notification_stats(
             """, (start_date, end_date))
             summary_row = cursor.fetchone()
 
-            total = summary_row[0]
-            success = summary_row[1]
+            total = summary_row['total']
+            success = summary_row['success']
             success_rate = (success / total * 100) if total > 0 else 0
 
             summary = {
                 "total_sent": total,
                 "success_count": success,
-                "failed_count": summary_row[2],
+                "failed_count": summary_row['failed'],
                 "success_rate": round(success_rate, 2),
                 "by_channel": {
-                    "email": summary_row[3],
-                    "push": summary_row[4],
-                    "sms": summary_row[5]
+                    "email": summary_row['email_count'],
+                    "push": summary_row['push_count'],
+                    "sms": summary_row['sms_count']
                 }
             }
 

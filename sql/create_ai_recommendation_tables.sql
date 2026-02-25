@@ -1,13 +1,6 @@
 -- AI 추천 시스템 테이블 생성
 -- 2025-09-25
 
--- 기존 테이블 삭제
-DROP TABLE IF EXISTS user_preferences CASCADE;
-DROP TABLE IF EXISTS user_bid_interactions CASCADE;
-DROP TABLE IF EXISTS bid_similarities CASCADE;
-DROP TABLE IF EXISTS recommendation_history CASCADE;
-DROP TABLE IF EXISTS recommendation_feedback CASCADE;
-
 -- 사용자 선호도 테이블
 CREATE TABLE user_preferences (
     id SERIAL PRIMARY KEY,

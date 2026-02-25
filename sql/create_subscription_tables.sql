@@ -1,16 +1,6 @@
 -- 구독/결제 시스템 테이블 생성
 -- 2025-09-25
 
--- 기존 테이블 삭제
-DROP TABLE IF EXISTS payment_history CASCADE;
-DROP TABLE IF EXISTS user_subscriptions CASCADE;
-DROP TABLE IF EXISTS subscription_features CASCADE;
-DROP TABLE IF EXISTS subscription_plans CASCADE;
-DROP TABLE IF EXISTS payment_methods CASCADE;
-DROP TABLE IF EXISTS billing_addresses CASCADE;
-DROP TABLE IF EXISTS subscription_usage CASCADE;
-DROP TABLE IF EXISTS invoices CASCADE;
-
 -- 구독 플랜 테이블
 CREATE TABLE subscription_plans (
     id SERIAL PRIMARY KEY,

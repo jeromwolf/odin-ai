@@ -3,6 +3,9 @@
 -- Auto-generated master init file for Docker PostgreSQL
 -- Combines all schema files in dependency order
 -- ============================================================
+-- ⚠️ WARNING: This file creates tables with IF NOT EXISTS.
+-- DO NOT add DROP TABLE statements - they will destroy production data!
+-- For schema changes, use Alembic migrations instead.
 -- Order:
 --   1. create_user_tables.sql       (base: users, sessions, tokens)
 --   2. create_alert_tables.sql      (references users implicitly)
@@ -278,6 +281,25 @@ COMMENT ON TABLE alert_templates IS '알림 템플릿';
 COMMENT ON TABLE alert_logs IS '알림 발송 로그';
 COMMENT ON TABLE user_notification_settings IS '사용자 알림 설정';
 
+-- 알림 내역 테이블 (notifications)
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    alert_rule_id INTEGER REFERENCES alert_rules(id) ON DELETE SET NULL,
+    title VARCHAR(200) NOT NULL,
+    message TEXT,
+    type VARCHAR(50) DEFAULT 'info',
+    status VARCHAR(20) DEFAULT 'unread',
+    priority INTEGER DEFAULT 0,
+    metadata JSONB,
+    read_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+
 
 -- ============================================================
 -- SECTION 3: Bookmark Tables
@@ -405,16 +427,6 @@ COMMENT ON TABLE bookmark_folder_relations IS '북마크-폴더 관계';
 -- SECTION 4: Subscription Tables
 -- Source: sql/create_subscription_tables.sql
 -- ============================================================
-
--- 기존 테이블 삭제 (초기화 시 재생성)
-DROP TABLE IF EXISTS payment_history CASCADE;
-DROP TABLE IF EXISTS user_subscriptions CASCADE;
-DROP TABLE IF EXISTS subscription_features CASCADE;
-DROP TABLE IF EXISTS subscription_plans CASCADE;
-DROP TABLE IF EXISTS payment_methods CASCADE;
-DROP TABLE IF EXISTS billing_addresses CASCADE;
-DROP TABLE IF EXISTS subscription_usage CASCADE;
-DROP TABLE IF EXISTS invoices CASCADE;
 
 -- 구독 플랜 테이블
 CREATE TABLE subscription_plans (
@@ -791,12 +803,6 @@ $$ LANGUAGE plpgsql;
 --       bid_announcements which is created by the batch system.
 --       Using IF NOT EXISTS and deferring FK constraints where needed.
 -- ============================================================
-
-DROP TABLE IF EXISTS user_preferences CASCADE;
-DROP TABLE IF EXISTS user_bid_interactions CASCADE;
-DROP TABLE IF EXISTS bid_similarities CASCADE;
-DROP TABLE IF EXISTS recommendation_history CASCADE;
-DROP TABLE IF EXISTS recommendation_feedback CASCADE;
 
 -- 사용자 선호도 테이블
 CREATE TABLE user_preferences (

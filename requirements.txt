@@ -84,3 +84,14 @@ tqdm==4.66.1
 # RAG / Vector Search
 openai>=1.0.0
 tiktoken>=0.5.0
+
+# Local LLM / Embedding
+sentence-transformers>=2.2.0
+httpx>=0.25.0
+
+# Graph Database
+neo4j==5.18.0
+
+# GraphRAG
+networkx>=3.0
+python-louvain>=0.16

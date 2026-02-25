@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
 from database import get_db_connection
 from auth.dependencies import get_current_user_optional, get_current_user, User
+from psycopg2.extras import RealDictCursor
 import logging
 
 try:
@@ -28,7 +29,7 @@ async def get_dashboard_overview(user: Optional[User] = Depends(get_current_user
 
         def fetch_overview():
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
 
                 # 전체/활성/가격/신규/마감임박 통계를 단일 쿼리로 조회
                 cursor.execute("""
@@ -42,12 +43,12 @@ async def get_dashboard_overview(user: Optional[User] = Depends(get_current_user
                     FROM bid_announcements
                 """)
                 row = cursor.fetchone()
-                total_bids = row[0]
-                active_bids = row[1]
-                total_price = row[2]
-                today_new = row[3]
-                week_new = row[4]
-                deadline_soon = row[5]
+                total_bids = row['total_bids']
+                active_bids = row['active_bids']
+                total_price = row['total_price']
+                today_new = row['today_new']
+                week_new = row['week_new']
+                deadline_soon = row['deadline_soon']
                 expired_bids = total_bids - active_bids
 
                 # 사용자별 통계 (로그인한 경우)
@@ -63,8 +64,8 @@ async def get_dashboard_overview(user: Optional[User] = Depends(get_current_user
                     """, (user.id,))
                     user_row = cursor.fetchone()
                     user_stats = {
-                        "bookmarks": user_row[0],
-                        "active_bookmarks": user_row[1],
+                        "bookmarks": user_row['bookmark_count'],
+                        "active_bookmarks": user_row['active_bookmarks'],
                         "alerts": 0  # 알림 시스템 구현 후
                     }
 
@@ -104,7 +105,7 @@ async def get_bid_statistics(
 
         def fetch_statistics():
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
 
                 # 일별 입찰 통계
                 cursor.execute("""
@@ -121,9 +122,9 @@ async def get_bid_statistics(
                 daily_stats = []
                 for row in cursor.fetchall():
                     daily_stats.append({
-                        "date": row[0].isoformat(),
-                        "count": row[1],
-                        "total_price": float(row[2])
+                        "date": row['date'].isoformat(),
+                        "count": row['count'],
+                        "total_price": float(row['total_price'])
                     })
 
                 # 카테고리별 분포 (태그 기반)
@@ -144,14 +145,14 @@ async def get_bid_statistics(
 
                 # 전체 개수 계산
                 for row in rows:
-                    total_count += row[1]
+                    total_count += row['count']
 
                 # 퍼센트 계산하여 추가
                 for row in rows:
-                    percentage = round((row[1] / total_count * 100), 1) if total_count > 0 else 0
+                    percentage = round((row['count'] / total_count * 100), 1) if total_count > 0 else 0
                     category_distribution.append({
-                        "category": row[0],
-                        "count": row[1],
+                        "category": row['category'],
+                        "count": row['count'],
                         "percentage": percentage
                     })
 
@@ -171,9 +172,9 @@ async def get_bid_statistics(
                 organization_stats = []
                 for row in cursor.fetchall():
                     organization_stats.append({
-                        "organization": row[0],
-                        "count": row[1],
-                        "total_price": float(row[2])
+                        "organization": row['organization_name'],
+                        "count": row['count'],
+                        "total_price": float(row['total_price'])
                     })
 
                 # 가격대별 분포
@@ -198,8 +199,8 @@ async def get_bid_statistics(
                 price_distribution = []
                 for row in cursor.fetchall():
                     price_distribution.append({
-                        "range": row[0],
-                        "count": row[1]
+                        "range": row['price_range'],
+                        "count": row['count']
                     })
 
                 return {
@@ -235,7 +236,7 @@ async def get_approaching_deadlines(
     """마감 임박 입찰 목록 (실제 DB)"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 마감 임박 입찰 조회
             cursor.execute("""
@@ -255,7 +256,7 @@ async def get_approaching_deadlines(
 
             deadlines = []
             for row in cursor.fetchall():
-                hours = row[5]
+                hours = row['hours_remaining']
                 if hours < 24:
                     urgency = "urgent"
                     remaining_text = f"{int(hours)}시간"
@@ -267,11 +268,11 @@ async def get_approaching_deadlines(
                     remaining_text = f"{int(hours/24)}일"
 
                 deadlines.append({
-                    "bid_id": row[0],
-                    "title": row[1],
-                    "organization": row[2],
-                    "price": float(row[3]) if row[3] else None,
-                    "deadline": row[4].isoformat(),
+                    "bid_id": row['bid_notice_no'],
+                    "title": row['title'],
+                    "organization": row['organization_name'],
+                    "price": float(row['estimated_price']) if row['estimated_price'] else None,
+                    "deadline": row['bid_end_date'].isoformat(),
                     "hours_remaining": round(hours, 1),
                     "remaining_text": remaining_text,
                     "urgency": urgency
@@ -285,7 +286,7 @@ async def get_approaching_deadlines(
                     WHERE user_id = %s AND bid_id = ANY(%s)
                 """, (user.id, bid_ids))
 
-                bookmarked_ids = {row[0] for row in cursor.fetchall()}
+                bookmarked_ids = {row['bid_id'] for row in cursor.fetchall()}
                 for deadline in deadlines:
                     deadline["is_bookmarked"] = deadline["bid_id"] in bookmarked_ids
 
@@ -311,7 +312,7 @@ async def get_recommendations(
     """AI 추천 입찰 (향후 실제 AI 모델 연동)"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 사용자 북마크 기반 추천 (간단한 로직)
             # 1. 사용자가 북마크한 입찰의 기관들 찾기 (bid_announcements JOIN)
@@ -323,7 +324,7 @@ async def get_recommendations(
                 LIMIT 10
             """, (user.id,))
 
-            user_orgs = [row[0] for row in cursor.fetchall()]
+            user_orgs = [row['organization_name'] for row in cursor.fetchall()]
 
             recommendations = []
 
@@ -352,14 +353,14 @@ async def get_recommendations(
 
                 for row in cursor.fetchall():
                     recommendations.append({
-                        "bid_id": row[0],
-                        "title": row[1],
-                        "organization": row[2],
-                        "price": float(row[3]) if row[3] else None,
-                        "deadline": row[4].isoformat() if row[4] else None,
+                        "bid_id": row['bid_notice_no'],
+                        "title": row['title'],
+                        "organization": row['organization_name'],
+                        "price": float(row['estimated_price']) if row['estimated_price'] else None,
+                        "deadline": row['bid_end_date'].isoformat() if row['bid_end_date'] else None,
                         "score": 85,  # 더미 점수
-                        "reason": f"{row[2]}의 다른 입찰",
-                        "is_bookmarked": row[5]
+                        "reason": f"{row['organization_name']}의 다른 입찰",
+                        "is_bookmarked": row['is_bookmarked']
                     })
 
             # 추천이 없으면 최신 입찰 추천
@@ -385,14 +386,14 @@ async def get_recommendations(
 
                 for row in cursor.fetchall():
                     recommendations.append({
-                        "bid_id": row[0],
-                        "title": row[1],
-                        "organization": row[2],
-                        "price": float(row[3]) if row[3] else None,
-                        "deadline": row[4].isoformat() if row[4] else None,
+                        "bid_id": row['bid_notice_no'],
+                        "title": row['title'],
+                        "organization": row['organization_name'],
+                        "price": float(row['estimated_price']) if row['estimated_price'] else None,
+                        "deadline": row['bid_end_date'].isoformat() if row['bid_end_date'] else None,
                         "score": 70,
                         "reason": "최신 입찰",
-                        "is_bookmarked": row[5]
+                        "is_bookmarked": row['is_bookmarked']
                     })
 
             return {
@@ -418,7 +419,7 @@ async def get_bid_trends(
 
         def fetch_trends():
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
 
                 # 기간 설정
                 if period == "day":
@@ -469,8 +470,8 @@ async def get_bid_trends(
                 trends = []
                 for row in cursor.fetchall():
                     trends.append({
-                        "period": str(row[0]),
-                        "count": row[1]
+                        "period": str(row['period']),
+                        "count": row['count']
                     })
 
                 # 인기 키워드 (태그 기반)
@@ -490,8 +491,8 @@ async def get_bid_trends(
                 top_keywords = []
                 for row in cursor.fetchall():
                     top_keywords.append({
-                        "keyword": row[0],
-                        "count": row[1]
+                        "keyword": row['tag_name'],
+                        "count": row['count']
                     })
 
                 return {

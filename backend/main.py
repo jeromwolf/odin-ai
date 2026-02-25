@@ -209,6 +209,14 @@ try:
 except ImportError as e:
     logger.warning(f"RAG 검색 API 라우터 로드 실패: {e}")
 
+# Graph 검색 라우터 추가
+try:
+    from api.graph_search import router as graph_search_router
+    app.include_router(graph_search_router)
+    logger.info("Graph 검색 API 라우터 등록됨")
+except ImportError as e:
+    logger.warning(f"Graph 검색 API 라우터 로드 실패: {e}")
+
 # 설정 라우터 추가
 try:
     from api.settings import router as settings_router

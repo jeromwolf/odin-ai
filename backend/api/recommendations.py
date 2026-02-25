@@ -187,12 +187,12 @@ async def get_content_based_recommendations(
             recommendations = []
             for row in cursor.fetchall():
                 recommendations.append(RecommendationResponse(
-                    bid_notice_no=row[0],
-                    title=row[1],
-                    organization=row[2],
-                    estimated_price=row[3],
-                    bid_end_date=row[4],
-                    recommendation_score=row[5],
+                    bid_notice_no=row["bid_notice_no"],
+                    title=row["title"],
+                    organization=row["organization_name"],
+                    estimated_price=row["estimated_price"],
+                    bid_end_date=row["bid_end_date"],
+                    recommendation_score=row["score"],
                     recommendation_type="content_based",
                     recommendation_reasons={"method": "content_based"}
                 ))
@@ -252,14 +252,14 @@ async def get_collaborative_recommendations(
             recommendations = []
             for row in cursor.fetchall():
                 recommendations.append(RecommendationResponse(
-                    bid_notice_no=row[0],
-                    title=row[1],
-                    organization=row[2],
-                    estimated_price=row[3],
-                    bid_end_date=row[4],
-                    recommendation_score=float(row[5]),
+                    bid_notice_no=row["bid_notice_no"],
+                    title=row["title"],
+                    organization=row["organization_name"],
+                    estimated_price=row["estimated_price"],
+                    bid_end_date=row["bid_end_date"],
+                    recommendation_score=float(row["interest_count"]),
                     recommendation_type="collaborative",
-                    recommendation_reasons={"similar_users_interested": row[5]}
+                    recommendation_reasons={"similar_users_interested": row["interest_count"]}
                 ))
 
             return recommendations

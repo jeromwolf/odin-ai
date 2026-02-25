@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from database import get_db_connection
 from auth.dependencies import get_current_user, User
 from pydantic import BaseModel
+from psycopg2.extras import RealDictCursor
 import logging
 import json
 import smtplib
@@ -61,7 +62,7 @@ async def get_notifications(
     """알림 목록 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 기본 쿼리
             query = """
@@ -87,25 +88,25 @@ async def get_notifications(
             notifications = []
             for row in cursor.fetchall():
                 notifications.append({
-                    "id": row[0],
-                    "title": row[1],
-                    "message": row[2],
-                    "type": row[3],
-                    "status": row[4],
-                    "priority": row[5],
-                    "metadata": row[6],
-                    "created_at": row[7].isoformat() if row[7] else None,
-                    "read_at": row[8].isoformat() if row[8] else None
+                    "id": row["id"],
+                    "title": row["title"],
+                    "message": row["message"],
+                    "type": row["type"],
+                    "status": row["status"],
+                    "priority": row["priority"],
+                    "metadata": row["metadata"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                    "read_at": row["read_at"].isoformat() if row["read_at"] else None
                 })
 
             # 전체 개수 (status_filter 적용)
-            count_query = "SELECT COUNT(*) FROM notifications WHERE user_id = %s"
+            count_query = "SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = %s"
             count_params = [user.id]
             if status_filter and status_filter != "all":
                 count_query += " AND status = %s"
                 count_params.append(status_filter)
             cursor.execute(count_query, count_params)
-            total = cursor.fetchone()[0]
+            total = cursor.fetchone()["cnt"]
 
             return {
                 "success": True,
@@ -131,7 +132,7 @@ async def get_alert_rules(
     """알림 규칙 목록 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 조건 쿼리
             where_clauses = ["user_id = %s"]
@@ -145,10 +146,10 @@ async def get_alert_rules(
 
             # 전체 개수
             cursor.execute(f"""
-                SELECT COUNT(*) FROM alert_rules
+                SELECT COUNT(*) AS cnt FROM alert_rules
                 WHERE {where_sql}
             """, params)
-            total = cursor.fetchone()[0]
+            total = cursor.fetchone()["cnt"]
 
             # 페이징 조회
             params.extend([(page - 1) * limit, limit])
@@ -177,24 +178,26 @@ async def get_alert_rules(
 
             rules = []
             for row in cursor.fetchall():
+                conditions_val = row["conditions"]
+                channels_val = row["notification_channels"]
                 rules.append({
-                    "id": row[0],
-                    "rule_name": row[1],
-                    "description": row[2],
-                    "is_active": row[3],
-                    "conditions": row[4] if isinstance(row[4], dict) else json.loads(row[4]) if row[4] else {},
-                    "notification_channels": row[5] if isinstance(row[5], list) else json.loads(row[5]) if row[5] else [],
-                    "notification_timing": row[6],
-                    "notification_time": str(row[7]) if row[7] else None,
-                    "notification_day": row[8],
+                    "id": row["id"],
+                    "rule_name": row["rule_name"],
+                    "description": row["description"],
+                    "is_active": row["is_active"],
+                    "conditions": conditions_val if isinstance(conditions_val, dict) else json.loads(conditions_val) if conditions_val else {},
+                    "notification_channels": channels_val if isinstance(channels_val, list) else json.loads(channels_val) if channels_val else [],
+                    "notification_timing": row["notification_timing"],
+                    "notification_time": str(row["notification_time"]) if row["notification_time"] else None,
+                    "notification_day": row["notification_day"],
                     "statistics": {
-                        "match_count": row[9],
-                        "notification_count": row[10],
-                        "last_matched_at": row[11].isoformat() if row[11] else None,
-                        "last_notified_at": row[12].isoformat() if row[12] else None
+                        "match_count": row["match_count"],
+                        "notification_count": row["notification_count"],
+                        "last_matched_at": row["last_matched_at"].isoformat() if row["last_matched_at"] else None,
+                        "last_notified_at": row["last_notified_at"].isoformat() if row["last_notified_at"] else None
                     },
-                    "created_at": row[13].isoformat() if row[13] else None,
-                    "updated_at": row[14].isoformat() if row[14] else None
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                    "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None
                 })
 
             return {
@@ -219,7 +222,7 @@ async def create_alert_rule(
     """알림 규칙 생성"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 INSERT INTO alert_rules (
@@ -239,7 +242,7 @@ async def create_alert_rule(
                 rule.notification_day
             ))
 
-            rule_id = cursor.fetchone()[0]
+            rule_id = cursor.fetchone()["id"]
             conn.commit()
 
             return {
@@ -261,7 +264,7 @@ async def update_alert_rule(
     """알림 규칙 수정"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 권한 확인
             cursor.execute("""
@@ -270,7 +273,7 @@ async def update_alert_rule(
             """, (rule_id,))
 
             result = cursor.fetchone()
-            if not result or result[0] != user.id:
+            if not result or result["user_id"] != user.id:
                 raise HTTPException(status_code=404, detail="알림 규칙을 찾을 수 없습니다")
 
             # 업데이트 쿼리 생성
@@ -327,7 +330,7 @@ async def delete_alert_rule(
     """알림 규칙 삭제"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 DELETE FROM alert_rules
@@ -358,7 +361,7 @@ async def test_alert_rule(
     """알림 규칙 테스트 (매칭 시뮬레이션)"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 규칙 조회
             cursor.execute("""
@@ -371,7 +374,7 @@ async def test_alert_rule(
             if not result:
                 raise HTTPException(status_code=404, detail="알림 규칙을 찾을 수 없습니다")
 
-            conditions = result[0] if isinstance(result[0], dict) else json.loads(result[0])
+            conditions = result["conditions"] if isinstance(result["conditions"], dict) else json.loads(result["conditions"])
 
             # 조건에 따른 쿼리 생성
             where_clauses = []
@@ -421,11 +424,11 @@ async def test_alert_rule(
             matches = []
             for row in cursor.fetchall():
                 matches.append({
-                    "bid_notice_no": row[0],
-                    "title": row[1],
-                    "organization": row[2],
-                    "price": row[3],
-                    "deadline": row[4].isoformat() if row[4] else None,
+                    "bid_notice_no": row["bid_notice_no"],
+                    "title": row["title"],
+                    "organization": row["organization_name"],
+                    "price": row["estimated_price"],
+                    "deadline": row["bid_end_date"].isoformat() if row["bid_end_date"] else None,
                     "match_score": 85  # 실제로는 계산된 점수
                 })
 
@@ -454,64 +457,67 @@ async def get_notification_history(
     """알림 발송 이력 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-            # 조건 쿼리
-            where_clauses = ["user_id = %s"]
+            # 조건 쿼리 (notifications 테이블 사용)
+            where_clauses = ["n.user_id = %s"]
             params = [user.id]
 
             if notification_type:
-                where_clauses.append("notification_type = %s")
+                where_clauses.append("n.type = %s")
                 params.append(notification_type)
 
             if status:
-                where_clauses.append("status = %s")
+                where_clauses.append("n.status = %s")
                 params.append(status)
 
             where_sql = " AND ".join(where_clauses)
 
             # 전체 개수
             cursor.execute(f"""
-                SELECT COUNT(*) FROM notification_history
+                SELECT COUNT(*) AS cnt FROM notifications n
                 WHERE {where_sql}
             """, params)
-            total = cursor.fetchone()[0]
+            total = cursor.fetchone()["cnt"]
 
-            # 페이징 조회
+            # 페이징 조회 — JOIN alert_rules for rule_name
             params.extend([(page - 1) * limit, limit])
             cursor.execute(f"""
                 SELECT
-                    id,
-                    notification_type,
-                    channel,
-                    subject,
-                    content,
-                    recipient,
-                    status,
-                    sent_at,
-                    opened_at,
-                    clicked_at,
-                    created_at
-                FROM notification_history
+                    n.id,
+                    n.type,
+                    n.title,
+                    n.message,
+                    n.status,
+                    n.priority,
+                    n.metadata,
+                    n.read_at,
+                    n.created_at,
+                    ar.rule_name
+                FROM notifications n
+                LEFT JOIN alert_rules ar ON ar.id = n.alert_rule_id
                 WHERE {where_sql}
-                ORDER BY created_at DESC
+                ORDER BY n.created_at DESC
                 OFFSET %s LIMIT %s
             """, params)
 
             notifications = []
             for row in cursor.fetchall():
+                message_val = row["message"]
                 notifications.append({
-                    "id": row[0],
-                    "type": row[1],
-                    "channel": row[2],
-                    "subject": row[3],
-                    "content": row[4][:200] + "..." if len(row[4]) > 200 else row[4],
-                    "recipient": row[5],
-                    "status": row[6],
-                    "sent_at": row[7].isoformat() if row[7] else None,
-                    "opened_at": row[8].isoformat() if row[8] else None,
-                    "clicked_at": row[9].isoformat() if row[9] else None,
-                    "created_at": row[10].isoformat() if row[10] else None
+                    "id": row["id"],
+                    "type": row["type"],
+                    "channel": "web",
+                    "subject": row["title"],
+                    "content": message_val[:200] + "..." if message_val and len(message_val) > 200 else message_val,
+                    "recipient": None,
+                    "status": row["status"],
+                    "rule_name": row["rule_name"],
+                    "priority": row["priority"],
+                    "sent_at": row["created_at"].isoformat() if row["created_at"] else None,
+                    "opened_at": row["read_at"].isoformat() if row["read_at"] else None,
+                    "clicked_at": None,
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None
                 })
 
             return {
@@ -535,7 +541,7 @@ async def get_notification_settings(user: User = Depends(get_current_user)):
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 SELECT
@@ -578,32 +584,32 @@ async def get_notification_settings(user: User = Depends(get_current_user)):
 
             return {
                 "channels": {
-                    "email": row[0],
-                    "sms": row[1],
-                    "web": row[2],
-                    "push": row[3]
+                    "email": row["email_enabled"],
+                    "sms": row["sms_enabled"],
+                    "web": row["web_enabled"],
+                    "push": row["push_enabled"]
                 },
                 "types": {
-                    "alert_match": row[4],
-                    "deadline_reminder": row[5],
-                    "system": row[6],
-                    "marketing": row[7]
+                    "alert_match": row["alert_match_enabled"],
+                    "deadline_reminder": row["deadline_reminder_enabled"],
+                    "system": row["system_notification_enabled"],
+                    "marketing": row["marketing_enabled"]
                 },
                 "digest": {
-                    "daily_enabled": row[8],
-                    "daily_time": str(row[9]) if row[9] else None,
-                    "weekly_enabled": row[10],
-                    "weekly_day": row[11],
-                    "weekly_time": str(row[12]) if row[12] else None
+                    "daily_enabled": row["daily_digest_enabled"],
+                    "daily_time": str(row["daily_digest_time"]) if row["daily_digest_time"] else None,
+                    "weekly_enabled": row["weekly_report_enabled"],
+                    "weekly_day": row["weekly_report_day"],
+                    "weekly_time": str(row["weekly_report_time"]) if row["weekly_report_time"] else None
                 },
                 "quiet_hours": {
-                    "enabled": row[13],
-                    "start": str(row[14]) if row[14] else None,
-                    "end": str(row[15]) if row[15] else None
+                    "enabled": row["quiet_hours_enabled"],
+                    "start": str(row["quiet_hours_start"]) if row["quiet_hours_start"] else None,
+                    "end": str(row["quiet_hours_end"]) if row["quiet_hours_end"] else None
                 },
                 "contacts": {
-                    "email": row[16],
-                    "phone": row[17]
+                    "email": row["email_address"],
+                    "phone": row["phone_number"]
                 }
             }
 
@@ -620,7 +626,7 @@ async def update_notification_settings(
     """알림 설정 업데이트"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 업데이트 쿼리 생성
             update_fields = []
@@ -669,38 +675,53 @@ async def get_notification_queue(
     user: User = Depends(get_current_user),
     status: str = Query("pending", regex="^(pending|processing|sent|failed)$")
 ):
-    """알림 대기열 조회"""
+    """알림 대기열 조회 — pending/unread notifications treated as queue"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+            # Map legacy queue status names to notifications.status values
+            # pending/processing → unread, sent → read, failed → remains as-is
+            status_map = {
+                "pending": "unread",
+                "processing": "unread",
+                "sent": "read",
+                "failed": "unread",
+            }
+            db_status = status_map.get(status, "unread")
 
             cursor.execute("""
                 SELECT
-                    id,
-                    notification_type,
-                    subject,
-                    channels,
-                    status,
-                    scheduled_for,
-                    attempts,
-                    created_at
-                FROM notification_queue
-                WHERE user_id = %s AND status = %s
-                ORDER BY priority ASC, scheduled_for ASC
+                    n.id,
+                    n.type,
+                    n.title,
+                    n.message,
+                    n.status,
+                    n.priority,
+                    n.metadata,
+                    n.created_at,
+                    ar.rule_name,
+                    ar.notification_channels
+                FROM notifications n
+                LEFT JOIN alert_rules ar ON ar.id = n.alert_rule_id
+                WHERE n.user_id = %s AND n.status = %s
+                ORDER BY n.priority ASC, n.created_at ASC
                 LIMIT 50
-            """, (user.id, status))
+            """, (user.id, db_status))
 
             queue = []
             for row in cursor.fetchall():
+                channels_val = row["notification_channels"]
                 queue.append({
-                    "id": row[0],
-                    "type": row[1],
-                    "subject": row[2],
-                    "channels": row[3] if isinstance(row[3], list) else json.loads(row[3]) if row[3] else [],
-                    "status": row[4],
-                    "scheduled_for": row[5].isoformat() if row[5] else None,
-                    "attempts": row[6],
-                    "created_at": row[7].isoformat() if row[7] else None
+                    "id": row["id"],
+                    "type": row["type"],
+                    "subject": row["title"],
+                    "channels": channels_val if isinstance(channels_val, list) else json.loads(channels_val) if channels_val else ["web"],
+                    "status": status,
+                    "rule_name": row["rule_name"],
+                    "scheduled_for": None,
+                    "attempts": 0,
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None
                 })
 
             return {

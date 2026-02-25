@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS rfp_chunks (
     chunk_text      TEXT NOT NULL,                                 -- 청크 원문 텍스트
     chunk_text_tsv  TSVECTOR GENERATED ALWAYS AS                  -- 전문 검색용 tsvector (자동 생성)
                         (to_tsvector('simple', chunk_text)) STORED,
-    embedding       vector(1536),                                  -- text-embedding-3-small 차원 (1536)
-    embedding_model VARCHAR(50) DEFAULT 'text-embedding-3-small', -- 사용된 임베딩 모델명
+    embedding       vector(1024),                                  -- KURE-v1 차원 (1024)
+    embedding_model VARCHAR(50) DEFAULT 'KURE-v1',               -- 사용된 임베딩 모델명
     section_type    VARCHAR(50),                                   -- 섹션 유형: '자격요건', '예정가격', '제출서류' 등
     page_number     INTEGER,                                       -- 원본 문서의 페이지 번호
     token_count     INTEGER,                                       -- 청크의 토큰 수
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS rfp_chunks (
 COMMENT ON TABLE rfp_chunks IS 'RFP 문서를 청크 단위로 분할하여 벡터 임베딩과 함께 저장하는 RAG 핵심 테이블';
 COMMENT ON COLUMN rfp_chunks.chunk_index    IS '문서 내 청크 순서 (0부터 시작)';
 COMMENT ON COLUMN rfp_chunks.chunk_text_tsv IS 'simple 딕셔너리 기반 전문 검색용 tsvector (자동 생성 컬럼)';
-COMMENT ON COLUMN rfp_chunks.embedding      IS 'text-embedding-3-small 모델 기준 1536차원 벡터';
+COMMENT ON COLUMN rfp_chunks.embedding      IS 'KURE-v1 모델 기준 1024차원 벡터';
 COMMENT ON COLUMN rfp_chunks.section_type   IS '청크가 속한 문서 섹션 유형 (자격요건, 예정가격, 제출서류 등)';
 
 -- =============================================================================
@@ -99,7 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_bid_has_embedding
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION fn_hybrid_search(
-    query_embedding     vector(1536),           -- 검색 쿼리의 벡터 임베딩
+    query_embedding     vector(1024),           -- 검색 쿼리의 벡터 임베딩
     query_text          TEXT,                   -- 검색 쿼리 원문 (FTS용)
     match_count         INT     DEFAULT 10,     -- 최종 반환할 결과 수
     candidate_count     INT     DEFAULT 40,     -- 각 검색 방식에서 수집할 후보 수

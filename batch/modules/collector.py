@@ -20,6 +20,15 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from src.database.models import BidAnnouncement, BidDocument
 
 
+# 공공데이터포털 입찰공고 API 엔드포인트 (4개 카테고리)
+CATEGORY_ENDPOINTS = {
+    "공사": "getBidPblancListInfoCnstwk",
+    "용역": "getBidPblancListInfoServc",
+    "물품": "getBidPblancListInfoThng",
+    "외자": "getBidPblancListInfoFrgcpt",
+}
+
+
 class APICollector:
     """API 데이터 수집기"""
 
@@ -40,16 +49,17 @@ class APICollector:
         if not api_key_encoded:
             raise ValueError("BID_API_KEY 환경변수가 설정되지 않았습니다. .env 파일을 확인하세요.")
         self.api_key = urllib.parse.unquote(api_key_encoded)
-        self.api_url = os.getenv('BID_API_URL', 'http://apis.data.go.kr/1230000/ad/BidPublicInfoService/getBidPblancListInfoCnstwk')
+        self.base_url = os.getenv('BID_API_BASE_URL', 'http://apis.data.go.kr/1230000/ad/BidPublicInfoService')
 
-    def collect_by_date_range(self, start_date=None, end_date=None, num_of_rows=100, max_pages=None):
-        """날짜 범위로 공고 수집 (페이지네이션 지원)
+    def collect_by_date_range(self, start_date=None, end_date=None, num_of_rows=100, max_pages=None, categories=None):
+        """날짜 범위로 공고 수집 - 4개 카테고리 모두 수집 (페이지네이션 지원)
 
         Args:
             start_date: 시작일 (None이면 7일 전)
             end_date: 종료일 (None이면 오늘)
             num_of_rows: 페이지당 조회 건수
             max_pages: 최대 페이지 수 (None이면 모두)
+            categories: 수집할 카테고리 리스트 (None이면 전체 4개)
 
         Returns:
             dict: 수집 결과 통계
@@ -66,96 +76,106 @@ class APICollector:
 
         logger.info(f"📅 API 수집 기간: {start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
 
+        # 카테고리 필터 (None이면 전체)
+        target_categories = categories or list(CATEGORY_ENDPOINTS.keys())
+
         total_fetched = 0
         total_saved = 0
-        page_no = 1
-        total_count = 0
-        new_bid_ids = []  # 새로 수집된 공고 ID 리스트
+        total_count_all = 0
+        new_bid_ids = []
 
         try:
-            while True:
-                # API 파라미터
-                params = {
-                    'serviceKey': self.api_key,
-                    'pageNo': str(page_no),
-                    'numOfRows': str(num_of_rows),
-                    'type': 'json',
-                    'inqryDiv': '1',
-                    'inqryBgnDt': start_str,
-                    'inqryEndDt': end_str
-                }
+            for category, endpoint_name in CATEGORY_ENDPOINTS.items():
+                if category not in target_categories:
+                    continue
 
-                # API 호출
-                logger.info(f"🌐 API 호출 중... (페이지 {page_no})")
-                response = requests.get(self.api_url, params=params, timeout=30)
-                response.raise_for_status()
+                api_url = f"{self.base_url}/{endpoint_name}"
+                logger.info(f"📂 [{category}] 카테고리 수집 시작...")
 
-                data = response.json()
+                page_no = 1
+                cat_fetched = 0
+                cat_total = 0
 
-                # 응답 파싱
-                if 'response' in data and 'body' in data['response']:
-                    items = data['response']['body'].get('items', [])
-                    total_count = data['response']['body'].get('totalCount', 0)
+                while True:
+                    # API 파라미터
+                    params = {
+                        'serviceKey': self.api_key,
+                        'pageNo': str(page_no),
+                        'numOfRows': str(num_of_rows),
+                        'type': 'json',
+                        'inqryDiv': '1',
+                        'inqryBgnDt': start_str,
+                        'inqryEndDt': end_str
+                    }
 
-                    if not items:
-                        logger.info(f"📋 페이지 {page_no}: 더 이상 데이터 없음")
+                    logger.info(f"🌐 [{category}] API 호출 중... (페이지 {page_no})")
+                    response = requests.get(api_url, params=params, timeout=30)
+                    response.raise_for_status()
+                    data = response.json()
+
+                    if 'response' in data and 'body' in data['response']:
+                        items = data['response']['body'].get('items', [])
+                        cat_total = data['response']['body'].get('totalCount', 0)
+
+                        if not items:
+                            logger.info(f"📋 [{category}] 페이지 {page_no}: 더 이상 데이터 없음")
+                            break
+
+                        logger.info(f"📊 [{category}] 페이지 {page_no}: {len(items)}개 조회 (전체 {cat_total}개)")
+
+                        saved_count, saved_ids = self._save_to_database(items, category=category)
+                        cat_fetched += len(items)
+                        total_saved += saved_count
+                        new_bid_ids.extend(saved_ids)
+
+                        if cat_fetched >= cat_total:
+                            logger.info(f"✅ [{category}] 모든 데이터 수집 완료")
+                            break
+
+                        if max_pages and page_no >= max_pages:
+                            logger.info(f"⚠️ [{category}] 최대 페이지 수({max_pages}) 도달")
+                            break
+
+                        page_no += 1
+                        time.sleep(0.5)  # API 부하 방지
+
+                    else:
+                        logger.error(f"[{category}] 페이지 {page_no}: API 응답 형식 오류")
                         break
 
-                    logger.info(f"📊 페이지 {page_no}: {len(items)}개 조회 (전체 {total_count}개)")
+                total_fetched += cat_fetched
+                total_count_all += cat_total
+                logger.info(f"✅ [{category}] 수집 완료: {cat_total}개 중 {cat_fetched}개 수집, 신규 저장됨")
 
-                    # DB 저장
-                    saved_count, saved_ids = self._save_to_database(items)
-                    total_fetched += len(items)
-                    total_saved += saved_count
-                    new_bid_ids.extend(saved_ids)
-
-                    # 다음 페이지 확인
-                    if total_fetched >= total_count:
-                        logger.info(f"✅ 모든 데이터 수집 완료")
-                        break
-
-                    # 최대 페이지 제한 확인
-                    if max_pages and page_no >= max_pages:
-                        logger.info(f"⚠️ 최대 페이지 수({max_pages}) 도달")
-                        break
-
-                    page_no += 1
-                    time.sleep(0.5)  # API 부하 방지
-
-                else:
-                    logger.error(f"페이지 {page_no}: API 응답 형식 오류")
-                    break
-
-            logger.info(f"📊 수집 완료: 총 {total_count}개 중 {total_fetched}개 수집, {total_saved}개 저장")
+            logger.info(f"📊 전체 수집 완료: 총 {total_count_all}개, {total_fetched}개 수집, {total_saved}개 저장")
 
             return {
-                'total_api': total_count,
+                'total_api': total_count_all,
                 'fetched': total_fetched,
                 'saved': total_saved,
-                'pages': page_no,
                 'status': 'success',
-                'new_bid_ids': new_bid_ids  # 새로 수집된 공고 ID 리스트 반환
+                'new_bid_ids': new_bid_ids
             }
 
         except Exception as e:
             logger.error(f"API 수집 실패: {e}")
             return {
-                'total_api': total_count,
+                'total_api': total_count_all,
                 'fetched': total_fetched,
                 'saved': total_saved,
-                'pages': page_no - 1,
                 'status': 'error',
                 'message': str(e),
-                'new_bid_ids': new_bid_ids  # 에러 발생시에도 수집된 ID 반환
+                'new_bid_ids': new_bid_ids
             }
         finally:
             self.session.close()
 
-    def _save_to_database(self, items):
+    def _save_to_database(self, items, category='공사'):
         """데이터베이스에 저장
 
         Args:
             items: API 응답 아이템 리스트
+            category: 입찰 카테고리 (공사/용역/물품/외자)
 
         Returns:
             tuple: (저장된 건수, 새로 저장된 공고 ID 리스트)
@@ -190,6 +210,7 @@ class APICollector:
                         contract_method=item.get('cntrctCnclsMthdNm'),
                         detail_page_url=item.get('bidNtceDtlUrl'),
                         standard_doc_url=item.get('stdNtceDocUrl'),
+                        category=category,
                         status='active',
                         collection_status='completed',
                         collected_at=datetime.now(timezone.utc)

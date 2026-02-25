@@ -51,6 +51,9 @@ class BidAnnouncement(Base):
     detail_page_url = Column(Text)
     standard_doc_url = Column(Text)
 
+    # 카테고리 (공사/용역/물품/외자)
+    category = Column(String(20), default='공사')
+
     # 상태
     status = Column(String(20), default='active')
     collection_status = Column(String(20), default='pending')

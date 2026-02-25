@@ -676,7 +676,107 @@ echo "일시적 시스템 점검 중입니다" > maintenance.html
 
 ---
 
-## 📝 최근 작업 기록 (2026-02-22)
+## 📝 최근 작업 기록 (2026-02-25)
+
+### 🔄 RAG + Neo4j + GraphRAG 대규모 보강 작업 (진행 중)
+
+#### 🎯 작업 목표
+- 임베딩 커버리지 17.4% → 100% 확대
+- Neo4j 노드 476건 → 18,977건 동기화
+- GraphRAG 엔티티 100개 → 수천개 확장
+
+#### 📊 작업 전 → 작업 중 상태 (세션 종료 시점)
+
+| 항목 | Before | After (진행 중) | 비고 |
+|------|--------|----------------|------|
+| **임베딩 건수** | 3,304건 (17.4%) | **8,665건 (45.7%)** | 1,800/5,223 배치 진행 중 |
+| **임베딩 청크** | 64,454개 | **~99,590개** | 35,136 신규 생성 |
+| **Neo4j BidAnnouncement** | 476건 | **18,977건** ✅ | 전체 동기화 완료 |
+| **Neo4j Organization** | 264개 | **4,396개** ✅ | 전체 동기화 완료 |
+| **Neo4j 관계** | 42,183개 | **16,514,393개** ✅ | SIMILAR_TO 포함 |
+| **GraphRAG 엔티티** | 100개 | **856개** | 2,000건 추가 배치 실행 중 |
+| **GraphRAG 커뮤니티** | 20개 | 확인 필요 | |
+
+#### 🔧 수행한 인프라 작업
+
+1. **Neo4j 메모리 증가**: 트랜잭션 메모리 358MB → 1GB, 힙 512MB → 1GB
+   - SIMILAR_TO 엣지 대량 생성 시 메모리 부족 해결
+   - `docker exec odin-neo4j` 로 neo4j.conf 수정 후 재시작
+
+2. **`.env` 설정 변경**:
+   - `ENABLE_GRAPHRAG=true` 추가 (기존에 누락되어 배치 Phase 3.7이 항상 스킵됨)
+   - `ENABLE_EMBEDDING=true` (이미 설정됨, 확인)
+   - `ENABLE_GRAPH_SYNC=true` (이미 설정됨, 확인)
+
+3. **배경 프로세스 실행 (세션 종료 시점에서 실행 중)**:
+   - `embedding_generator.py` — PID 63254, 1,800/5,223 (34.5%), ~3시간 추가 소요 예상
+   - `graphrag_indexer.py --mode full --limit 2000` — PID 71294, Ollama LLM 호출
+   - `neo4j_syncer` SIMILAR_TO 엣지 생성 — 16.4M 엣지 완료, 계속 실행 중
+
+#### ⚠️ 다음 세션에서 해야 할 일
+
+1. **백그라운드 프로세스 확인**:
+   ```bash
+   # 프로세스 실행 여부 확인
+   ps aux | grep -E "embedding_generator|graphrag_indexer|neo4j_syncer" | grep -v grep
+
+   # 임베딩 진행 확인
+   grep "임베딩 진행" /tmp/embedding_bulk.log | tail -3
+   grep "임베딩 생성 완료" /tmp/embedding_bulk.log
+
+   # GraphRAG 진행 확인
+   tail -10 /tmp/graphrag_bulk.log
+
+   # DB 통계 확인
+   psql -d odin_db -c "SELECT COUNT(DISTINCT bid_notice_no) FROM rfp_chunks WHERE embedding IS NOT NULL;"
+   psql -d odin_db -c "SELECT COUNT(*) FROM graphrag_entities;"
+   ```
+
+2. **임베딩 완료 안 됐으면 재실행**:
+   ```bash
+   source venv/bin/activate
+   export DATABASE_URL="postgresql://blockmeta@localhost:5432/odin_db"
+   nohup python batch/modules/embedding_generator.py > /tmp/embedding_bulk.log 2>&1 &
+   ```
+
+3. **GraphRAG 추가 실행** (전체 18,977건 대상):
+   ```bash
+   source venv/bin/activate
+   export DATABASE_URL="postgresql://blockmeta@localhost:5432/odin_db"
+   export OLLAMA_URL="http://localhost:11434"
+   export OLLAMA_MODEL="exaone3.5:7.8b"
+   nohup python batch/modules/graphrag_indexer.py --mode full > /tmp/graphrag_bulk.log 2>&1 &
+   ```
+
+4. **최종 검증**:
+   ```bash
+   curl http://127.0.0.1:9000/api/rag/status
+   curl http://127.0.0.1:9000/api/graph/status
+   curl "http://127.0.0.1:9000/api/rag/search?q=%EB%8F%84%EB%A1%9C%EA%B3%B5%EC%82%AC"
+   ```
+
+5. **제안서 문서 보완**: 개발 보강 완료 후 `docs/generate_proposal.py` 재실행하여 최신 수치 반영
+
+#### 💡 발견된 문제점
+
+1. **`ENABLE_GRAPHRAG` 미설정**: `.env`에 누락되어 배치 Phase 3.7이 항상 스킵됨 → 수정 완료
+2. **Neo4j `sync_incremental(24h)`**: 과거 데이터 미동기화 원인 → `sync_all()` 1회 실행으로 해결
+3. **Neo4j 메모리 한도 358MB**: SIMILAR_TO 대량 생성 시 OOM → 1GB로 증가 해결
+4. **임베딩 미처리 원인**: 과거 `ENABLE_EMBEDDING=false` 상태에서 수집된 데이터 → 벌크 생성으로 해결 중
+
+#### 📈 리소스 사용 현황 (48GB RAM / 926GB SSD)
+
+| 리소스 | 사용량 | 비고 |
+|--------|--------|------|
+| RAM | ~1.3GB (임베딩 프로세스) | 48GB 중 3% |
+| 디스크 | 17GB / 926GB | 96% 여유 |
+| PostgreSQL | 2.3GB | |
+| Neo4j | 3.7GB | SIMILAR_TO 16.4M 엣지 포함 |
+| Ollama 모델 | ~45GB | 7개 모델 (exaone3.5, qwen2.5-coder:32b 등) |
+
+---
+
+## 📝 이전 작업 기록 (2026-02-22)
 
 ### ✅ 2026년 실시간 데이터 수집 및 E2E 테스트 완료
 

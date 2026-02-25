@@ -6,6 +6,7 @@ pgvector 벡터 유사도 + PostgreSQL FTS를 RRF로 결합
 import logging
 from typing import List, Dict, Optional
 from database import get_db_connection
+from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class HybridSearchService:
         """pgvector 확장 설치 여부 확인"""
         try:
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
                 cursor.execute("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
                 result = cursor.fetchone()
                 return result is not None
@@ -132,7 +133,7 @@ class HybridSearchService:
         # 3. Build and execute hybrid search SQL
         try:
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
 
                 # Set HNSW search parameter
                 cursor.execute("SET hnsw.ef_search = 100")
@@ -232,18 +233,18 @@ class HybridSearchService:
                 results = []
                 for row in rows:
                     results.append({
-                        "chunk_id": row[0],
-                        "chunk_text": row[1],
-                        "bid_notice_no": row[2],
-                        "section_type": row[3],
-                        "chunk_index": row[4],
-                        "token_count": row[5],
-                        "score": round(float(row[6]), 6),
-                        "match_sources": row[7],
-                        "bid_title": row[8],
-                        "organization_name": row[9],
-                        "estimated_price": row[10],
-                        "bid_end_date": row[11].isoformat() if row[11] else None,
+                        "chunk_id": row["chunk_id"],
+                        "chunk_text": row["chunk_text"],
+                        "bid_notice_no": row["bid_notice_no"],
+                        "section_type": row["section_type"],
+                        "chunk_index": row["chunk_index"],
+                        "token_count": row["token_count"],
+                        "score": round(float(row["final_score"]), 6),
+                        "match_sources": row["match_sources"],
+                        "bid_title": row["bid_title"],
+                        "organization_name": row["organization_name"],
+                        "estimated_price": row["estimated_price"],
+                        "bid_end_date": row["bid_end_date"].isoformat() if row["bid_end_date"] else None,
                     })
 
                 return {
@@ -265,7 +266,7 @@ class HybridSearchService:
         """FTS 전용 검색 (pgvector 없을 때 폴백)"""
         try:
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
 
                 filters = []
                 params = []
@@ -319,18 +320,18 @@ class HybridSearchService:
                 results = []
                 for row in rows:
                     results.append({
-                        "chunk_id": row[0],
-                        "chunk_text": row[1],
-                        "bid_notice_no": row[2],
-                        "section_type": row[3],
-                        "chunk_index": row[4],
-                        "token_count": row[5],
-                        "score": round(float(row[6]), 6),
+                        "chunk_id": row["chunk_id"],
+                        "chunk_text": row["chunk_text"],
+                        "bid_notice_no": row["bid_notice_no"],
+                        "section_type": row["section_type"],
+                        "chunk_index": row["chunk_index"],
+                        "token_count": row["token_count"],
+                        "score": round(float(row["score"]), 6),
                         "match_sources": ["fts"],
-                        "bid_title": row[7],
-                        "organization_name": row[8],
-                        "estimated_price": row[9],
-                        "bid_end_date": row[10].isoformat() if row[10] else None,
+                        "bid_title": row["bid_title"],
+                        "organization_name": row["organization_name"],
+                        "estimated_price": row["estimated_price"],
+                        "bid_end_date": row["bid_end_date"].isoformat() if row["bid_end_date"] else None,
                     })
 
                 return {
@@ -347,7 +348,7 @@ class HybridSearchService:
         """임베딩 현황 통계"""
         try:
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
 
                 cursor.execute("""
                     SELECT
@@ -358,14 +359,14 @@ class HybridSearchService:
                 """)
                 row = cursor.fetchone()
 
-                total_bids = row[0] or 0
-                embedded_bids = row[1] or 0
+                total_bids = row["total_bids"] or 0
+                embedded_bids = row["embedded_bids"] or 0
 
                 return {
                     "total_bids": total_bids,
                     "embedded_bids": embedded_bids,
-                    "total_chunks": row[2] or 0,
-                    "embedded_chunks": row[3] or 0,
+                    "total_chunks": row["total_chunks"] or 0,
+                    "embedded_chunks": row["embedded_chunks"] or 0,
                     "coverage_pct": round(
                         (embedded_bids / total_bids * 100) if total_bids > 0 else 0, 1
                     ),

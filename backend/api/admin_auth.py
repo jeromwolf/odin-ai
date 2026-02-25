@@ -9,6 +9,7 @@ from typing import Optional
 from datetime import datetime, timedelta, timezone
 from database import get_db_connection
 from jose import JWTError, jwt
+from psycopg2.extras import RealDictCursor
 import logging
 import hashlib
 import html
@@ -93,7 +94,7 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
             raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다")
 
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute("""
                 SELECT id, email, username, full_name, is_active, is_superuser
                 FROM users
@@ -104,18 +105,18 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
             if not row:
                 raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
 
-            if not row[4]:  # is_active
+            if not row["is_active"]:
                 raise HTTPException(status_code=403, detail="비활성화된 계정입니다")
 
-            if not row[5]:  # is_superuser
+            if not row["is_superuser"]:
                 raise HTTPException(status_code=403, detail="관리자 권한이 해제되었습니다")
 
             return {
-                "id": row[0],
-                "email": row[1],
-                "username": row[2],
-                "full_name": row[3],
-                "role": "super_admin" if row[5] else "admin"
+                "id": row["id"],
+                "email": row["email"],
+                "username": row["username"],
+                "full_name": row["full_name"],
+                "role": "super_admin" if row["is_superuser"] else "admin"
             }
 
     except JWTError:
@@ -141,7 +142,7 @@ async def admin_login(request: Request, login_data: AdminLoginRequest):
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 사용자 조회
             cursor.execute("""
@@ -156,7 +157,13 @@ async def admin_login(request: Request, login_data: AdminLoginRequest):
                 logger.warning(f"로그인 실패: 존재하지 않는 이메일 ({html.escape(str(login_data.email))})")
                 raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다")
 
-            user_id, email, username, full_name, hashed_password, is_active, is_superuser = row
+            user_id = row["id"]
+            email = row["email"]
+            username = row["username"]
+            full_name = row["full_name"]
+            hashed_password = row["hashed_password"]
+            is_active = row["is_active"]
+            is_superuser = row["is_superuser"]
 
             # 계정 활성화 확인
             if not is_active:
@@ -228,7 +235,7 @@ async def admin_logout(current_admin: dict = Depends(get_current_admin)):
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 관리자 활동 로그 기록
             logout_details = json.dumps({"description": "관리자 로그아웃", "email": current_admin["email"]})
@@ -257,7 +264,7 @@ async def get_current_admin_info(current_admin: dict = Depends(get_current_admin
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 SELECT id, email, username, last_login
@@ -271,11 +278,11 @@ async def get_current_admin_info(current_admin: dict = Depends(get_current_admin
                 raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
 
             return AdminInfo(
-                id=row[0],
-                email=row[1],
-                username=row[2],
+                id=row["id"],
+                email=row["email"],
+                username=row["username"],
                 role=current_admin["role"],
-                last_login=row[3]
+                last_login=row["last_login"]
             )
 
     except HTTPException:
@@ -298,7 +305,7 @@ async def get_admin_activity_logs(
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # super_admin은 모든 로그 조회 가능
             if current_admin["role"] == "super_admin":
@@ -326,13 +333,13 @@ async def get_admin_activity_logs(
             logs = []
             for row in cursor.fetchall():
                 logs.append({
-                    "id": row[0],
-                    "admin_user_id": row[1],
-                    "email": row[2],
-                    "username": row[3],
-                    "activity_type": row[4],
-                    "description": row[5],
-                    "created_at": row[6].isoformat()
+                    "id": row["id"],
+                    "admin_user_id": row["admin_user_id"],
+                    "email": row["email"],
+                    "username": row["username"],
+                    "activity_type": row["activity_type"],
+                    "description": row["description"],
+                    "created_at": row["created_at"].isoformat()
                 })
 
             return {"logs": logs, "total": len(logs)}

@@ -8,6 +8,7 @@ from typing import List, Optional
 from datetime import datetime, date
 from database import get_db_connection
 from api.admin_auth import get_current_admin
+from psycopg2.extras import RealDictCursor
 import logging
 import os
 import threading
@@ -144,7 +145,7 @@ async def get_batch_executions(
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # WHERE 조건 구성
             where_clauses = []
@@ -170,12 +171,12 @@ async def get_batch_executions(
 
             # 총 개수 조회
             count_query = f"""
-                SELECT COUNT(*)
+                SELECT COUNT(*) AS cnt
                 FROM batch_execution_logs
                 WHERE {where_sql}
             """
             cursor.execute(count_query, params)
-            total = cursor.fetchone()[0]
+            total = cursor.fetchone()["cnt"]
 
             # 데이터 조회
             offset = (page - 1) * limit
@@ -195,20 +196,20 @@ async def get_batch_executions(
             executions = []
             for row in cursor.fetchall():
                 executions.append(BatchExecutionResponse(
-                    id=row[0],
-                    batch_type=row[1],
-                    status=row[2],
-                    start_time=row[3],
-                    end_time=row[4],
-                    duration_seconds=row[5],
-                    total_items=row[6],
-                    success_items=row[7],
-                    failed_items=row[8],
-                    skipped_items=row[9],
-                    error_message=row[10],
-                    error_count=row[11],
-                    triggered_by=row[12],
-                    created_at=row[13]
+                    id=row["id"],
+                    batch_type=row["batch_type"],
+                    status=row["status"],
+                    start_time=row["start_time"],
+                    end_time=row["end_time"],
+                    duration_seconds=row["duration_seconds"],
+                    total_items=row["total_items"],
+                    success_items=row["success_items"],
+                    failed_items=row["failed_items"],
+                    skipped_items=row["skipped_items"],
+                    error_message=row["error_message"],
+                    error_count=row["error_count"],
+                    triggered_by=row["triggered_by"],
+                    created_at=row["created_at"]
                 ))
 
             return BatchExecutionListResponse(
@@ -236,7 +237,7 @@ async def get_batch_execution_detail(
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 배치 실행 정보 조회
             exec_query = """
@@ -255,20 +256,20 @@ async def get_batch_execution_detail(
                 raise HTTPException(status_code=404, detail="배치 실행 정보를 찾을 수 없습니다")
 
             execution = BatchExecutionResponse(
-                id=row[0],
-                batch_type=row[1],
-                status=row[2],
-                start_time=row[3],
-                end_time=row[4],
-                duration_seconds=row[5],
-                total_items=row[6],
-                success_items=row[7],
-                failed_items=row[8],
-                skipped_items=row[9],
-                error_message=row[10],
-                error_count=row[11],
-                triggered_by=row[12],
-                created_at=row[13]
+                id=row["id"],
+                batch_type=row["batch_type"],
+                status=row["status"],
+                start_time=row["start_time"],
+                end_time=row["end_time"],
+                duration_seconds=row["duration_seconds"],
+                total_items=row["total_items"],
+                success_items=row["success_items"],
+                failed_items=row["failed_items"],
+                skipped_items=row["skipped_items"],
+                error_message=row["error_message"],
+                error_count=row["error_count"],
+                triggered_by=row["triggered_by"],
+                created_at=row["created_at"]
             )
 
             # 상세 로그 조회 (최근 100개)
@@ -284,12 +285,12 @@ async def get_batch_execution_detail(
             detail_logs = []
             for log_row in cursor.fetchall():
                 detail_logs.append(BatchDetailLog(
-                    id=log_row[0],
-                    execution_id=log_row[1],
-                    log_level=log_row[2],
-                    message=log_row[3],
-                    context=log_row[4],
-                    created_at=log_row[5]
+                    id=log_row["id"],
+                    execution_id=log_row["execution_id"],
+                    log_level=log_row["log_level"],
+                    message=log_row["message"],
+                    context=log_row["context"],
+                    created_at=log_row["created_at"]
                 ))
 
             # 통계 계산
@@ -301,14 +302,14 @@ async def get_batch_execution_detail(
 
             # 로그 레벨별 카운트
             level_query = """
-                SELECT log_level, COUNT(*)
+                SELECT log_level, COUNT(*) AS cnt
                 FROM batch_detail_logs
                 WHERE execution_id = %s
                 GROUP BY log_level
             """
             cursor.execute(level_query, (execution_id,))
             for level_row in cursor.fetchall():
-                statistics["log_levels"][level_row[0]] = level_row[1]
+                statistics["log_levels"][level_row["log_level"]] = level_row["cnt"]
 
             return BatchExecutionDetailResponse(
                 execution=execution,
@@ -338,7 +339,7 @@ async def get_batch_statistics(
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # WHERE 조건 구성
             where_clauses = ["status IN ('success', 'failed')"]
@@ -380,26 +381,26 @@ async def get_batch_statistics(
 
             statistics = []
             for row in cursor.fetchall():
-                total_exec = row[1]
-                success_count = row[2]
+                total_exec = row["total_executions"]
+                success_count = row["success_count"]
                 success_rate = (success_count / total_exec * 100) if total_exec > 0 else 0
 
                 statistics.append(BatchStatisticsResponse(
-                    batch_type=row[0],
+                    batch_type=row["batch_type"],
                     date_range={
                         "start": start_date.isoformat() if start_date else None,
                         "end": end_date.isoformat() if end_date else None
                     },
                     total_executions=total_exec,
                     success_count=success_count,
-                    failed_count=row[3],
+                    failed_count=row["failed_count"],
                     success_rate=round(success_rate, 2),
-                    avg_duration_seconds=round(row[4], 2) if row[4] else 0,
-                    max_duration_seconds=row[5] or 0,
-                    min_duration_seconds=row[6] or 0,
-                    total_items_processed=row[7] or 0,
-                    total_success_items=row[8] or 0,
-                    total_failed_items=row[9] or 0
+                    avg_duration_seconds=round(row["avg_duration_seconds"], 2) if row["avg_duration_seconds"] else 0,
+                    max_duration_seconds=row["max_duration_seconds"] or 0,
+                    min_duration_seconds=row["min_duration_seconds"] or 0,
+                    total_items_processed=row["total_items_processed"] or 0,
+                    total_success_items=row["total_success_items"] or 0,
+                    total_failed_items=row["total_failed_items"] or 0
                 ))
 
             return statistics
@@ -507,7 +508,7 @@ async def get_batch_progress(execution_id: int, current_admin: dict = Depends(ge
     """실행 중인 배치의 단계별 진행률 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 배치 실행 정보 조회
             cursor.execute("""
@@ -521,9 +522,16 @@ async def get_batch_progress(execution_id: int, current_admin: dict = Depends(ge
             if not row:
                 raise HTTPException(status_code=404, detail="배치 실행 정보를 찾을 수 없습니다")
 
-            columns = ['id', 'batch_type', 'status', 'start_time', 'end_time',
-                       'total_items', 'success_items', 'failed_items']
-            execution = dict(zip(columns, row))
+            execution = {
+                "id": row["id"],
+                "batch_type": row["batch_type"],
+                "status": row["status"],
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "total_items": row["total_items"],
+                "success_items": row["success_items"],
+                "failed_items": row["failed_items"],
+            }
 
             # datetime 직렬화
             for key in ['start_time', 'end_time']:
@@ -561,7 +569,7 @@ async def get_batch_progress(execution_id: int, current_admin: dict = Depends(ge
             current_phase = 0
             current_message = ""
             if latest_log:
-                current_message = latest_log[0] or ""
+                current_message = latest_log["message"] or ""
                 msg_lower = current_message.lower()
                 for phase_num, keywords in phase_keywords.items():
                     if any(kw in msg_lower for kw in keywords):
@@ -600,7 +608,7 @@ def get_recent_batch_status():
     """최근 배치 실행 상태 조회 (대시보드용)"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             query = """
                 SELECT
@@ -619,11 +627,11 @@ def get_recent_batch_status():
             results = []
             for row in cursor.fetchall():
                 results.append({
-                    "batch_type": row[0],
-                    "status": row[1],
-                    "start_time": row[2].isoformat(),
-                    "success_items": row[3],
-                    "failed_items": row[4]
+                    "batch_type": row["batch_type"],
+                    "status": row["status"],
+                    "start_time": row["start_time"].isoformat(),
+                    "success_items": row["success_items"],
+                    "failed_items": row["failed_items"]
                 })
 
             return results

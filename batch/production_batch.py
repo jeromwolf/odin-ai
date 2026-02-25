@@ -168,6 +168,44 @@ class ProductionBatch:
                 else:
                     logger.info("\n⏭️ Phase 3.5: 임베딩 생성 건너뜀 (ENABLE_EMBEDDING=false)")
 
+                # 4.6. Neo4j 그래프 동기화 (ENABLE_GRAPH_SYNC=true인 경우만)
+                if os.getenv('ENABLE_GRAPH_SYNC', 'false').lower() == 'true':
+                    logger.info("\n" + "="*40)
+                    logger.info("🕸️ Phase 3.6: Neo4j 그래프 동기화")
+                    logger.info("="*40)
+                    try:
+                        from batch.modules.neo4j_syncer import Neo4jSyncer
+                        neo4j_url = os.getenv('NEO4J_URL', 'bolt://localhost:7687')
+                        neo4j_user = os.getenv('NEO4J_USER', 'neo4j')
+                        neo4j_password = os.getenv('NEO4J_PASSWORD', 'odin2025neo4j')
+                        syncer = Neo4jSyncer(self.db_url, neo4j_url, neo4j_user, neo4j_password)
+                        sync_result = syncer.sync_incremental()
+                        syncer.close()
+                        logger.info(f"✅ Phase 3.6 완료: Neo4j 동기화 {sync_result}")
+                    except ImportError as e:
+                        logger.warning(f"⚠️ Phase 3.6: Neo4j 모듈 로드 실패 - {e}")
+                    except Exception as e:
+                        logger.error(f"❌ Phase 3.6 실패: Neo4j 동기화 오류 - {e}")
+                else:
+                    logger.info("\n⏭️ Phase 3.6: Neo4j 그래프 동기화 건너뜀 (ENABLE_GRAPH_SYNC=false)")
+
+                # 4.7. GraphRAG 인덱싱 (ENABLE_GRAPHRAG=true인 경우만)
+                if os.getenv('ENABLE_GRAPHRAG', 'false').lower() == 'true':
+                    logger.info("\n" + "="*40)
+                    logger.info("🧩 Phase 3.7: GraphRAG 인덱싱")
+                    logger.info("="*40)
+                    try:
+                        from batch.modules.graphrag_indexer import GraphRAGIndexer
+                        indexer = GraphRAGIndexer(self.db_url)
+                        graphrag_result = indexer.run_incremental()
+                        logger.info(f"✅ Phase 3.7 완료: GraphRAG {graphrag_result}")
+                    except ImportError as e:
+                        logger.warning(f"⚠️ Phase 3.7: GraphRAG 모듈 로드 실패 - {e}")
+                    except Exception as e:
+                        logger.error(f"❌ Phase 3.7 실패: GraphRAG 인덱싱 오류 - {e}")
+                else:
+                    logger.info("\n⏭️ Phase 3.7: GraphRAG 인덱싱 건너뜀 (ENABLE_GRAPHRAG=false)")
+
                 # 5. 알림 매칭 (ENABLE_NOTIFICATION=true인 경우만)
                 if self.enable_notification:
                     logger.info("\n" + "="*40)

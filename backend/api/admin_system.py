@@ -8,6 +8,7 @@ from typing import List, Optional, Dict
 from datetime import datetime, timedelta, timezone
 from database import get_db_connection
 from api.admin_auth import get_current_admin
+from psycopg2.extras import RealDictCursor
 import psutil
 import logging
 
@@ -96,7 +97,7 @@ async def get_system_metrics(
     """
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # WHERE 조건 구성
             where_clauses = []
@@ -129,10 +130,10 @@ async def get_system_metrics(
             metrics = []
             for row in cursor.fetchall():
                 metrics.append(SystemMetric(
-                    metric_type=row[0],
-                    metric_value=row[1],
-                    metric_unit=row[2],
-                    recorded_at=row[3]
+                    metric_type=row['metric_type'],
+                    metric_value=row['metric_value'],
+                    metric_unit=row['metric_unit'],
+                    recorded_at=row['recorded_at']
                 ))
 
             # 요약 통계 (최근 1시간)
@@ -151,10 +152,10 @@ async def get_system_metrics(
                 cursor.execute(summary_query)
                 summary = {}
                 for row in cursor.fetchall():
-                    summary[row[0]] = {
-                        "avg": round(row[1], 2),
-                        "max": round(row[2], 2),
-                        "min": round(row[3], 2)
+                    summary[row['metric_type']] = {
+                        "avg": round(row['avg_value'], 2),
+                        "max": round(row['max_value'], 2),
+                        "min": round(row['min_value'], 2)
                     }
 
             return SystemMetricsResponse(
@@ -197,14 +198,14 @@ async def get_system_status(current_admin: dict = Depends(get_current_admin)):
         db_connections = 0
         try:
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
                 # 활성 연결 수 조회
                 cursor.execute("""
-                    SELECT COUNT(*)
+                    SELECT COUNT(*) as count
                     FROM pg_stat_activity
                     WHERE state = 'active'
                 """)
-                db_connections = cursor.fetchone()[0]
+                db_connections = cursor.fetchone()['count']
         except Exception as e:
             logger.error(f"DB 상태 확인 실패: {e}")
             db_status = "error"
@@ -212,7 +213,7 @@ async def get_system_status(current_admin: dict = Depends(get_current_admin)):
         # 메트릭 저장 (백그라운드 작업으로 처리하는 것이 좋음)
         try:
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
                 cursor.execute(
                     "SELECT fn_record_metric(%s, %s, %s)",
                     ('cpu', cpu_percent, 'percent')
@@ -267,7 +268,7 @@ async def get_api_performance(
             start_time = end_time - timedelta(hours=1)
 
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             query = """
                 SELECT
@@ -286,14 +287,14 @@ async def get_api_performance(
 
             endpoints = []
             for row in cursor.fetchall():
-                request_count = row[3]
-                error_count = row[4]
+                request_count = row['request_count']
+                error_count = row['error_count']
                 error_rate = (error_count / request_count * 100) if request_count > 0 else 0
 
                 endpoints.append(APIPerformanceMetric(
-                    endpoint=row[0],
-                    avg_response_time=round(row[1], 2),
-                    max_response_time=round(row[2], 2),
+                    endpoint=row['endpoint'],
+                    avg_response_time=round(row['avg_response_time'], 2),
+                    max_response_time=round(row['max_response_time'], 2),
                     request_count=request_count,
                     error_count=error_count,
                     error_rate=round(error_rate, 2)
@@ -333,7 +334,7 @@ async def get_notification_status(
             start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0)
 
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 전체 통계
             stats_query = """
@@ -348,10 +349,10 @@ async def get_notification_status(
             cursor.execute(stats_query, (start_time, end_time))
             stats = cursor.fetchone()
 
-            total_sent = stats[0] or 0
-            success_count = stats[1] or 0
-            failed_count = stats[2] or 0
-            pending_count = stats[3] or 0
+            total_sent = stats['total'] or 0
+            success_count = stats['success'] or 0
+            failed_count = stats['failed'] or 0
+            pending_count = stats['pending'] or 0
             success_rate = (success_count / total_sent * 100) if total_sent > 0 else 0
 
             # 실패 원인별 분류
@@ -371,7 +372,7 @@ async def get_notification_status(
 
             failure_reasons = {}
             for row in cursor.fetchall():
-                failure_reasons[row[0]] = row[1]
+                failure_reasons[row['error_type']] = row['count']
 
             return NotificationStatusResponse(
                 total_sent=total_sent,

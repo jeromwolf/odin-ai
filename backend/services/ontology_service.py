@@ -17,6 +17,8 @@ import time
 import threading
 from typing import List, Dict, Optional, Set, Tuple
 
+from psycopg2.extras import RealDictCursor
+
 from database import get_db_connection
 
 logger = logging.getLogger(__name__)
@@ -89,7 +91,7 @@ def get_concept_by_name(concept_name: str) -> Optional[Dict]:
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
                 """
                 SELECT id, concept_name, concept_name_en, parent_id, level,
@@ -104,16 +106,16 @@ def get_concept_by_name(concept_name: str) -> Optional[Dict]:
                 return None
 
             result = {
-                "id": row[0],
-                "concept_name": row[1],
-                "concept_name_en": row[2],
-                "parent_id": row[3],
-                "level": row[4],
-                "description": row[5],
-                "keywords": row[6] or [],
-                "synonyms": row[7] or [],
-                "is_active": row[8],
-                "display_order": row[9],
+                "id": row["id"],
+                "concept_name": row["concept_name"],
+                "concept_name_en": row["concept_name_en"],
+                "parent_id": row["parent_id"],
+                "level": row["level"],
+                "description": row["description"],
+                "keywords": row["keywords"] or [],
+                "synonyms": row["synonyms"] or [],
+                "is_active": row["is_active"],
+                "display_order": row["display_order"],
             }
             _concept_cache.set(cache_key, result)
             return result
@@ -132,7 +134,7 @@ def _get_concept_by_id(concept_id: int) -> Optional[Dict]:
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
                 """
                 SELECT id, concept_name, concept_name_en, parent_id, level,
@@ -147,16 +149,16 @@ def _get_concept_by_id(concept_id: int) -> Optional[Dict]:
                 return None
 
             result = {
-                "id": row[0],
-                "concept_name": row[1],
-                "concept_name_en": row[2],
-                "parent_id": row[3],
-                "level": row[4],
-                "description": row[5],
-                "keywords": row[6] or [],
-                "synonyms": row[7] or [],
-                "is_active": row[8],
-                "display_order": row[9],
+                "id": row["id"],
+                "concept_name": row["concept_name"],
+                "concept_name_en": row["concept_name_en"],
+                "parent_id": row["parent_id"],
+                "level": row["level"],
+                "description": row["description"],
+                "keywords": row["keywords"] or [],
+                "synonyms": row["synonyms"] or [],
+                "is_active": row["is_active"],
+                "display_order": row["display_order"],
             }
             _concept_cache.set(cache_key, result)
             return result
@@ -188,12 +190,12 @@ def get_descendant_concept_ids(concept_id: int) -> List[int]:
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
                 "SELECT concept_id FROM fn_get_descendant_concepts(%s)",
                 (concept_id,),
             )
-            ids = [row[0] for row in cursor.fetchall()]
+            ids = [row["concept_id"] for row in cursor.fetchall()]
             _concept_cache.set(cache_key, ids)
             return ids
 
@@ -229,16 +231,16 @@ def get_expanded_keywords(concept_name: str) -> List[str]:
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 1. Use DB function to get self + descendant keywords/synonyms
             cursor.execute(
-                "SELECT fn_get_expanded_keywords(%s)",
+                "SELECT fn_get_expanded_keywords(%s) AS expanded_keywords",
                 (concept_id,),
             )
             row = cursor.fetchone()
-            if row and row[0]:
-                all_keywords.update(row[0])
+            if row and row["expanded_keywords"]:
+                all_keywords.update(row["expanded_keywords"])
 
             # 2. Related concepts (relatedTo, similarTo) with weight >= 0.5
             cursor.execute(
@@ -254,10 +256,10 @@ def get_expanded_keywords(concept_name: str) -> List[str]:
                 (concept_id,),
             )
             for kw_row in cursor.fetchall():
-                if kw_row[0]:
-                    all_keywords.update(kw_row[0])
-                if kw_row[1]:
-                    all_keywords.update(kw_row[1])
+                if kw_row["keywords"]:
+                    all_keywords.update(kw_row["keywords"])
+                if kw_row["synonyms"]:
+                    all_keywords.update(kw_row["synonyms"])
 
         # Filter out empty strings
         result = sorted(kw for kw in all_keywords if kw)
@@ -287,7 +289,7 @@ def _load_keyword_to_concept_map() -> Dict[str, List[int]]:
     mapping: Dict[str, List[int]] = {}
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
                 """
                 SELECT id, keywords, synonyms, concept_name
@@ -296,10 +298,10 @@ def _load_keyword_to_concept_map() -> Dict[str, List[int]]:
                 """
             )
             for row in cursor.fetchall():
-                cid = row[0]
-                keywords = row[1] or []
-                synonyms = row[2] or []
-                concept_name_val = row[3] or ""
+                cid = row["id"]
+                keywords = row["keywords"] or []
+                synonyms = row["synonyms"] or []
+                concept_name_val = row["concept_name"] or ""
 
                 # Map each keyword/synonym to this concept
                 for kw in keywords:
@@ -373,17 +375,17 @@ def expand_search_terms(query: str) -> List[str]:
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             for cid in matched_concept_ids:
                 # Descendant keywords via DB function (fast, stable)
                 cursor.execute(
-                    "SELECT fn_get_expanded_keywords(%s)",
+                    "SELECT fn_get_expanded_keywords(%s) AS expanded_keywords",
                     (cid,),
                 )
                 row = cursor.fetchone()
-                if row and row[0]:
-                    all_terms.update(row[0])
+                if row and row["expanded_keywords"]:
+                    all_terms.update(row["expanded_keywords"])
 
                 # Related concepts with weight >= 0.6
                 cursor.execute(
@@ -399,10 +401,10 @@ def expand_search_terms(query: str) -> List[str]:
                     (cid,),
                 )
                 for rel_row in cursor.fetchall():
-                    if rel_row[0]:
-                        all_terms.update(rel_row[0])
-                    if rel_row[1]:
-                        all_terms.update(rel_row[1])
+                    if rel_row["keywords"]:
+                        all_terms.update(rel_row["keywords"])
+                    if rel_row["synonyms"]:
+                        all_terms.update(rel_row["synonyms"])
 
     except Exception as e:
         logger.error(f"expand_search_terms('{query}') failed: {e}")
@@ -428,7 +430,7 @@ def _load_classification_concepts() -> List[Dict]:
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
                 """
                 SELECT id, concept_name, level, keywords, synonyms
@@ -440,11 +442,11 @@ def _load_classification_concepts() -> List[Dict]:
             concepts = []
             for row in cursor.fetchall():
                 concepts.append({
-                    "id": row[0],
-                    "concept_name": row[1],
-                    "level": row[2],
-                    "keywords": [kw.lower() for kw in (row[3] or []) if kw],
-                    "synonyms": [syn.lower() for syn in (row[4] or []) if syn],
+                    "id": row["id"],
+                    "concept_name": row["concept_name"],
+                    "level": row["level"],
+                    "keywords": [kw.lower() for kw in (row["keywords"] or []) if kw],
+                    "synonyms": [syn.lower() for syn in (row["synonyms"] or []) if syn],
                 })
             _concept_cache.set(cache_key, concepts)
             return concepts
@@ -544,7 +546,7 @@ def get_related_concepts(
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             if relation_types:
                 cursor.execute(
@@ -577,10 +579,10 @@ def get_related_concepts(
             results = []
             for row in cursor.fetchall():
                 results.append({
-                    "concept_id": row[0],
-                    "concept_name": row[1],
-                    "relation_type": row[2],
-                    "weight": row[3],
+                    "concept_id": row["id"],
+                    "concept_name": row["concept_name"],
+                    "relation_type": row["relation_type"],
+                    "weight": row["weight"],
                 })
 
             _concept_cache.set(cache_key, results)
@@ -626,7 +628,7 @@ def get_concept_tree() -> List[Dict]:
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
                 """
                 SELECT id, concept_name, concept_name_en, parent_id, level,
@@ -641,18 +643,18 @@ def get_concept_tree() -> List[Dict]:
             nodes: Dict[int, Dict] = {}
             for row in cursor.fetchall():
                 node = {
-                    "id": row[0],
-                    "concept_name": row[1],
-                    "concept_name_en": row[2],
-                    "parent_id": row[3],
-                    "level": row[4],
-                    "description": row[5],
-                    "keywords": row[6] or [],
-                    "synonyms": row[7] or [],
-                    "display_order": row[8],
+                    "id": row["id"],
+                    "concept_name": row["concept_name"],
+                    "concept_name_en": row["concept_name_en"],
+                    "parent_id": row["parent_id"],
+                    "level": row["level"],
+                    "description": row["description"],
+                    "keywords": row["keywords"] or [],
+                    "synonyms": row["synonyms"] or [],
+                    "display_order": row["display_order"],
                     "children": [],
                 }
-                nodes[row[0]] = node
+                nodes[row["id"]] = node
 
             # Build tree by linking children to parents
             roots: List[Dict] = []
@@ -698,18 +700,18 @@ def get_ontology_stats() -> Dict:
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # Total concepts
             cursor.execute(
-                "SELECT COUNT(*) FROM ontology_concepts WHERE is_active = true"
+                "SELECT COUNT(*) AS cnt FROM ontology_concepts WHERE is_active = true"
             )
-            stats["total_concepts"] = cursor.fetchone()[0]
+            stats["total_concepts"] = cursor.fetchone()["cnt"]
 
             # Concepts per level
             cursor.execute(
                 """
-                SELECT level, COUNT(*)
+                SELECT level, COUNT(*) AS cnt
                 FROM ontology_concepts
                 WHERE is_active = true
                 GROUP BY level
@@ -717,27 +719,27 @@ def get_ontology_stats() -> Dict:
                 """
             )
             stats["concepts_per_level"] = {
-                row[0]: row[1] for row in cursor.fetchall()
+                row["level"]: row["cnt"] for row in cursor.fetchall()
             }
 
             # Total relations
-            cursor.execute("SELECT COUNT(*) FROM ontology_relations")
-            stats["total_relations"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) AS cnt FROM ontology_relations")
+            stats["total_relations"] = cursor.fetchone()["cnt"]
 
             # Total mappings
-            cursor.execute("SELECT COUNT(*) FROM bid_ontology_mappings")
-            stats["total_mappings"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) AS cnt FROM bid_ontology_mappings")
+            stats["total_mappings"] = cursor.fetchone()["cnt"]
 
             # Mapping sources breakdown
             cursor.execute(
                 """
-                SELECT source, COUNT(*)
+                SELECT source, COUNT(*) AS cnt
                 FROM bid_ontology_mappings
                 GROUP BY source
                 """
             )
             stats["mapping_sources"] = {
-                row[0]: row[1] for row in cursor.fetchall()
+                row["source"]: row["cnt"] for row in cursor.fetchall()
             }
 
         _tree_cache.set("ontology_stats", stats)

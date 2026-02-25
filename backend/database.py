@@ -70,6 +70,16 @@ def get_db():
         pool.putconn(conn)
 
 
+@contextmanager
+def get_dict_cursor(conn):
+    """RealDictCursor를 사용하는 커서 컨텍스트 매니저 (row['column_name'] 접근)"""
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        yield cursor
+    finally:
+        cursor.close()
+
+
 def close_pool():
     """애플리케이션 종료 시 커넥션 풀 전체 반환"""
     global _pool

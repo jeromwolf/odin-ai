@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, date
+from psycopg2.extras import RealDictCursor
 from database import get_db_connection
 from api.admin_auth import get_current_admin
 import logging
@@ -48,7 +49,7 @@ async def get_logs(
     """로그 검색 및 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             where_clauses = []
             params = []
@@ -73,7 +74,7 @@ async def get_logs(
 
             # 총 개수
             cursor.execute(f"SELECT COUNT(*) FROM batch_detail_logs WHERE {where_sql}", params)
-            total = cursor.fetchone()[0]
+            total = cursor.fetchone()['count']
 
             # 로그 조회
             offset = (page - 1) * limit
@@ -89,12 +90,12 @@ async def get_logs(
             logs = []
             for row in cursor.fetchall():
                 logs.append(LogEntry(
-                    id=row[0],
-                    execution_id=row[1],
-                    log_level=row[2],
-                    message=row[3],
-                    context=row[4],
-                    created_at=row[5]
+                    id=row['id'],
+                    execution_id=row['execution_id'],
+                    log_level=row['log_level'],
+                    message=row['message'],
+                    context=row['context'],
+                    created_at=row['created_at']
                 ))
 
             return LogListResponse(logs=logs, total=total, page=page)
@@ -153,7 +154,7 @@ async def get_error_statistics(
     """에러 로그 통계"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             where_clauses = ["log_level = 'ERROR'"]
             params = []
@@ -183,7 +184,7 @@ async def get_error_statistics(
 
             top_errors = []
             for row in cursor.fetchall():
-                top_errors.append({"message": row[0], "count": row[1]})
+                top_errors.append({"message": row['error_msg'], "count": row['count']})
 
             # 에러 추이 (일별)
             trend_query = f"""
@@ -201,8 +202,8 @@ async def get_error_statistics(
             error_trend = []
             for row in cursor.fetchall():
                 error_trend.append({
-                    "date": row[0].isoformat(),
-                    "count": row[1]
+                    "date": row['error_date'].isoformat(),
+                    "count": row['count']
                 })
 
             return {

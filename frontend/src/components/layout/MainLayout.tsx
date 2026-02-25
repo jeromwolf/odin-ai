@@ -36,6 +36,7 @@ import {
   People,
   Assessment,
   Description,
+  Hub,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -46,6 +47,7 @@ const menuItems = [
   { text: '입찰 검색', icon: <Search />, path: '/search' },
   { text: '북마크', icon: <Bookmark />, path: '/bookmarks' },
   { text: '알림 설정', icon: <NotificationsActive />, path: '/notifications' },
+  { text: '지식 그래프', icon: <Hub />, path: '/graph' },
   { text: '프로필', icon: <Person />, path: '/profile' },
   { text: '설정', icon: <Settings />, path: '/settings' },
 ];

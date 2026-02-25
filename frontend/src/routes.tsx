@@ -21,6 +21,7 @@ const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const NotificationInbox = lazy(() => import('./pages/NotificationInbox'));
+const GraphExplorer = lazy(() => import('./pages/GraphExplorer'));
 
 // Admin pages
 const AdminLogin = lazy(() => import('./pages/admin/Login'));
@@ -85,6 +86,7 @@ const AppRoutes = () => {
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/graph" element={<GraphExplorer />} />
           </Route>
         </Route>
 
