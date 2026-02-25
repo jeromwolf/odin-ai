@@ -80,3 +80,6 @@ frontend/.omc/
 
 # Logs
 logs/
+
+# Generated reports
+reports/

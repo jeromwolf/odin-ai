@@ -1,0 +1,254 @@
+{
+  "tag": "건설",
+  "total_bids": 30,
+  "bids": [
+    {
+      "bid_notice_no": "R26BK01347906",
+      "title": "2025년 의당면 소하천(청송천, 중산천) 재해복구사업",
+      "estimated_price": 65636364,
+      "organization_name": "충청남도 공주시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R26BK01347911",
+      "title": "2025년 유구읍 명곡리(269번지 외 4개소) 오골천 소하천 재해복구사업",
+      "estimated_price": 162363637,
+      "organization_name": "충청남도 공주시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R26BK01347807",
+      "title": "도서발전소 발전기 계획예방정비 공사(관리도)",
+      "estimated_price": 116070000,
+      "organization_name": "전북특별자치도 군산시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R26BK01347916",
+      "title": "2025년 우성면 소하천(은골천,중새터천) 재해복구사업",
+      "estimated_price": 64436364,
+      "organization_name": "충청남도 공주시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R26BK01347908",
+      "title": "계약대행[수산업 경영인연합회관 개보수공사]",
+      "estimated_price": 81818181,
+      "organization_name": "충청남도 보령시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R26BK01347829",
+      "title": "수산1리 옹벽 설치공사",
+      "estimated_price": 89737273,
+      "organization_name": "경기도 이천시 설성면",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R26BK01347920",
+      "title": "2025년 우성면 소하천(가느니천,마그름천,상영천) 재해복구사업",
+      "estimated_price": 141863637,
+      "organization_name": "충청남도 공주시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R26BK01347893",
+      "title": "탄천면 송학리(558-8)배수로 설치공사",
+      "estimated_price": 27918182,
+      "organization_name": "충청남도 공주시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R26BK01347930",
+      "title": "2025년 금학동 주미동(163) 회선동천 소하천 재해복구사업",
+      "estimated_price": 136736364,
+      "organization_name": "충청남도 공주시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124605",
+      "title": "진위역 보도육교 대설 예방시설 설치공사",
+      "estimated_price": 252738182,
+      "organization_name": "경기도 평택시 송탄출장소",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124715",
+      "title": "2025년 한양도성 오염성돌 보존처리 공사",
+      "estimated_price": 161818182,
+      "organization_name": "서울특별시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01123353",
+      "title": "[대행]경북세무고등학교 학교급식 환기시설개선 천장개체공사소액수의 견적제출 공고",
+      "estimated_price": 26100000,
+      "organization_name": "경상북도교육청 경상북도포항교육지원청",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124193",
+      "title": "2025년 신흥리 끝이네골 산불피해지위험목제거사업 (긴급벌채)",
+      "estimated_price": 56609091,
+      "organization_name": "경북 청송군산림조합",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124644",
+      "title": "경강선 이매역 등 18개역 에스컬레이터 핸드레일 부품 개량공사",
+      "estimated_price": 563460000,
+      "organization_name": "한국철도공사 회계통합센터",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124541",
+      "title": "남원노암초등학교 승강기 증축공사",
+      "estimated_price": 188246363,
+      "organization_name": "전북특별자치도교육청 전북특별자치도남원교육지원청",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124358",
+      "title": "금산 통합돌봄 복지마을 조성사업 통신공사 입찰공고",
+      "estimated_price": 246387273,
+      "organization_name": "충청남도개발공사",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01115276",
+      "title": "계동초 드라이비트 해소공사 수의계약 안내 공고",
+      "estimated_price": 199770000,
+      "organization_name": "경상남도김해교육청 계동초등학교",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124624",
+      "title": "2025년 어린이보호구역 조정에 따른 정비사업",
+      "estimated_price": 90763637,
+      "organization_name": "대구광역시 서구",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01116862",
+      "title": "국립경국대학교 학생 체력단련장 설치 및 강의실 조성 기계공사",
+      "estimated_price": 64130000,
+      "organization_name": "국립경국대학교",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124129",
+      "title": "2025년 하반기 안양천(지방하천) 준설공사",
+      "estimated_price": 90600000,
+      "organization_name": "경기도 안양시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124670",
+      "title": "효동마을회 마을회관 등(마을회관) 조성사업(보조사업)",
+      "estimated_price": 2872818275,
+      "organization_name": "제주특별자치도 상하수도본부",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124389",
+      "title": "한국경마축산고 말산업 종합실습동 증축 기계설비공사",
+      "estimated_price": 192023636,
+      "organization_name": "전북특별자치도교육청 전북특별자치도남원교육지원청",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01123021",
+      "title": "삼익아파트 중앙도로 경계석 및 보도블럭 정비공사",
+      "estimated_price": 60578182,
+      "organization_name": "부산광역시 서구",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124629",
+      "title": "도암 덕산지구 창고 신축공사(자체)",
+      "estimated_price": 36730000,
+      "organization_name": "전라남도 강진군",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01123896",
+      "title": "2025년 권선구 하반기 하수도 비굴착 부분보수공사(2차)(2권역)",
+      "estimated_price": 100800000,
+      "organization_name": "경기도 수원시 권선구",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124719",
+      "title": "경부선 금정역 등 10역 비상게이트 개량 기타공사",
+      "estimated_price": 158887000,
+      "organization_name": "한국철도공사 회계통합센터",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124585",
+      "title": "가을철경제수조림공사(3지구)",
+      "estimated_price": 72890000,
+      "organization_name": "전북특별자치도 정읍시",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124727",
+      "title": "구천장국2리중곡소하천정비공사",
+      "estimated_price": 87090909,
+      "organization_name": "경상북도 의성군",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124331",
+      "title": "★기술자 및 실적보유★고속철도 ATC원격복구장치 보수 기타공사",
+      "estimated_price": 604526364,
+      "organization_name": "한국철도공사 회계통합센터",
+      "category": "공사"
+    },
+    {
+      "bid_notice_no": "R25BK01124622",
+      "title": "상수도관 및 오수관로 설치 공사(둘리쌍문근린공원 실내놀이복합문화공간 조성)",
+      "estimated_price": 78718182,
+      "organization_name": "서울특별시 도봉구",
+      "category": "공사"
+    }
+  ],
+  "co_occurring_tags": [
+    {
+      "tag": "유지보수",
+      "co_count": 177
+    },
+    {
+      "tag": "물품",
+      "co_count": 164
+    },
+    {
+      "tag": "기계",
+      "co_count": 112
+    },
+    {
+      "tag": "조경",
+      "co_count": 72
+    },
+    {
+      "tag": "긴급",
+      "co_count": 67
+    },
+    {
+      "tag": "통신",
+      "co_count": 67
+    },
+    {
+      "tag": "토목",
+      "co_count": 62
+    },
+    {
+      "tag": "용역",
+      "co_count": 38
+    },
+    {
+      "tag": "전기",
+      "co_count": 32
+    }
+  ]
+}

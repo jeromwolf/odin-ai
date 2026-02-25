@@ -1,0 +1,14 @@
+{
+  "connected": true,
+  "nodes": {
+    "BidAnnouncement": 476,
+    "Organization": 264,
+    "Tag": 10,
+    "Region": 17
+  },
+  "relationships": {
+    "total": 42183,
+    "SIMILAR_TO": 40082
+  },
+  "available": true
+}

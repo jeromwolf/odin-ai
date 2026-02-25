@@ -1,0 +1,17 @@
+{
+  "rag_available": true,
+  "llm_available": true,
+  "embedding_stats": {
+    "total_bids": 476,
+    "embedded_bids": 401,
+    "total_chunks": 7056,
+    "embedded_chunks": 7056,
+    "coverage_pct": 84.2
+  },
+  "search_available": true,
+  "graphrag": {
+    "entities": 100,
+    "communities": 20,
+    "available": true
+  }
+}
