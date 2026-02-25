@@ -3,6 +3,7 @@
 이메일, 웹푸시, SMS 알림을 통합 처리하는 서비스
 """
 
+import asyncio
 import os
 import smtplib
 import json
@@ -13,6 +14,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 
 from database import get_db_connection
+from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +37,14 @@ class NotificationService:
     ) -> bool:
         """이메일 알림 발송"""
         try:
-            # 사용자 이메일 조회
-            user_email = override_email or await self._get_user_email(user_id)
+            # 사용자 이메일 조회 (sync DB를 thread에서 실행)
+            user_email = override_email or await asyncio.to_thread(self._get_user_email, user_id)
             if not user_email:
                 logger.warning(f"사용자 이메일을 찾을 수 없음: user_id={user_id}")
                 return False
 
-            # 템플릿 조회 및 렌더링
-            template = await self._get_email_template(template_name)
+            # 템플릿 조회 및 렌더링 (sync DB를 thread에서 실행)
+            template = await asyncio.to_thread(self._get_email_template, template_name)
             if not template:
                 logger.error(f"이메일 템플릿을 찾을 수 없음: {template_name}")
                 return False
@@ -50,8 +52,8 @@ class NotificationService:
             subject = self._render_template(template['subject_template'], template_data)
             content = self._render_template(template['content_template'], template_data)
 
-            # 이메일 발송
-            return await self._send_email(user_email, subject, content)
+            # 이메일 발송 (sync SMTP를 thread에서 실행)
+            return await asyncio.to_thread(self._send_email, user_email, subject, content)
 
         except Exception as e:
             logger.error(f"이메일 알림 발송 실패: {e}")
@@ -65,8 +67,8 @@ class NotificationService:
     ) -> bool:
         """웹 푸시 알림 발송"""
         try:
-            # 웹 알림 템플릿 조회
-            template = await self._get_web_template(template_name)
+            # 웹 알림 템플릿 조회 (sync DB를 thread에서 실행)
+            template = await asyncio.to_thread(self._get_web_template, template_name)
             if not template:
                 logger.error(f"웹 알림 템플릿을 찾을 수 없음: {template_name}")
                 return False
@@ -74,8 +76,8 @@ class NotificationService:
             title = self._render_template(template['subject_template'], template_data)
             message = self._render_template(template['content_template'], template_data)
 
-            # 웹 알림 저장 (실제 푸시는 WebSocket 또는 다른 방식으로)
-            await self._store_web_notification(user_id, title, message)
+            # 웹 알림 저장 (sync DB를 thread에서 실행)
+            await asyncio.to_thread(self._store_web_notification, user_id, title, message)
 
             return True
 
@@ -91,7 +93,7 @@ class NotificationService:
         """SMS 알림 발송"""
         try:
             # SMS는 간단한 메시지로만 구성
-            phone_number = await self._get_user_phone(user_id)
+            phone_number = await asyncio.to_thread(self._get_user_phone, user_id)
             if not phone_number:
                 logger.warning(f"사용자 전화번호를 찾을 수 없음: user_id={user_id}")
                 return False
@@ -107,29 +109,29 @@ class NotificationService:
             logger.error(f"SMS 알림 발송 실패: {e}")
             return False
 
-    async def _get_user_email(self, user_id: int) -> Optional[str]:
+    def _get_user_email(self, user_id: int) -> Optional[str]:
         """사용자 이메일 조회"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute("SELECT email FROM users WHERE id = %s", (user_id,))
             result = cursor.fetchone()
-            return result[0] if result else None
+            return result['email'] if result else None
 
-    async def _get_user_phone(self, user_id: int) -> Optional[str]:
+    def _get_user_phone(self, user_id: int) -> Optional[str]:
         """사용자 전화번호 조회"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
                 "SELECT sms_phone_number FROM user_notification_settings WHERE user_id = %s",
                 (user_id,)
             )
             result = cursor.fetchone()
-            return result[0] if result else None
+            return result['sms_phone_number'] if result else None
 
-    async def _get_email_template(self, template_name: str) -> Optional[Dict[str, str]]:
+    def _get_email_template(self, template_name: str) -> Optional[Dict[str, str]]:
         """이메일 템플릿 조회"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
                 "SELECT subject_template, content_template FROM notification_templates "
                 "WHERE template_name = %s AND channel = 'email' AND is_active = true",
@@ -138,15 +140,15 @@ class NotificationService:
             result = cursor.fetchone()
             if result:
                 return {
-                    'subject_template': result[0],
-                    'content_template': result[1]
+                    'subject_template': result['subject_template'],
+                    'content_template': result['content_template']
                 }
             return None
 
-    async def _get_web_template(self, template_name: str) -> Optional[Dict[str, str]]:
+    def _get_web_template(self, template_name: str) -> Optional[Dict[str, str]]:
         """웹 알림 템플릿 조회"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
                 "SELECT subject_template, content_template FROM notification_templates "
                 "WHERE template_name = %s AND channel = 'web' AND is_active = true",
@@ -155,8 +157,8 @@ class NotificationService:
             result = cursor.fetchone()
             if result:
                 return {
-                    'subject_template': result[0],
-                    'content_template': result[1]
+                    'subject_template': result['subject_template'],
+                    'content_template': result['content_template']
                 }
             return None
 
@@ -168,7 +170,7 @@ class NotificationService:
             result = result.replace(placeholder, str(value))
         return result
 
-    async def _send_email(self, to_email: str, subject: str, content: str) -> bool:
+    def _send_email(self, to_email: str, subject: str, content: str) -> bool:
         """실제 이메일 발송"""
         try:
             # MIME 메시지 생성
@@ -195,10 +197,10 @@ class NotificationService:
             logger.error(f"이메일 발송 실패: {e}")
             return False
 
-    async def _store_web_notification(self, user_id: int, title: str, message: str):
+    def _store_web_notification(self, user_id: int, title: str, message: str):
         """웹 알림 저장"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 웹 알림용 별도 테이블이 있다면 저장
             # 여기서는 간단히 alert_notifications 테이블에 저장
@@ -213,7 +215,11 @@ class NotificationService:
 
     async def send_batch_summary(self, batch_stats: Dict[str, Any]):
         """배치 처리 결과 요약 이메일 발송 (관리자용)"""
-        admin_emails = ["admin@odin-ai.com"]  # 환경변수에서 가져와야 함
+        admin_emails_str = os.getenv("ADMIN_NOTIFICATION_EMAILS", "")
+        admin_emails = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
+        if not admin_emails:
+            logger.warning("ADMIN_NOTIFICATION_EMAILS 미설정 - 배치 요약 이메일 발송 생략")
+            return
 
         subject = f"[ODIN-AI] 배치 처리 완료 - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
 
@@ -230,12 +236,12 @@ class NotificationService:
         """
 
         for admin_email in admin_emails:
-            await self._send_email(admin_email, subject, content)
+            await asyncio.to_thread(self._send_email, admin_email, subject, content)
 
-    async def get_user_notification_stats(self, user_id: int) -> Dict[str, Any]:
+    def get_user_notification_stats(self, user_id: int) -> Dict[str, Any]:
         """사용자 알림 통계 조회"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 최근 30일 알림 통계
             cursor.execute("""
@@ -253,7 +259,11 @@ class NotificationService:
 
             stats = {}
             for row in cursor.fetchall():
-                channel, total, sent, failed, read = row
+                channel = row['channel']
+                total = row['total_count']
+                sent = row['sent_count']
+                failed = row['failed_count']
+                read = row['read_count']
                 stats[channel] = {
                     'total': total,
                     'sent': sent,

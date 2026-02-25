@@ -8,6 +8,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from database import get_db_connection
 from .security import decode_token
+from psycopg2.extras import RealDictCursor
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ async def get_current_user_optional(
 
         # 데이터베이스에서 사용자 조회
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             query = """
                 SELECT id, email, username, full_name, is_active,
                        is_superuser, email_verified, created_at
@@ -67,21 +68,17 @@ async def get_current_user_optional(
 
             # 사용자 객체 생성
             user = User({
-                'id': user_data[0],
-                'email': user_data[1],
-                'username': user_data[2],
-                'full_name': user_data[3],
-                'is_active': user_data[4],
-                'is_superuser': user_data[5],
-                'email_verified': user_data[6],
-                'created_at': user_data[7]
+                'id': user_data['id'],
+                'email': user_data['email'],
+                'username': user_data['username'],
+                'full_name': user_data['full_name'],
+                'is_active': user_data['is_active'],
+                'is_superuser': user_data['is_superuser'],
+                'email_verified': user_data['email_verified'],
+                'created_at': user_data['created_at']
             })
 
-            # 마지막 로그인 시간 업데이트
-            update_query = "UPDATE users SET last_login = %s WHERE id = %s"
-            cursor.execute(update_query, (datetime.now(timezone.utc), user_id))
-            conn.commit()
-
+            # last_login은 로그인 시에만 갱신 (auth.py login 엔드포인트에서 처리)
             return user
 
     except Exception as e:

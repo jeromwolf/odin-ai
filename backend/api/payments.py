@@ -8,6 +8,7 @@ from datetime import datetime
 from database import get_db_connection
 from auth.dependencies import get_current_user, User
 from pydantic import BaseModel
+from psycopg2.extras import RealDictCursor
 import logging
 import requests
 import base64
@@ -17,6 +18,8 @@ import hashlib
 import secrets
 
 logger = logging.getLogger(__name__)
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
@@ -81,7 +84,7 @@ async def request_payment(
     """결제 요청 생성"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 구독 정보 조회
             cursor.execute("""
@@ -104,17 +107,17 @@ async def request_payment(
                 raise HTTPException(status_code=404, detail="구독 정보를 찾을 수 없습니다")
 
             # 가격 계산
-            if sub_data[2] == "yearly":
-                amount = sub_data[6] or sub_data[5] * 12
+            if sub_data["billing_cycle"] == "yearly":
+                amount = sub_data["price_yearly"] or sub_data["price_monthly"] * 12
             else:
-                amount = sub_data[5]
+                amount = sub_data["price_monthly"]
 
             # 할인 적용
-            if sub_data[7]:
-                amount = amount * (100 - sub_data[7]) // 100
+            if sub_data["discount_percentage"]:
+                amount = amount * (100 - sub_data["discount_percentage"]) // 100
 
             # 주문 ID 생성
-            order_id = f"SUB_{user.id}_{sub_data[0]}_{secrets.token_hex(8)}"
+            order_id = f"SUB_{user.id}_{sub_data['id']}_{secrets.token_hex(8)}"
 
             # 결제 내역 생성
             cursor.execute("""
@@ -126,20 +129,20 @@ async def request_payment(
             """, (
                 user.id, payment.subscription_id, amount, "KRW",
                 payment.payment_method, "pending",
-                f"{sub_data[4]} - {sub_data[2]} 구독"
+                f"{sub_data['display_name']} - {sub_data['billing_cycle']} 구독"
             ))
 
-            payment_id = cursor.fetchone()[0]
+            payment_id = cursor.fetchone()["id"]
 
             # 토스페이먼츠 결제 요청 데이터
             payment_data = {
                 "amount": amount,
                 "orderId": order_id,
-                "orderName": f"ODIN-AI {sub_data[4]} 구독",
+                "orderName": f"ODIN-AI {sub_data['display_name']} 구독",
                 "customerName": user.username,
                 "customerEmail": user.email,
-                "successUrl": payment.return_url or "http://localhost:3000/payment/success",
-                "failUrl": "http://localhost:3000/payment/fail",
+                "successUrl": payment.return_url or f"{FRONTEND_URL}/payment/success",
+                "failUrl": f"{FRONTEND_URL}/payment/fail",
             }
 
             if USE_TEST_MODE:
@@ -199,7 +202,7 @@ async def confirm_payment(
     """결제 승인"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 결제 내역 확인
             cursor.execute("""
@@ -212,7 +215,7 @@ async def confirm_payment(
             if not payment:
                 raise HTTPException(status_code=404, detail="결제 정보를 찾을 수 없습니다")
 
-            if payment[1] != confirm.amount:
+            if payment["amount"] != confirm.amount:
                 raise HTTPException(status_code=400, detail="결제 금액이 일치하지 않습니다")
 
             if USE_TEST_MODE:
@@ -237,7 +240,7 @@ async def confirm_payment(
                         UPDATE payment_history
                         SET status = 'failed', failed_at = NOW()
                         WHERE id = %s
-                    """, (payment[0],))
+                    """, (payment["id"],))
                     raise HTTPException(status_code=400, detail="결제 승인 실패")
 
                 approval_status = "completed"
@@ -247,7 +250,7 @@ async def confirm_payment(
                 UPDATE payment_history
                 SET status = %s, processed_at = NOW()
                 WHERE id = %s
-            """, (approval_status, payment[0]))
+            """, (approval_status, payment["id"]))
 
             # 구독 활성화
             cursor.execute("""
@@ -257,14 +260,14 @@ async def confirm_payment(
                     last_payment_date = NOW(),
                     last_payment_amount = %s
                 WHERE id = %s
-            """, (confirm.amount, payment[2]))
+            """, (confirm.amount, payment["subscription_id"]))
 
             conn.commit()
 
             return {
                 "status": "success",
-                "payment_id": payment[0],
-                "subscription_id": payment[2],
+                "payment_id": payment["id"],
+                "subscription_id": payment["subscription_id"],
                 "message": "결제가 성공적으로 완료되었습니다"
             }
 
@@ -283,7 +286,7 @@ async def register_billing_key(
     """빌링키 등록 (정기결제용)"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             if USE_TEST_MODE:
                 # 테스트 모드에서는 더미 빌링키 생성
@@ -332,7 +335,7 @@ async def register_billing_key(
                 True
             ))
 
-            method_id = cursor.fetchone()[0]
+            method_id = cursor.fetchone()["id"]
             conn.commit()
 
             return {
@@ -363,7 +366,7 @@ async def payment_webhook(
                 raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             if webhook.event_type == "PAYMENT_STATUS_CHANGED":
                 # 결제 상태 변경 처리
@@ -407,7 +410,7 @@ async def get_payment_history(
     """결제 내역 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 SELECT
@@ -431,15 +434,15 @@ async def get_payment_history(
             history = []
             for row in cursor.fetchall():
                 history.append({
-                    "id": row[0],
-                    "amount": row[1],
-                    "currency": row[2],
-                    "method": row[3],
-                    "status": row[4],
-                    "description": row[5],
-                    "created_at": row[6].isoformat() if row[6] else None,
-                    "processed_at": row[7].isoformat() if row[7] else None,
-                    "plan": row[8]
+                    "id": row["id"],
+                    "amount": row["amount"],
+                    "currency": row["currency"],
+                    "method": row["payment_method"],
+                    "status": row["status"],
+                    "description": row["description"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                    "processed_at": row["processed_at"].isoformat() if row["processed_at"] else None,
+                    "plan": row["plan_name"]
                 })
 
             return {
@@ -460,7 +463,7 @@ async def delete_payment_method(
     """결제 수단 삭제"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 UPDATE payment_methods

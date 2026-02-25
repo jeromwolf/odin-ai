@@ -29,21 +29,6 @@ class UserSettings(BaseModel):
     analytics_enabled: Optional[bool] = None
 
 
-def _ensure_settings_table(conn):
-    """user_settings 테이블이 없으면 생성"""
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS user_settings (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-            settings JSONB DEFAULT '{}',
-            created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW()
-        )
-    """)
-    conn.commit()
-
-
 _DEFAULT_SETTINGS = {
     "dark_mode": False,
     "language": "ko",
@@ -64,7 +49,6 @@ async def get_settings(current_user: User = Depends(get_current_user)):
 
     try:
         with get_db_connection() as conn:
-            _ensure_settings_table(conn)
 
             cur = conn.cursor(cursor_factory=RealDictCursor)
             cur.execute("""
@@ -89,7 +73,6 @@ async def update_settings(settings: UserSettings, current_user: User = Depends(g
 
     try:
         with get_db_connection() as conn:
-            _ensure_settings_table(conn)
 
             cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -135,7 +118,6 @@ async def export_data(current_user: User = Depends(get_current_user)):
 
     try:
         with get_db_connection() as conn:
-            _ensure_settings_table(conn)
 
             cur = conn.cursor(cursor_factory=RealDictCursor)
 

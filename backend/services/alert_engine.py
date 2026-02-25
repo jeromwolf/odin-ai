@@ -6,13 +6,15 @@
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Tuple
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 from dataclasses import dataclass
+from psycopg2.extras import RealDictCursor
 
 from database import get_db_connection
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 from .notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
@@ -68,13 +70,13 @@ class AlertEngine:
         logger.info(f"새로운 입찰 공고 {len(bids)}개에 대한 알림 처리 시작")
 
         try:
-            # 활성화된 알림 규칙들 가져오기
-            alert_rules = await self._get_active_alert_rules()
+            # 활성화된 알림 규칙들 가져오기 (sync DB를 thread에서 실행)
+            alert_rules = await asyncio.to_thread(self._get_active_alert_rules)
             stats['total_rules_checked'] = len(alert_rules)
 
-            # 각 입찰 공고에 대해 알림 규칙 검사
+            # 각 입찰 공고에 대해 알림 규칙 검사 (순수 계산)
             for bid in bids:
-                matches = await self._check_bid_against_rules(bid, alert_rules)
+                matches = self._check_bid_against_rules(bid, alert_rules)
                 stats['total_matches'] += len(matches)
 
                 # 매칭된 규칙들에 대해 알림 발송
@@ -93,10 +95,10 @@ class AlertEngine:
         logger.info(f"알림 처리 완료: {stats}")
         return stats
 
-    async def _get_active_alert_rules(self) -> List[AlertRule]:
+    def _get_active_alert_rules(self) -> List[AlertRule]:
         """활성화된 알림 규칙들 조회"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             query = """
                 SELECT id, user_id, rule_name, conditions, match_type,
@@ -111,35 +113,35 @@ class AlertEngine:
 
             for row in cursor.fetchall():
                 rule = AlertRule(
-                    id=row[0],
-                    user_id=row[1],
-                    rule_name=row[2],
-                    conditions=json.loads(row[3]) if isinstance(row[3], str) else row[3],
-                    match_type=row[4],
-                    notification_channels=row[5],
-                    notification_timing=row[6],
-                    is_active=row[7]
+                    id=row['id'],
+                    user_id=row['user_id'],
+                    rule_name=row['rule_name'],
+                    conditions=json.loads(row['conditions']) if isinstance(row['conditions'], str) else row['conditions'],
+                    match_type=row['match_type'],
+                    notification_channels=row['notification_channels'],
+                    notification_timing=row['notification_timing'],
+                    is_active=row['is_active']
                 )
                 rules.append(rule)
 
             return rules
 
-    async def _check_bid_against_rules(
+    def _check_bid_against_rules(
         self,
         bid: BidAnnouncement,
         rules: List[AlertRule]
     ) -> List[Tuple[AlertRule, Dict[str, Any]]]:
-        """입찰 공고가 알림 규칙들과 매칭되는지 검사"""
+        """입찰 공고가 알림 규칙들과 매칭되는지 검사 (순수 계산, I/O 없음)"""
         matches = []
 
         for rule in rules:
-            match_result = await self._evaluate_rule_conditions(bid, rule)
+            match_result = self._evaluate_rule_conditions(bid, rule)
             if match_result['matched']:
                 matches.append((rule, match_result))
 
         return matches
 
-    async def _evaluate_rule_conditions(
+    def _evaluate_rule_conditions(
         self,
         bid: BidAnnouncement,
         rule: AlertRule
@@ -254,8 +256,8 @@ class AlertEngine:
             # 일일/주간 알림은 스케줄링 (알림 기록만 저장)
             await self._schedule_notification(bid, rule, match_details)
 
-        # 알림 규칙 트리거 횟수 업데이트
-        await self._update_rule_trigger_count(rule.id)
+        # 알림 규칙 트리거 횟수 업데이트 (sync DB를 thread에서 실행)
+        await asyncio.to_thread(self._update_rule_trigger_count, rule.id)
 
     async def _send_immediate_notification(
         self,
@@ -266,8 +268,10 @@ class AlertEngine:
     ):
         """즉시 알림 발송"""
         try:
-            # 알림 기록 생성
-            notification_id = await self._create_notification_record(bid, rule, channel)
+            # 알림 기록 생성 (sync DB를 thread에서 실행)
+            notification_id = await asyncio.to_thread(
+                self._create_notification_record, bid, rule, channel
+            )
 
             # 템플릿 기반 메시지 생성
             template_data = {
@@ -276,7 +280,7 @@ class AlertEngine:
                 'organization_name': bid.organization_name,
                 'estimated_price': f"{bid.estimated_price:,.0f}원" if bid.estimated_price else "미정",
                 'bid_end_date': bid.bid_end_date.strftime('%Y-%m-%d %H:%M') if bid.bid_end_date else "미정",
-                'detail_url': f"http://localhost:3000/bids/{bid.bid_notice_no}",
+                'detail_url': f"{FRONTEND_URL}/bids/{bid.bid_notice_no}",
                 'matched_conditions': ', '.join(match_details['matched_conditions'])
             }
 
@@ -298,12 +302,12 @@ class AlertEngine:
                     template_data=template_data
                 )
 
-            # 발송 완료 상태 업데이트
-            await self._update_notification_status(notification_id, 'sent')
+            # 발송 완료 상태 업데이트 (sync DB를 thread에서 실행)
+            await asyncio.to_thread(self._update_notification_status, notification_id, 'sent')
 
         except Exception as e:
             logger.error(f"즉시 알림 발송 실패 (rule_id: {rule.id}, channel: {channel}): {e}")
-            await self._update_notification_status(notification_id, 'failed', str(e))
+            await asyncio.to_thread(self._update_notification_status, notification_id, 'failed', str(e))
 
     async def _schedule_notification(
         self,
@@ -313,9 +317,11 @@ class AlertEngine:
     ):
         """일일/주간 알림 스케줄링 (기록 저장)"""
         for channel in rule.notification_channels:
-            await self._create_notification_record(bid, rule, channel, status='pending')
+            await asyncio.to_thread(
+                self._create_notification_record, bid, rule, channel, 'pending'
+            )
 
-    async def _create_notification_record(
+    def _create_notification_record(
         self,
         bid: BidAnnouncement,
         rule: AlertRule,
@@ -324,7 +330,7 @@ class AlertEngine:
     ) -> int:
         """알림 기록 생성"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             query = """
                 INSERT INTO alert_notifications (
@@ -342,11 +348,11 @@ class AlertEngine:
                 status, subject, content
             ))
 
-            notification_id = cursor.fetchone()[0]
+            notification_id = cursor.fetchone()['id']
             conn.commit()
             return notification_id
 
-    async def _update_notification_status(
+    def _update_notification_status(
         self,
         notification_id: int,
         status: str,
@@ -354,7 +360,7 @@ class AlertEngine:
     ):
         """알림 상태 업데이트"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             if status == 'sent':
                 query = """
@@ -373,10 +379,10 @@ class AlertEngine:
 
             conn.commit()
 
-    async def _update_rule_trigger_count(self, rule_id: int):
+    def _update_rule_trigger_count(self, rule_id: int):
         """알림 규칙 트리거 횟수 업데이트"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             query = """
                 UPDATE alert_rules
@@ -401,7 +407,7 @@ class AlertEngine:
     async def _process_daily_notifications(self):
         """일일 알림 처리"""
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 어제부터 오늘까지의 pending 알림들을 사용자별로 그룹화
             query = """
@@ -418,7 +424,10 @@ class AlertEngine:
             cursor.execute(query)
             daily_summaries = cursor.fetchall()
 
-            for user_id, count, bid_notices in daily_summaries:
+            for row in daily_summaries:
+                user_id = row['user_id']
+                count = row['count']
+                bid_notices = row['bid_notices']
                 await self._send_daily_summary(user_id, count, bid_notices)
 
                 # 처리된 알림들 상태 업데이트
@@ -438,7 +447,7 @@ class AlertEngine:
             'count': count,
             'date': datetime.now(timezone.utc).strftime('%Y년 %m월 %d일'),
             'bid_notices': bid_notices[:10],  # 최대 10개만
-            'dashboard_url': 'http://localhost:3000/dashboard'
+            'dashboard_url': f'{FRONTEND_URL}/dashboard'
         }
 
         await self.notification_service.send_email_notification(

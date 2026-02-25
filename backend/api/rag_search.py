@@ -3,13 +3,14 @@ RAG 의미 검색 API
 하이브리드 벡터 + 전문검색 엔드포인트
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import Optional
 import logging
 import os
 import json
 
 from database import get_db_connection
+from middleware.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,9 @@ router = APIRouter(prefix="/api/rag", tags=["RAG Search"])
 
 
 @router.get("/search")
+@limiter.limit("30/minute")
 async def rag_search(
+    request: Request,
     q: str = Query(..., min_length=1, max_length=500, description="검색 쿼리"),
     limit: int = Query(10, ge=1, le=50, description="결과 수"),
     section_type: Optional[str] = Query(None, description="섹션 타입 필터 (자격요건, 예정가격 등)"),
@@ -70,7 +73,9 @@ async def rag_search(
 
 
 @router.get("/ask")
+@limiter.limit("10/minute")
 async def rag_ask(
+    request: Request,
     q: str = Query(..., min_length=1, max_length=500, description="질문"),
     limit: int = Query(5, ge=1, le=20, description="참조 청크 수"),
     bid_notice_no: Optional[str] = Query(None, description="특정 공고로 한정"),
@@ -185,7 +190,9 @@ async def rag_status():
 
 
 @router.get("/global-ask")
+@limiter.limit("10/minute")
 async def rag_global_ask(
+    request: Request,
     q: str = Query(..., min_length=1, max_length=500, description="글로벌 질문"),
     top_communities: int = Query(5, ge=1, le=20, description="참조 커뮤니티 수"),
 ):

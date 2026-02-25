@@ -3,9 +3,11 @@ Graph Search API
 Neo4j 기반 그래프 검색 엔드포인트
 """
 
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, HTTPException, Query, Path, Request
 from typing import Optional
 import logging
+
+from middleware.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,8 @@ router = APIRouter(prefix="/api/graph", tags=["Graph Search"])
 
 
 @router.get("/status")
-async def graph_status():
+@limiter.limit("20/minute")
+async def graph_status(request: Request):
     """Neo4j 그래프 DB 상태 및 통계"""
     if not GRAPH_AVAILABLE:
         return {"available": False, "reason": "neo4j 패키지 미설치"}
@@ -34,7 +37,9 @@ async def graph_status():
 
 
 @router.get("/related/{bid_notice_no}")
+@limiter.limit("20/minute")
 async def graph_related(
+    request: Request,
     bid_notice_no: str = Path(..., description="입찰공고번호"),
     depth: int = Query(2, ge=1, le=3),
     limit: int = Query(20, ge=1, le=100),
@@ -54,7 +59,9 @@ async def graph_related(
 
 
 @router.get("/org/{org_name}")
+@limiter.limit("20/minute")
 async def graph_org_network(
+    request: Request,
     org_name: str = Path(..., description="기관명"),
     limit: int = Query(50, ge=1, le=200),
 ):
@@ -73,7 +80,9 @@ async def graph_org_network(
 
 
 @router.get("/tag/{tag_name}")
+@limiter.limit("20/minute")
 async def graph_tag_network(
+    request: Request,
     tag_name: str = Path(..., description="태그명"),
     limit: int = Query(30, ge=1, le=100),
 ):
@@ -92,7 +101,9 @@ async def graph_tag_network(
 
 
 @router.get("/region/{region_name}")
+@limiter.limit("20/minute")
 async def graph_region_bids(
+    request: Request,
     region_name: str = Path(..., description="지역명"),
     limit: int = Query(30, ge=1, le=100),
 ):
