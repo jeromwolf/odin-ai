@@ -4,6 +4,62 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:900
 const TOKEN_KEY = process.env.REACT_APP_TOKEN_KEY || 'odin_ai_token';
 const REFRESH_TOKEN_KEY = process.env.REACT_APP_REFRESH_TOKEN_KEY || 'odin_ai_refresh_token';
 
+// API 파라미터 타입 정의
+interface RegisterData {
+  email: string;
+  password: string;
+  username?: string;
+  full_name?: string;
+}
+
+interface BidListParams {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: 'asc' | 'desc';
+}
+
+interface SearchFilters {
+  start_date?: string;
+  end_date?: string;
+  min_price?: number;
+  max_price?: number;
+  organization?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+interface ProfileUpdateData {
+  full_name?: string;
+  company?: string;
+  position?: string;
+  phone?: string;
+}
+
+interface SettingsUpdateData {
+  dark_mode?: boolean;
+  language?: string;
+  auto_save?: boolean;
+  data_sync?: boolean;
+  email_notifications?: boolean;
+  push_notifications?: boolean;
+  sound_enabled?: boolean;
+  public_profile?: boolean;
+  analytics_enabled?: boolean;
+}
+
+// 알림 설정은 중첩 객체 구조가 복잡하여 Record 타입 사용
+type NotificationSettingsData = Record<string, unknown>;
+
+interface NotificationRuleData {
+  rule_name: string;
+  conditions: Record<string, unknown>;
+  match_type?: 'ALL' | 'ANY';
+  notification_channels?: string[];
+  notification_timing?: string;
+}
+
 class ApiClient {
   private client: AxiosInstance;
   private isRefreshing: boolean = false;
@@ -131,7 +187,7 @@ class ApiClient {
     return { user, access_token };
   }
 
-  async register(data: any) {
+  async register(data: RegisterData) {
     const response = await this.client.post('/auth/register', data);
     return response.data;
   }
@@ -145,7 +201,7 @@ class ApiClient {
   }
 
   // Bid API
-  async getBids(params?: any) {
+  async getBids(params?: BidListParams) {
     const response = await this.client.get('/bids', { params });
     return response.data;
   }
@@ -155,7 +211,7 @@ class ApiClient {
     return response.data;
   }
 
-  async searchBids(query: string, filters?: any) {
+  async searchBids(query: string, filters?: SearchFilters) {
     const response = await this.client.get('/search', {
       params: { q: query, ...filters },
     });
@@ -226,7 +282,7 @@ class ApiClient {
     return response.data;
   }
 
-  async updateProfile(data: any) {
+  async updateProfile(data: ProfileUpdateData) {
     const response = await this.client.put('/profile', data);
     return response.data;
   }
@@ -245,7 +301,7 @@ class ApiClient {
     return response.data;
   }
 
-  async updateSettings(data: any) {
+  async updateSettings(data: SettingsUpdateData) {
     const response = await this.client.put('/settings', data);
     return response.data;
   }
@@ -313,12 +369,12 @@ class ApiClient {
     return response.data;
   }
 
-  async updateNotificationSettings(settings: any) {
+  async updateNotificationSettings(settings: NotificationSettingsData) {
     const response = await this.client.put('/notifications/settings', settings);
     return response.data;
   }
 
-  async addNotificationRule(rule: any) {
+  async addNotificationRule(rule: NotificationRuleData) {
     const response = await this.client.post('/notifications/rules', rule);
     return response.data;
   }
