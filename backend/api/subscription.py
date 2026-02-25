@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 from auth.dependencies import get_current_user, User
 from database import get_db_connection
+from psycopg2.extras import RealDictCursor
+from errors import ErrorCode, ApiError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -126,7 +128,7 @@ async def get_plan_details(plan_id: str):
     """특정 플랜 상세 조회"""
     plan = next((p for p in SUBSCRIPTION_PLANS if p["plan_id"] == plan_id), None)
     if not plan:
-        raise HTTPException(status_code=404, detail="플랜을 찾을 수 없습니다")
+        raise ApiError(404, ErrorCode.RESOURCE_NOT_FOUND, "플랜을 찾을 수 없습니다")
 
     return {
         "success": True,
@@ -143,11 +145,11 @@ async def create_subscription(
     # 플랜 확인
     plan = next((p for p in SUBSCRIPTION_PLANS if p["plan_id"] == subscription.plan_id), None)
     if not plan:
-        raise HTTPException(status_code=404, detail="플랜을 찾을 수 없습니다")
+        raise ApiError(404, ErrorCode.RESOURCE_NOT_FOUND, "플랜을 찾을 수 없습니다")
 
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 기존 구독 확인
             cursor.execute("""
@@ -157,7 +159,7 @@ async def create_subscription(
 
             existing = cursor.fetchone()
             if existing:
-                if existing[1] == subscription.plan_id:
+                if existing['plan_id'] == subscription.plan_id:
                     return {
                         "success": False,
                         "message": "이미 동일한 플랜을 구독 중입니다"
@@ -168,7 +170,7 @@ async def create_subscription(
                         UPDATE user_subscriptions
                         SET status = 'cancelled', cancelled_at = NOW()
                         WHERE id = %s
-                    """, (existing[0],))
+                    """, (existing['id'],))
 
             # 새 구독 생성
             cursor.execute("""
@@ -181,7 +183,7 @@ async def create_subscription(
                 ) RETURNING id
             """, (user.id, subscription.plan_id, subscription.payment_method))
 
-            subscription_id = cursor.fetchone()[0]
+            subscription_id = cursor.fetchone()['id']
             conn.commit()
 
             return {
@@ -191,9 +193,11 @@ async def create_subscription(
                 "plan": plan
             }
 
+    except ApiError:
+        raise
     except Exception as e:
         logger.error(f"구독 신청 실패: {e}")
-        raise HTTPException(status_code=500, detail="구독 신청 중 오류가 발생했습니다")
+        raise ApiError(500, ErrorCode.SERVER_ERROR, "구독 신청 중 오류가 발생했습니다")
 
 
 @router.get("/current")
@@ -201,7 +205,7 @@ async def get_current_subscription(user: User = Depends(get_current_user)):
     """현재 구독 상태 조회"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 SELECT plan_id, status, started_at, next_billing_date
@@ -213,22 +217,24 @@ async def get_current_subscription(user: User = Depends(get_current_user)):
 
             result = cursor.fetchone()
             if result:
-                plan = next((p for p in SUBSCRIPTION_PLANS if p["plan_id"] == result[0]), None)
+                plan = next((p for p in SUBSCRIPTION_PLANS if p["plan_id"] == result['plan_id']), None)
                 return {
                     "success": True,
                     "has_subscription": True,
                     "subscription": {
-                        "plan_id": result[0],
+                        "plan_id": result['plan_id'],
                         "plan": plan,
-                        "status": result[1],
-                        "started_at": result[2].isoformat() if result[2] else None,
-                        "next_billing_date": result[3].isoformat() if result[3] else None
+                        "status": result['status'],
+                        "started_at": result['started_at'].isoformat() if result['started_at'] else None,
+                        "next_billing_date": result['next_billing_date'].isoformat() if result['next_billing_date'] else None
                     }
                 }
 
+    except ApiError:
+        raise
     except Exception as e:
         logger.error(f"구독 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail="구독 조회 중 오류가 발생했습니다")
+        raise ApiError(500, ErrorCode.SERVER_ERROR, "구독 조회 중 오류가 발생했습니다")
 
     # 구독이 없으면 Free 플랜
     free_plan = SUBSCRIPTION_PLANS[0]
@@ -252,7 +258,7 @@ async def checkout(
     # 플랜 확인
     plan = next((p for p in SUBSCRIPTION_PLANS if p["plan_id"] == request.plan_id), None)
     if not plan:
-        raise HTTPException(status_code=404, detail="플랜을 찾을 수 없습니다")
+        raise ApiError(404, ErrorCode.RESOURCE_NOT_FOUND, "플랜을 찾을 수 없습니다")
 
     # 실제 결제 처리는 Stripe 등 결제 서비스 연동 필요
     # 여기서는 시뮬레이션
@@ -283,7 +289,7 @@ async def cancel_subscription(user: User = Depends(get_current_user)):
     """구독 취소"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 UPDATE user_subscriptions
@@ -301,11 +307,13 @@ async def cancel_subscription(user: User = Depends(get_current_user)):
                     "message": "구독이 취소되었습니다"
                 }
             else:
-                raise HTTPException(status_code=404, detail="활성 구독이 없습니다")
+                raise ApiError(404, ErrorCode.RESOURCE_NOT_FOUND, "활성 구독이 없습니다")
 
+    except ApiError:
+        raise
     except Exception as e:
         logger.error(f"구독 취소 실패: {e}")
-        raise HTTPException(status_code=500, detail="구독 취소 중 오류가 발생했습니다")
+        raise ApiError(500, ErrorCode.SERVER_ERROR, "구독 취소 중 오류가 발생했습니다")
 
 
 @router.get("/usage")
@@ -317,26 +325,26 @@ async def get_usage_stats(user: User = Depends(get_current_user)):
 
     # 실제 사용량을 DB에서 조회
     with get_db_connection() as conn:
-        with conn.cursor() as cursor:
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(
-                "SELECT COUNT(*) FROM user_bookmarks WHERE user_id = %s",
+                "SELECT COUNT(*) as count FROM user_bookmarks WHERE user_id = %s",
                 (user.id,)
             )
-            bookmarks_used = cursor.fetchone()[0]
+            bookmarks_used = cursor.fetchone()['count']
 
             cursor.execute(
-                "SELECT COUNT(*) FROM alert_rules WHERE user_id = %s AND is_active = true",
+                "SELECT COUNT(*) as count FROM alert_rules WHERE user_id = %s AND is_active = true",
                 (user.id,)
             )
-            alerts_used = cursor.fetchone()[0]
+            alerts_used = cursor.fetchone()['count']
 
             # API 활동 수: 알림 수로 대체
             try:
                 cursor.execute(
-                    "SELECT COUNT(*) FROM notifications WHERE user_id = %s",
+                    "SELECT COUNT(*) as count FROM notifications WHERE user_id = %s",
                     (user.id,)
                 )
-                api_calls_used = cursor.fetchone()[0]
+                api_calls_used = cursor.fetchone()['count']
             except Exception:
                 api_calls_used = 0
 

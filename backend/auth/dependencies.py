@@ -2,13 +2,14 @@
 인증 의존성 및 미들웨어
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 from datetime import datetime, timezone
 from database import get_db_connection
 from .security import decode_token
 from psycopg2.extras import RealDictCursor
+from errors import ErrorCode, ApiError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -91,19 +92,11 @@ async def get_current_user(
 ) -> User:
     """현재 사용자 가져오기 (필수)"""
     if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="인증 토큰이 필요합니다",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise ApiError(401, ErrorCode.AUTH_REQUIRED, "인증 토큰이 필요합니다")
 
     user = await get_current_user_optional(credentials)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="유효하지 않은 인증 정보입니다",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise ApiError(401, ErrorCode.AUTH_TOKEN_INVALID, "유효하지 않은 인증 정보입니다")
 
     return user
 
@@ -113,10 +106,7 @@ async def get_current_active_user(
 ) -> User:
     """활성 사용자 확인"""
     if not current_user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="비활성 사용자입니다"
-        )
+        raise ApiError(400, ErrorCode.AUTH_INACTIVE_USER, "비활성 사용자입니다")
     return current_user
 
 
@@ -125,10 +115,7 @@ async def get_current_verified_user(
 ) -> User:
     """이메일 인증된 사용자 확인"""
     if not current_user.email_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이메일 인증이 필요합니다"
-        )
+        raise ApiError(400, ErrorCode.AUTH_EMAIL_NOT_VERIFIED, "이메일 인증이 필요합니다")
     return current_user
 
 
@@ -137,8 +124,5 @@ async def get_current_superuser(
 ) -> User:
     """관리자 확인"""
     if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="관리자 권한이 필요합니다"
-        )
+        raise ApiError(403, ErrorCode.AUTH_FORBIDDEN, "관리자 권한이 필요합니다")
     return current_user

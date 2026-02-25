@@ -7,6 +7,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 from database import get_db_connection
 from psycopg2.extras import RealDictCursor
+from errors import ErrorCode, ApiError
 import logging
 
 try:
@@ -265,7 +266,7 @@ def _search_bids_from_db(
 
     except Exception as e:
         logger.error(f"검색 실패: {e}")
-        raise HTTPException(status_code=500, detail="검색 처리 중 오류가 발생했습니다")
+        raise ApiError(500, ErrorCode.SEARCH_FAILED, "검색 처리 중 오류가 발생했습니다")
 
 
 @router.get("/search")
@@ -284,7 +285,7 @@ async def search_bids(
 
     # 500자 제한 검증 (Query에서 이미 처리되지만 명시적으로 확인)
     if q and len(q) > 500:
-        raise HTTPException(status_code=422, detail="검색어는 500자를 초과할 수 없습니다")
+        raise ApiError(422, ErrorCode.SEARCH_QUERY_TOO_LONG, "검색어는 500자를 초과할 수 없습니다")
 
     # 캐시 키 생성
     cache_params = {
@@ -374,7 +375,7 @@ async def list_bids(
 
     except Exception as e:
         logger.error(f"목록 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail="목록 조회 중 오류가 발생했습니다")
+        raise ApiError(500, ErrorCode.SEARCH_FAILED, "목록 조회 중 오류가 발생했습니다")
 
 
 @router.get("/bids/{bid_notice_no}")
@@ -408,7 +409,7 @@ async def get_bid_detail(bid_notice_no: str):
 
             row = cursor.fetchone()
             if not row:
-                raise HTTPException(status_code=404, detail="입찰 공고를 찾을 수 없습니다")
+                raise ApiError(404, ErrorCode.RESOURCE_NOT_FOUND, "입찰 공고를 찾을 수 없습니다")
 
             return {
                 "success": True,
@@ -436,4 +437,4 @@ async def get_bid_detail(bid_notice_no: str):
         raise
     except Exception as e:
         logger.error(f"상세 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail="상세 조회 중 오류가 발생했습니다")
+        raise ApiError(500, ErrorCode.SERVER_ERROR, "상세 조회 중 오류가 발생했습니다")

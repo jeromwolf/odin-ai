@@ -3,13 +3,14 @@ RAG 의미 검색 API
 하이브리드 벡터 + 전문검색 엔드포인트
 """
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Query, Request
 from typing import Optional
 import logging
 import os
 
 from database import get_db_connection
 from middleware.rate_limit import limiter
+from errors import ErrorCode, ApiError
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ async def rag_search(
     의미적으로 관련된 문서 청크를 반환합니다.
     """
     if not RAG_AVAILABLE:
-        raise HTTPException(status_code=503, detail="RAG 검색 서비스가 비활성화되어 있습니다")
+        raise ApiError(503, ErrorCode.SERVICE_RAG_UNAVAILABLE, "RAG 검색 서비스가 비활성화되어 있습니다")
 
     try:
         service = get_hybrid_search_service()
@@ -74,7 +75,7 @@ async def rag_search(
 
     except Exception as e:
         logger.error(f"RAG 검색 실패: {e}")
-        raise HTTPException(status_code=500, detail="검색 처리 중 오류가 발생했습니다")
+        raise ApiError(500, ErrorCode.SEARCH_FAILED, "검색 처리 중 오류가 발생했습니다")
 
 
 @router.get("/ask")
@@ -92,7 +93,7 @@ async def rag_ask(
     OPENAI_API_KEY가 없으면 검색 결과만 반환합니다.
     """
     if not RAG_AVAILABLE:
-        raise HTTPException(status_code=503, detail="RAG 검색 서비스가 비활성화되어 있습니다")
+        raise ApiError(503, ErrorCode.SERVICE_RAG_UNAVAILABLE, "RAG 검색 서비스가 비활성화되어 있습니다")
 
     try:
         # 1. Retrieve relevant chunks
@@ -151,7 +152,7 @@ async def rag_ask(
 
     except Exception as e:
         logger.error(f"RAG 질의응답 실패: {e}")
-        raise HTTPException(status_code=500, detail="질의응답 처리 중 오류가 발생했습니다")
+        raise ApiError(500, ErrorCode.SEARCH_FAILED, "질의응답 처리 중 오류가 발생했습니다")
 
 
 @router.get("/status")
@@ -197,7 +198,7 @@ async def rag_global_ask(
     인사이트에 대한 답변을 생성합니다.
     """
     if not GRAPHRAG_SERVICE_AVAILABLE:
-        raise HTTPException(status_code=503, detail="GraphRAG 서비스가 비활성화되어 있습니다")
+        raise ApiError(503, ErrorCode.SERVICE_GRAPH_UNAVAILABLE, "GraphRAG 서비스가 비활성화되어 있습니다")
 
     try:
         result = get_graphrag_service().global_ask(q, top_communities=top_communities)
@@ -205,7 +206,7 @@ async def rag_global_ask(
 
     except Exception as e:
         logger.error(f"GraphRAG 글로벌 질의 실패: {e}")
-        raise HTTPException(status_code=500, detail="글로벌 질의 처리 중 오류가 발생했습니다")
+        raise ApiError(500, ErrorCode.SEARCH_FAILED, "글로벌 질의 처리 중 오류가 발생했습니다")
 
 
 def _synthesize_answer(query: str, chunks: list) -> str:

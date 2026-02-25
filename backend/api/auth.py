@@ -2,13 +2,15 @@
 사용자 인증 API
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request, status
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import html
 import logging
 from database import get_db_connection
+from errors import ErrorCode, ApiError
+from psycopg2.extras import RealDictCursor
 from auth.security import (
     verify_password,
     get_password_hash,
@@ -90,25 +92,19 @@ async def register(user_data: UserRegister):
     """회원가입"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 이메일 중복 확인
             check_email_query = "SELECT id FROM users WHERE email = %s"
             cursor.execute(check_email_query, (user_data.email,))
             if cursor.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="이미 등록된 이메일입니다"
-                )
+                raise ApiError(400, ErrorCode.AUTH_DUPLICATE_EMAIL, "이미 등록된 이메일입니다")
 
             # 사용자명 중복 확인
             check_username_query = "SELECT id FROM users WHERE username = %s"
             cursor.execute(check_username_query, (user_data.username,))
             if cursor.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="이미 사용중인 사용자명입니다"
-                )
+                raise ApiError(400, ErrorCode.AUTH_DUPLICATE_EMAIL, "이미 사용중인 사용자명입니다")
 
             # XSS 방어를 위한 HTML 이스케이프
             safe_full_name = html.escape(user_data.full_name) if user_data.full_name else None
@@ -146,7 +142,7 @@ async def register(user_data: UserRegister):
                 ) VALUES (%s, %s, %s)
             """
             cursor.execute(token_query, (
-                user_record[0],
+                user_record['id'],
                 verification_token,
                 datetime.now(timezone.utc) + timedelta(hours=24)
             ))
@@ -165,24 +161,21 @@ async def register(user_data: UserRegister):
                 logger.warning(f"인증 메일 발송 실패 (회원가입은 완료됨): {email_err}")
 
             return UserResponse(
-                id=user_record[0],
-                email=user_record[1],
-                username=user_record[2],
-                full_name=user_record[3],
-                company=user_record[4],
-                is_active=user_record[5],
-                email_verified=user_record[6],
-                created_at=user_record[7]
+                id=user_record['id'],
+                email=user_record['email'],
+                username=user_record['username'],
+                full_name=user_record['full_name'],
+                company=user_record['company'],
+                is_active=user_record['is_active'],
+                email_verified=user_record['email_verified'],
+                created_at=user_record['created_at']
             )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"회원가입 실패: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="회원가입 처리 중 오류가 발생했습니다"
-        )
+        raise ApiError(500, ErrorCode.SERVER_ERROR, "회원가입 처리 중 오류가 발생했습니다")
 
 
 @limiter.limit("5/minute")
@@ -191,7 +184,7 @@ async def login(request: Request, credentials: UserLogin):
     """로그인"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 사용자 조회
             query = """
@@ -203,28 +196,19 @@ async def login(request: Request, credentials: UserLogin):
             user = cursor.fetchone()
 
             if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="이메일 또는 비밀번호가 일치하지 않습니다"
-                )
+                raise ApiError(401, ErrorCode.AUTH_LOGIN_FAILED, "이메일 또는 비밀번호가 일치하지 않습니다")
 
             # 비밀번호 검증
-            if not verify_password(credentials.password, user[3]):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="이메일 또는 비밀번호가 일치하지 않습니다"
-                )
+            if not verify_password(credentials.password, user['hashed_password']):
+                raise ApiError(401, ErrorCode.AUTH_LOGIN_FAILED, "이메일 또는 비밀번호가 일치하지 않습니다")
 
             # 활성 사용자 확인
-            if not user[4]:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="비활성화된 계정입니다"
-                )
+            if not user['is_active']:
+                raise ApiError(403, ErrorCode.AUTH_INACTIVE_USER, "비활성화된 계정입니다")
 
             # 토큰 생성
-            access_token = create_access_token(data={"sub": str(user[0])})
-            refresh_token = create_refresh_token(data={"sub": str(user[0])})
+            access_token = create_access_token(data={"sub": str(user['id'])})
+            refresh_token = create_refresh_token(data={"sub": str(user['id'])})
 
             # 세션 저장
             session_query = """
@@ -233,14 +217,14 @@ async def login(request: Request, credentials: UserLogin):
                 ) VALUES (%s, %s, %s)
             """
             cursor.execute(session_query, (
-                user[0],
+                user['id'],
                 refresh_token,
                 datetime.now(timezone.utc) + timedelta(days=7)
             ))
 
             # 마지막 로그인 시간 업데이트
             update_query = "UPDATE users SET last_login = %s WHERE id = %s"
-            cursor.execute(update_query, (datetime.now(timezone.utc), user[0]))
+            cursor.execute(update_query, (datetime.now(timezone.utc), user['id']))
             conn.commit()
 
             return TokenResponse(
@@ -254,10 +238,7 @@ async def login(request: Request, credentials: UserLogin):
         raise
     except Exception as e:
         logger.error(f"로그인 실패: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="로그인 처리 중 오류가 발생했습니다"
-        )
+        raise ApiError(500, ErrorCode.SERVER_ERROR, "로그인 처리 중 오류가 발생했습니다")
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -267,20 +248,14 @@ async def refresh_token(token_data: TokenRefresh):
         # 리프레시 토큰 검증
         payload = decode_token(token_data.refresh_token)
         if not payload or payload.get("type") != "refresh":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="유효하지 않은 리프레시 토큰입니다"
-            )
+            raise ApiError(401, ErrorCode.AUTH_TOKEN_INVALID, "유효하지 않은 리프레시 토큰입니다")
 
         user_id = payload.get("sub")
         if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="유효하지 않은 리프레시 토큰입니다"
-            )
+            raise ApiError(401, ErrorCode.AUTH_TOKEN_INVALID, "유효하지 않은 리프레시 토큰입니다")
 
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 세션 확인
             session_query = """
@@ -294,10 +269,7 @@ async def refresh_token(token_data: TokenRefresh):
             ))
 
             if not cursor.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="세션이 만료되었거나 유효하지 않습니다"
-                )
+                raise ApiError(401, ErrorCode.AUTH_TOKEN_EXPIRED, "세션이 만료되었거나 유효하지 않습니다")
 
             # 새 토큰 생성
             access_token = create_access_token(data={"sub": user_id})
@@ -327,10 +299,7 @@ async def refresh_token(token_data: TokenRefresh):
         raise
     except Exception as e:
         logger.error(f"토큰 갱신 실패: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="토큰 갱신 중 오류가 발생했습니다"
-        )
+        raise ApiError(500, ErrorCode.SERVER_ERROR, "토큰 갱신 중 오류가 발생했습니다")
 
 
 @router.post("/logout")
@@ -340,7 +309,7 @@ async def logout(current_user: User = Depends(get_current_user_optional)):
         # 토큰이 유효하지 않아도 로그아웃 성공으로 처리 (클라이언트에서 토큰 제거 필요)
         if current_user:
             with get_db_connection() as conn:
-                cursor = conn.cursor()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
 
                 # 모든 세션 비활성화
                 query = """
@@ -380,7 +349,7 @@ async def verify_email(request: EmailVerifyRequest):
     """이메일 인증 토큰 검증"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 토큰 조회
             token_query = """
@@ -392,18 +361,15 @@ async def verify_email(request: EmailVerifyRequest):
             token_record = cursor.fetchone()
 
             if not token_record:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="유효하지 않은 인증 토큰입니다"
-                )
+                raise ApiError(400, ErrorCode.AUTH_TOKEN_INVALID, "유효하지 않은 인증 토큰입니다")
 
-            token_id, user_id, expires_at, used = token_record
+            token_id = token_record['id']
+            user_id = token_record['user_id']
+            expires_at = token_record['expires_at']
+            used = token_record['used']
 
             if used:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="이미 사용된 인증 토큰입니다"
-                )
+                raise ApiError(400, ErrorCode.AUTH_TOKEN_INVALID, "이미 사용된 인증 토큰입니다")
 
             # 만료 확인 (expires_at이 timezone-naive일 수 있으므로 변환)
             now_utc = datetime.now(timezone.utc)
@@ -411,10 +377,7 @@ async def verify_email(request: EmailVerifyRequest):
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
 
             if now_utc > expires_at:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="만료된 인증 토큰입니다. 인증 메일을 재발송해 주세요"
-                )
+                raise ApiError(400, ErrorCode.AUTH_TOKEN_EXPIRED, "만료된 인증 토큰입니다. 인증 메일을 재발송해 주세요")
 
             # 이메일 인증 완료 처리
             cursor.execute(
@@ -434,10 +397,7 @@ async def verify_email(request: EmailVerifyRequest):
         raise
     except Exception as e:
         logger.error(f"이메일 인증 실패: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="이메일 인증 처리 중 오류가 발생했습니다"
-        )
+        raise ApiError(500, ErrorCode.SERVER_ERROR, "이메일 인증 처리 중 오류가 발생했습니다")
 
 
 @limiter.limit("3/minute")
@@ -446,7 +406,7 @@ async def resend_verification(request: Request, body: ResendVerificationRequest)
     """이메일 인증 메일 재발송"""
     try:
         with get_db_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 사용자 조회
             cursor.execute(
@@ -459,13 +419,12 @@ async def resend_verification(request: Request, body: ResendVerificationRequest)
             if not user:
                 return {"message": "인증 메일을 발송했습니다. 메일함을 확인해 주세요"}
 
-            user_id, username, email_verified = user
+            user_id = user['id']
+            username = user['username']
+            email_verified = user['email_verified']
 
             if email_verified:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="이미 이메일 인증이 완료된 계정입니다"
-                )
+                raise ApiError(400, ErrorCode.VALIDATION_FAILED, "이미 이메일 인증이 완료된 계정입니다")
 
             # 기존 미사용 토큰 만료 처리
             cursor.execute(
@@ -500,7 +459,4 @@ async def resend_verification(request: Request, body: ResendVerificationRequest)
         raise
     except Exception as e:
         logger.error(f"인증 메일 재발송 실패: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="인증 메일 재발송 중 오류가 발생했습니다"
-        )
+        raise ApiError(500, ErrorCode.SERVER_ERROR, "인증 메일 재발송 중 오류가 발생했습니다")
