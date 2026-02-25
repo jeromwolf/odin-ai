@@ -118,29 +118,94 @@ class OpenAIEmbedding(EmbeddingProvider):
             return None
 
 
+class LocalEmbeddingProvider(EmbeddingProvider):
+    """KURE-v1 로컬 임베딩 (sentence-transformers)"""
+
+    def __init__(self, model_name: str = "nlpai-lab/KURE-v1"):
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            raise ImportError("sentence-transformers 패키지가 설치되지 않았습니다: pip install sentence-transformers")
+
+        self._st_model = SentenceTransformer(model_name)
+        self._dimension = 1024  # KURE-v1 output dimension
+        self._model_name = model_name
+        logger.info(f"로컬 임베딩 서비스 초기화: model={model_name}, dim={self._dimension}")
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name
+
+    def embed_texts(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+        """텍스트 목록을 로컬 모델로 임베딩 생성"""
+        try:
+            cleaned = [t[:8000] if t else " " for t in texts]
+            embeddings = self._st_model.encode(
+                cleaned,
+                normalize_embeddings=True,
+                batch_size=batch_size,
+                show_progress_bar=len(cleaned) > 10
+            )
+            return embeddings.tolist()
+        except Exception as e:
+            logger.error(f"로컬 임베딩 생성 실패: {e}")
+            return [None] * len(texts)
+
+    def embed_query(self, query: str) -> Optional[List[float]]:
+        """검색 쿼리 임베딩 (단일 텍스트)"""
+        try:
+            embedding = self._st_model.encode(
+                [query[:8000]],
+                normalize_embeddings=True
+            )
+            return embedding[0].tolist()
+        except Exception as e:
+            logger.error(f"쿼리 임베딩 실패: {e}")
+            return None
+
+
+# DB vector column dimension (rfp_chunks.embedding is vector(1024))
+DB_VECTOR_DIMENSION = 1024
+
 # Singleton instance
 _embedding_provider: Optional[EmbeddingProvider] = None
 
 
 def get_embedding_provider() -> Optional[EmbeddingProvider]:
-    """임베딩 제공자 싱글턴 인스턴스 반환"""
+    """임베딩 제공자 싱글턴 인스턴스 반환 (로컬 우선, OpenAI는 차원 호환 시에만 폴백)"""
     global _embedding_provider
 
     if _embedding_provider is not None:
         return _embedding_provider
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        logger.warning("OPENAI_API_KEY 미설정 - 임베딩 서비스 비활성화")
-        return None
-
-    if not OPENAI_AVAILABLE:
-        logger.warning("openai 패키지 미설치 - 임베딩 서비스 비활성화")
-        return None
-
+    # 1. 로컬 KURE-v1 우선 시도 (1024차원 - DB 호환)
     try:
-        _embedding_provider = OpenAIEmbedding(api_key=api_key)
+        _embedding_provider = LocalEmbeddingProvider()
         return _embedding_provider
     except Exception as e:
-        logger.error(f"임베딩 서비스 초기화 실패: {e}")
-        return None
+        logger.warning(f"로컬 임베딩 로드 실패 (KURE-v1): {e}")
+
+    # 2. OpenAI 폴백 - 차원 호환성 검증 필수
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key and OPENAI_AVAILABLE:
+        try:
+            provider = OpenAIEmbedding(api_key=api_key)
+            if provider.dimension != DB_VECTOR_DIMENSION:
+                logger.error(
+                    f"OpenAI 임베딩 차원 불일치! "
+                    f"프로바이더={provider.dimension}차원, DB=vector({DB_VECTOR_DIMENSION}). "
+                    f"OpenAI 폴백을 사용하지 않습니다. KURE-v1 모델을 설치하세요."
+                )
+                # 차원 불일치 시 폴백 거부 - INSERT 실패 방지
+            else:
+                _embedding_provider = provider
+                return _embedding_provider
+        except Exception as e:
+            logger.error(f"OpenAI 임베딩 초기화 실패: {e}")
+
+    logger.warning("사용 가능한 임베딩 제공자가 없습니다 (KURE-v1 설치 권장: pip install sentence-transformers)")
+    return None

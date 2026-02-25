@@ -7,6 +7,9 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 import logging
 import os
+import json
+
+from database import get_db_connection
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +21,12 @@ except ImportError:
     RAG_AVAILABLE = False
     logger.warning("하이브리드 검색 서비스 로드 실패 - RAG API 비활성화")
 
-# OpenAI for answer synthesis (optional)
+# Ollama LLM for answer synthesis (local)
 try:
-    from openai import OpenAI
-    LLM_AVAILABLE = True
+    import httpx
+    HTTPX_AVAILABLE = True
 except ImportError:
-    LLM_AVAILABLE = False
+    HTTPX_AVAILABLE = False
 
 router = APIRouter(prefix="/api/rag", tags=["RAG Search"])
 
@@ -102,9 +105,9 @@ async def rag_ask(
             }
 
         # 2. Synthesize answer with LLM (if available)
-        api_key = os.getenv("OPENAI_API_KEY")
-        if LLM_AVAILABLE and api_key:
-            answer = _synthesize_answer(q, chunks, api_key)
+        ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
+        if HTTPX_AVAILABLE and ollama_url:
+            answer = _synthesize_answer(q, chunks)
             has_llm = True
         else:
             # No LLM: return chunks as-is
@@ -148,7 +151,7 @@ async def rag_status():
     """
     status = {
         "rag_available": RAG_AVAILABLE,
-        "llm_available": LLM_AVAILABLE and bool(os.getenv("OPENAI_API_KEY")),
+        "llm_available": HTTPX_AVAILABLE and bool(os.getenv("OLLAMA_URL")),
         "embedding_stats": {},
     }
 
@@ -161,49 +164,192 @@ async def rag_status():
             logger.error(f"RAG 상태 조회 실패: {e}")
             status["search_available"] = False
 
+    # GraphRAG 통계 추가
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM graphrag_entities")
+            entity_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM graphrag_communities")
+            community_count = cursor.fetchone()[0]
+            cursor.close()
+        status["graphrag"] = {
+            "entities": entity_count,
+            "communities": community_count,
+            "available": entity_count > 0,
+        }
+    except Exception:
+        status["graphrag"] = {"available": False}
+
     return status
 
 
-def _synthesize_answer(query: str, chunks: list, api_key: str) -> str:
-    """LLM으로 답변 합성"""
-    try:
-        client = OpenAI(api_key=api_key)
+@router.get("/global-ask")
+async def rag_global_ask(
+    q: str = Query(..., min_length=1, max_length=500, description="글로벌 질문"),
+    top_communities: int = Query(5, ge=1, le=20, description="참조 커뮤니티 수"),
+):
+    """
+    GraphRAG 글로벌 질의응답
 
+    커뮤니티 요약을 기반으로 전체적인 패턴, 트렌드,
+    인사이트에 대한 답변을 생성합니다.
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # 1. 커뮤니티 요약 조회
+            cursor.execute("""
+                SELECT community_id, title, summary, findings,
+                       entity_count, bid_count
+                FROM graphrag_communities
+                ORDER BY bid_count DESC
+                LIMIT %s
+            """, (top_communities,))
+            communities = cursor.fetchall()
+
+            if not communities:
+                cursor.close()
+                return {
+                    "success": True,
+                    "query": q,
+                    "answer": "GraphRAG 커뮤니티 데이터가 없습니다. 인덱싱을 먼저 실행하세요.",
+                    "communities": [],
+                    "has_llm_answer": False,
+                }
+
+            # 2. 커뮤니티 컨텍스트 구성
+            community_data = []
+            context_parts = []
+            for i, (cid, title, summary, findings, e_count, b_count) in enumerate(communities, 1):
+                findings_parsed = json.loads(findings) if isinstance(findings, str) else findings
+                context_parts.append(
+                    f"[커뮤니티 {i}] {title}\n"
+                    f"요약: {summary}\n"
+                    f"엔티티 {e_count}개, 관련 입찰 {b_count}건"
+                )
+                community_data.append({
+                    "community_id": cid,
+                    "title": title,
+                    "summary": summary,
+                    "entity_count": e_count,
+                    "bid_count": b_count,
+                    "findings": findings_parsed[:5] if findings_parsed else [],
+                })
+
+            # 3. 관련 엔티티 검색 (키워드 매칭)
+            cursor.execute("""
+                SELECT entity_type, entity_name, description, community_id
+                FROM graphrag_entities
+                WHERE entity_name ILIKE %s OR description ILIKE %s
+                LIMIT 10
+            """, (f'%{q}%', f'%{q}%'))
+            related_entities = [
+                {"type": r[0], "name": r[1], "description": r[2], "community_id": r[3]}
+                for r in cursor.fetchall()
+            ]
+            cursor.close()
+
+        # 4. LLM으로 글로벌 답변 생성
+        context = "\n\n---\n\n".join(context_parts)
+        answer = _synthesize_global_answer(q, context, related_entities)
+
+        return {
+            "success": True,
+            "query": q,
+            "answer": answer,
+            "communities": community_data,
+            "related_entities": related_entities,
+            "has_llm_answer": HTTPX_AVAILABLE and bool(os.getenv("OLLAMA_URL")),
+        }
+
+    except Exception as e:
+        logger.error(f"GraphRAG 글로벌 질의 실패: {e}")
+        raise HTTPException(status_code=500, detail="글로벌 질의 처리 중 오류가 발생했습니다")
+
+
+def _synthesize_global_answer(query: str, community_context: str, entities: list) -> str:
+    """커뮤니티 기반 글로벌 답변 합성 (Ollama)"""
+    ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
+    ollama_model = os.getenv("OLLAMA_MODEL", "exaone3.5:7.8b")
+
+    if not HTTPX_AVAILABLE or not ollama_url:
+        return "LLM이 비활성화되어 커뮤니티 요약만 반환합니다."
+
+    try:
+        entity_info = ""
+        if entities:
+            entity_info = "\n관련 엔티티:\n" + "\n".join([
+                f"- [{e['type']}] {e['name']}: {e.get('description', '')}"
+                for e in entities[:5]
+            ])
+
+        prompt = (
+            "당신은 한국 공공입찰 데이터 분석 전문가입니다. "
+            "아래 커뮤니티 분석 데이터를 기반으로 질문에 답변하세요. "
+            "전체적인 트렌드, 패턴, 인사이트를 중심으로 답변하세요.\n\n"
+            f"커뮤니티 분석 데이터:\n{community_context}\n"
+            f"{entity_info}\n\n"
+            f"질문: {query}\n\n답변:"
+        )
+
+        response = httpx.post(
+            f"{ollama_url}/api/generate",
+            json={
+                "model": ollama_model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.3, "num_predict": 1000}
+            },
+            timeout=60.0
+        )
+        response.raise_for_status()
+        return response.json().get("response", "답변 생성에 실패했습니다.")
+
+    except Exception as e:
+        logger.error(f"글로벌 답변 합성 실패: {e}")
+        return "답변 생성 중 오류가 발생했습니다. 잠시 후 다시 시도하세요."
+
+
+def _synthesize_answer(query: str, chunks: list) -> str:
+    """Ollama EXAONE 3.5로 답변 합성 (로컬 LLM)"""
+    ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
+    ollama_model = os.getenv("OLLAMA_MODEL", "exaone3.5:7.8b")
+
+    try:
         # Build context from chunks
         context_parts = []
         for i, chunk in enumerate(chunks[:5], 1):
             bid_title = chunk.get("bid_title", "")
             section = chunk.get("section_type", "")
             text = chunk.get("chunk_text", "")
-            context_parts.append(
-                f"[문서 {i}] {bid_title} ({section})\n{text}"
-            )
+            context_parts.append(f"[문서 {i}] {bid_title} ({section})\n{text}")
 
         context = "\n\n---\n\n".join(context_parts)
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "당신은 한국 공공입찰 전문가입니다. "
-                        "아래 입찰공고 문서를 참고하여 질문에 정확하게 답변하세요. "
-                        "답변은 한국어로 작성하고, 근거가 되는 문서 번호를 인용하세요. "
-                        "문서에 없는 내용은 추측하지 마세요."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"참고 문서:\n{context}\n\n질문: {query}",
-                },
-            ],
-            max_tokens=1000,
-            temperature=0.3,
+        prompt = (
+            "당신은 한국 공공입찰 전문가입니다. "
+            "아래 입찰공고 문서를 참고하여 질문에 정확하게 답변하세요. "
+            "답변은 한국어로 작성하고, 근거가 되는 문서 번호를 인용하세요. "
+            "문서에 없는 내용은 추측하지 마세요.\n\n"
+            f"참고 문서:\n{context}\n\n"
+            f"질문: {query}\n\n답변:"
         )
 
-        return response.choices[0].message.content
+        response = httpx.post(
+            f"{ollama_url}/api/generate",
+            json={
+                "model": ollama_model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.3, "num_predict": 1000}
+            },
+            timeout=60.0
+        )
+        response.raise_for_status()
+        return response.json().get("response", "답변 생성에 실패했습니다.")
 
     except Exception as e:
-        logger.error(f"LLM 답변 합성 실패: {e}")
-        return f"답변 생성 중 오류가 발생했습니다: {str(e)}"
+        logger.error(f"Ollama LLM 답변 합성 실패: {e}")
+        return "답변 생성 중 오류가 발생했습니다. 잠시 후 다시 시도하세요."
