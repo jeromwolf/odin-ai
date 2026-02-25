@@ -175,13 +175,16 @@ class GraphRAGIndexer:
             logger.info("엔티티 추출 대상 공고 없음")
             return []
 
-        logger.info(f"엔티티 추출 대상: {len(bids)}건")
+        total = len(bids)
+        logger.info(f"엔티티 추출 대상: {total}건")
         all_entities = []
 
-        for row in bids:
+        for i, row in enumerate(bids, 1):
             bid = dict(zip(columns, row))
             entities = self._extract_entities_for_bid(bid)
             all_entities.extend(entities)
+            if i % 10 == 0 or i == total:
+                logger.info(f"엔티티 추출 진행: {i}/{total} ({i/total*100:.1f}%) - 누적 엔티티: {len(all_entities)}개")
 
         # DB에 저장
         if all_entities:
@@ -438,7 +441,8 @@ class GraphRAGIndexer:
         conn = psycopg2.connect(self.db_url)
         cursor = conn.cursor()
 
-        for comm_id, members in communities.items():
+        total_comms = len(communities)
+        for ci, (comm_id, members) in enumerate(communities.items(), 1):
             entity_count = len(members)
             # 관련 공고 수 조회
             entity_ids = [m['entity_id'] for m in members]
@@ -479,6 +483,8 @@ class GraphRAGIndexer:
                 json.dumps(findings, ensure_ascii=False),
                 entity_count, bid_count
             ))
+            if ci % 10 == 0 or ci == total_comms:
+                logger.info(f"커뮤니티 저장 진행: {ci}/{total_comms} ({ci/total_comms*100:.1f}%)")
 
         conn.commit()
         conn.close()
@@ -545,7 +551,8 @@ class GraphRAGIndexer:
         logger.info(f"엔티티 임베딩 생성: {len(rows)}건")
 
         count = 0
-        for i in range(0, len(rows), batch_size):
+        total_batches = (len(rows) + batch_size - 1) // batch_size
+        for bi, i in enumerate(range(0, len(rows), batch_size), 1):
             batch = rows[i:i + batch_size]
             texts = [
                 f"{r[2]}: {r[1]}. {r[3] or ''}" for r in batch
@@ -561,6 +568,9 @@ class GraphRAGIndexer:
                     WHERE entity_id = %s
                 """, (str(emb), entity_id))
                 count += 1
+
+            if bi % 5 == 0 or bi == total_batches:
+                logger.info(f"엔티티 임베딩 진행: {count}/{len(rows)} ({count/len(rows)*100:.1f}%)")
 
         conn.commit()
         conn.close()
