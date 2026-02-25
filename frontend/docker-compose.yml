@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: odin-postgres
     environment:
       POSTGRES_USER: ${DB_USER:-blockmeta}
@@ -52,7 +52,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-blockmeta}:${DB_PASSWORD:-odin2025}@postgres:5432/${DB_NAME:-odin_db}
       REDIS_URL: redis://redis:6379
       API_KEY: ${API_KEY}
-      SECRET_KEY: ${SECRET_KEY:-your-secret-key-here}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
@@ -68,6 +68,12 @@ services:
     networks:
       - odin-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 15s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
     command: uvicorn backend.main:app --host 0.0.0.0 --port 9000 --workers 4
 
   # Frontend
@@ -131,6 +137,30 @@ services:
       - odin-network
     command: python batch/production_batch.py
 
+  # Neo4j Graph Database
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: odin-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-odin2025neo4j}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_memory_heap_initial__size: 256m
+      NEO4J_dbms_memory_heap_max__size: 512m
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - odin-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
 networks:
   odin-network:
     driver: bridge
@@ -138,3 +168,5 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  neo4j_data:
+  neo4j_logs:
