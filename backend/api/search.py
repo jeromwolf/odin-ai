@@ -149,31 +149,34 @@ def _search_bids_from_db(
                     ts_rank(to_tsvector('simple', b.title), plainto_tsquery('simple', %s)) AS fts_rank,
                     similarity(b.title, %s) AS trgm_rank"""
                 rank_params = [q, q]
-                order_by = "ORDER BY (fts_rank * 2 + trgm_rank) DESC, b.created_at DESC"
+                order_by = "ORDER BY (fts_rank * 2 + trgm_rank) DESC, created_at DESC"
             else:
                 rank_select = ""
                 rank_params = []
-                order_by = "ORDER BY b.created_at DESC"
+                order_by = "ORDER BY created_at DESC"
 
             data_query = f"""
-                SELECT DISTINCT
-                    b.bid_notice_no,
-                    b.title,
-                    b.organization_name,
-                    b.department_name,
-                    b.estimated_price,
-                    b.bid_start_date,
-                    b.bid_end_date,
-                    b.status,
-                    b.bid_method,
-                    b.contract_method,
-                    b.region_restriction,
-                    b.created_at,
-                    CASE WHEN b.bid_end_date >= NOW() THEN EXTRACT(DAY FROM b.bid_end_date - NOW())::int ELSE NULL END as remaining_days,
-                    CASE WHEN b.bid_end_date >= NOW() THEN 'active' ELSE 'closed' END as computed_status
-                    {rank_select}
-                {data_from}
-                WHERE {where_sql}
+                SELECT * FROM (
+                    SELECT DISTINCT ON (b.bid_notice_no)
+                        b.bid_notice_no,
+                        b.title,
+                        b.organization_name,
+                        b.department_name,
+                        b.estimated_price,
+                        b.bid_start_date,
+                        b.bid_end_date,
+                        b.status,
+                        b.bid_method,
+                        b.contract_method,
+                        b.region_restriction,
+                        b.created_at,
+                        CASE WHEN b.bid_end_date >= NOW() THEN EXTRACT(DAY FROM b.bid_end_date - NOW())::int ELSE NULL END as remaining_days,
+                        CASE WHEN b.bid_end_date >= NOW() THEN 'active' ELSE 'closed' END as computed_status
+                        {rank_select}
+                    {data_from}
+                    WHERE {where_sql}
+                    ORDER BY b.bid_notice_no
+                ) sub
                 {order_by}
                 LIMIT %s OFFSET %s
             """
@@ -265,7 +268,7 @@ def _search_bids_from_db(
             }
 
     except Exception as e:
-        logger.error(f"검색 실패: {e}")
+        logger.error(f"검색 실패: {e}", exc_info=True)
         raise ApiError(500, ErrorCode.SEARCH_FAILED, "검색 처리 중 오류가 발생했습니다")
 
 
