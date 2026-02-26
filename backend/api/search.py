@@ -313,8 +313,8 @@ async def search_bids(
 async def list_bids(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    sort: str = Query("created_at", regex="^(created_at|bid_end_date|estimated_price)$"),
-    order: str = Query("desc", regex="^(asc|desc)$")
+    sort: str = Query("created_at", pattern="^(created_at|bid_end_date|estimated_price)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$")
 ):
     """입찰 목록 조회"""
     try:

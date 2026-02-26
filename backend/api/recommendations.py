@@ -275,7 +275,7 @@ async def get_collaborative_recommendations(
 async def get_personal_recommendations(
     user: User = Depends(get_current_user),
     limit: int = Query(10, ge=1, le=50),
-    recommendation_type: Optional[str] = Query(None, regex="^(content_based|collaborative|hybrid)$")
+    recommendation_type: Optional[str] = Query(None, pattern="^(content_based|collaborative|hybrid)$")
 ):
     """개인 맞춤 추천"""
     try:
@@ -516,7 +516,7 @@ async def get_similar_bids(
 @router.post("/feedback")
 async def submit_recommendation_feedback(
     recommendation_id: int,
-    feedback_type: str = Query(..., regex="^(like|dislike|not_relevant)$"),
+    feedback_type: str = Query(..., pattern="^(like|dislike|not_relevant)$"),
     feedback_score: Optional[int] = Query(None, ge=1, le=5),
     feedback_text: Optional[str] = None,
     user: User = Depends(get_current_user)

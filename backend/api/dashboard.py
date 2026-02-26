@@ -410,7 +410,7 @@ async def get_recommendations(
 
 @router.get("/trends")
 async def get_bid_trends(
-    period: str = Query("week", regex="^(day|week|month|year)$"),
+    period: str = Query("week", pattern="^(day|week|month|year)$"),
     user: Optional[User] = Depends(get_current_user_optional)
 ):
     """입찰 트렌드 분석"""

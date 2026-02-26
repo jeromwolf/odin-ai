@@ -55,7 +55,7 @@ class NotificationSettings(BaseModel):
 @router.get("/")
 async def get_notifications(
     user: User = Depends(get_current_user),
-    status_filter: Optional[str] = Query(None, regex="^(unread|read|all)$"),
+    status_filter: Optional[str] = Query(None, pattern="^(unread|read|all)$"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100)
 ):
@@ -673,7 +673,7 @@ async def update_notification_settings(
 @router.get("/queue")
 async def get_notification_queue(
     user: User = Depends(get_current_user),
-    status: str = Query("pending", regex="^(pending|processing|sent|failed)$")
+    status: str = Query("pending", pattern="^(pending|processing|sent|failed)$")
 ):
     """알림 대기열 조회 — pending/unread notifications treated as queue"""
     try:
