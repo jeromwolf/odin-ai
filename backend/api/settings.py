@@ -84,7 +84,7 @@ async def update_settings(settings: UserSettings, current_user: User = Depends(g
             current_settings = dict(row['settings']) if row and row['settings'] else _DEFAULT_SETTINGS.copy()
 
             # 변경된 필드만 덮어씀 (exclude_unset=True 로 미전송 필드 무시)
-            for field, value in settings.dict(exclude_unset=True).items():
+            for field, value in settings.model_dump(exclude_unset=True).items():
                 if value is not None:
                     current_settings[field] = value
 

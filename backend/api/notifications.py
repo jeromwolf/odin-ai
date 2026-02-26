@@ -39,17 +39,17 @@ class AlertRuleUpdate(BaseModel):
     notification_timing: Optional[str]
 
 class NotificationSettings(BaseModel):
-    email_enabled: Optional[bool]
-    sms_enabled: Optional[bool]
-    web_enabled: Optional[bool]
-    push_enabled: Optional[bool]
-    alert_match_enabled: Optional[bool]
-    deadline_reminder_enabled: Optional[bool]
-    daily_digest_enabled: Optional[bool]
-    weekly_report_enabled: Optional[bool]
-    quiet_hours_enabled: Optional[bool]
-    email_address: Optional[str]
-    phone_number: Optional[str]
+    email_enabled: Optional[bool] = None
+    sms_enabled: Optional[bool] = None
+    web_enabled: Optional[bool] = None
+    push_enabled: Optional[bool] = None
+    alert_match_enabled: Optional[bool] = None
+    deadline_reminder_enabled: Optional[bool] = None
+    daily_digest_enabled: Optional[bool] = None
+    weekly_report_enabled: Optional[bool] = None
+    quiet_hours_enabled: Optional[bool] = None
+    email_address: Optional[str] = None
+    phone_number: Optional[str] = None
 
 
 @router.get("/")

@@ -218,7 +218,7 @@ async def get_category_distribution(
             query = """
                 SELECT
                     t.tag_name as category,
-                    COUNT(DISTINCT ba.id) as count,
+                    COUNT(DISTINCT ba.bid_notice_no) as count,
                     COALESCE(SUM(ba.estimated_price), 0) as total_amount
                 FROM bid_announcements ba
                 JOIN bid_tag_relations btr ON ba.bid_notice_no = btr.bid_notice_no

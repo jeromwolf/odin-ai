@@ -3,7 +3,7 @@
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import html
@@ -39,9 +39,11 @@ class UserRegister(BaseModel):
     phone_number: Optional[str] = None
     marketing_consent: Optional[bool] = False
 
-    @validator('username')
-    def username_alphanumeric(cls, v):
-        assert v.replace('_', '').replace('-', '').isalnum(), '사용자명은 영문, 숫자, -, _만 가능합니다'
+    @field_validator('username')
+    @classmethod
+    def username_alphanumeric(cls, v: str) -> str:
+        if not v.replace('_', '').replace('-', '').isalnum():
+            raise ValueError('사용자명은 영문, 숫자, -, _만 가능합니다')
         return v
 
 
