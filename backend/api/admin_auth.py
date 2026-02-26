@@ -311,7 +311,7 @@ async def get_admin_activity_logs(
             if current_admin["role"] == "super_admin":
                 query = """
                     SELECT aal.id, aal.admin_user_id, u.email, u.username,
-                           aal.activity_type, aal.description, aal.created_at
+                           aal.action, aal.details, aal.created_at
                     FROM admin_activity_logs aal
                     JOIN users u ON aal.admin_user_id = u.id
                     ORDER BY aal.created_at DESC
@@ -321,7 +321,7 @@ async def get_admin_activity_logs(
             else:
                 query = """
                     SELECT aal.id, aal.admin_user_id, u.email, u.username,
-                           aal.activity_type, aal.description, aal.created_at
+                           aal.action, aal.details, aal.created_at
                     FROM admin_activity_logs aal
                     JOIN users u ON aal.admin_user_id = u.id
                     WHERE aal.admin_user_id = %s
@@ -337,8 +337,8 @@ async def get_admin_activity_logs(
                     "admin_user_id": row["admin_user_id"],
                     "email": row["email"],
                     "username": row["username"],
-                    "activity_type": row["activity_type"],
-                    "description": row["description"],
+                    "activity_type": row["action"],
+                    "description": row["details"],
                     "created_at": row["created_at"].isoformat()
                 })
 

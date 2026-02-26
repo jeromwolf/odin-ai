@@ -421,10 +421,7 @@ async def get_notification_stats(
                 SELECT
                     COUNT(*) as total,
                     COUNT(*) FILTER (WHERE status = 'sent') as success,
-                    COUNT(*) FILTER (WHERE status = 'failed') as failed,
-                    COUNT(*) FILTER (WHERE notification_channel = 'email') as email_count,
-                    COUNT(*) FILTER (WHERE notification_channel = 'push') as push_count,
-                    COUNT(*) FILTER (WHERE notification_channel = 'sms') as sms_count
+                    COUNT(*) FILTER (WHERE status = 'failed') as failed
                 FROM notification_send_logs
                 WHERE created_at::date >= %s AND created_at::date <= %s
             """, (start_date, end_date))
@@ -440,9 +437,9 @@ async def get_notification_stats(
                 "failed_count": summary_row['failed'],
                 "success_rate": round(success_rate, 2),
                 "by_channel": {
-                    "email": summary_row['email_count'],
-                    "push": summary_row['push_count'],
-                    "sms": summary_row['sms_count']
+                    "email": total,
+                    "push": 0,
+                    "sms": 0
                 }
             }
 

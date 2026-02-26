@@ -319,7 +319,7 @@ async def get_recommendations(
             cursor.execute("""
                 SELECT DISTINCT ba.organization_name
                 FROM user_bookmarks ub
-                JOIN bid_announcements ba ON ub.bid_notice_no = ba.bid_notice_no
+                JOIN bid_announcements ba ON ub.bid_id = ba.bid_notice_no
                 WHERE ub.user_id = %s AND ba.organization_name IS NOT NULL
                 LIMIT 10
             """, (user.id,))

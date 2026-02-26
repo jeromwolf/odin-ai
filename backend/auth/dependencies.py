@@ -25,6 +25,7 @@ class User:
         self.email = user_data.get('email')
         self.username = user_data.get('username')
         self.full_name = user_data.get('full_name')
+        self.company = user_data.get('company')
         self.is_active = user_data.get('is_active', True)
         self.is_superuser = user_data.get('is_superuser', False)
         self.email_verified = user_data.get('email_verified', False)
@@ -56,7 +57,7 @@ async def get_current_user_optional(
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             query = """
-                SELECT id, email, username, full_name, is_active,
+                SELECT id, email, username, full_name, company, is_active,
                        is_superuser, email_verified, created_at
                 FROM users
                 WHERE id = %s AND is_active = true
@@ -73,6 +74,7 @@ async def get_current_user_optional(
                 'email': user_data['email'],
                 'username': user_data['username'],
                 'full_name': user_data['full_name'],
+                'company': user_data['company'],
                 'is_active': user_data['is_active'],
                 'is_superuser': user_data['is_superuser'],
                 'email_verified': user_data['email_verified'],
