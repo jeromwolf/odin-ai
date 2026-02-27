@@ -437,9 +437,9 @@ class AlertEngine:
 
                 # 처리된 알림들 상태 업데이트
                 update_query = """
-                    UPDATE alert_notifications
-                    SET status = 'sent', sent_at = CURRENT_TIMESTAMP
-                    WHERE user_id = %s AND status = 'pending'
+                    UPDATE notifications
+                    SET status = 'read'
+                    WHERE user_id = %s AND status = 'unread'
                       AND created_at >= CURRENT_DATE - INTERVAL '1 day'
                 """
                 cursor.execute(update_query, (user_id,))
