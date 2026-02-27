@@ -128,14 +128,14 @@ async def export_data(current_user: User = Depends(get_current_user)):
 
             # 북마크
             cur.execute("""
-                SELECT bid_notice_no, note, created_at
+                SELECT bid_id, notes, created_at
                 FROM user_bookmarks WHERE user_id = %s
             """, (user_id,))
             bookmarks = cur.fetchall()
             data["bookmarks"] = [
                 {
-                    "bid_notice_no": b['bid_notice_no'],
-                    "note": b.get('note', ''),
+                    "bid_notice_no": b['bid_id'],
+                    "note": b.get('notes', ''),
                     "created_at": b['created_at'].isoformat() if b.get('created_at') else None,
                 }
                 for b in bookmarks

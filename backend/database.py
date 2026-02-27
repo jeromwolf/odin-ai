@@ -62,6 +62,7 @@ def get_db():
     conn = pool.getconn()
     try:
         yield conn
+        conn.commit()
     except Exception as e:
         conn.rollback()
         logger.error(f"Database error: {e}")
