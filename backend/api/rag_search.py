@@ -118,7 +118,7 @@ async def rag_ask(
         # 2. Synthesize answer with LLM (if available)
         ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
         if HTTPX_AVAILABLE and ollama_url:
-            answer = _synthesize_answer(q, chunks)
+            answer = await _synthesize_answer(q, chunks)
             has_llm = True
         else:
             # No LLM: return chunks as-is
@@ -209,7 +209,7 @@ async def rag_global_ask(
         raise ApiError(500, ErrorCode.SEARCH_FAILED, "글로벌 질의 처리 중 오류가 발생했습니다")
 
 
-def _synthesize_answer(query: str, chunks: list) -> str:
+async def _synthesize_answer(query: str, chunks: list) -> str:
     """Ollama EXAONE 3.5로 답변 합성 (로컬 LLM)"""
     ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
     ollama_model = os.getenv("OLLAMA_MODEL", "exaone3.5:7.8b")
@@ -234,16 +234,17 @@ def _synthesize_answer(query: str, chunks: list) -> str:
             f"질문: {query}\n\n답변:"
         )
 
-        response = httpx.post(
-            f"{ollama_url}/api/generate",
-            json={
-                "model": ollama_model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.3, "num_predict": 1000}
-            },
-            timeout=60.0
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{ollama_url}/api/generate",
+                json={
+                    "model": ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.3, "num_predict": 1000}
+                },
+                timeout=60.0
+            )
         response.raise_for_status()
         return response.json().get("response", "답변 생성에 실패했습니다.")
 

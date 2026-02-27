@@ -2227,7 +2227,7 @@ CREATE TABLE IF NOT EXISTS rfp_chunks (
     chunk_text      TEXT NOT NULL,
     chunk_text_tsv  TSVECTOR GENERATED ALWAYS AS
                         (to_tsvector('simple', chunk_text)) STORED,
-    embedding       vector(1536),
+    embedding       vector(1024),
     embedding_model VARCHAR(50) DEFAULT 'text-embedding-3-small',
     section_type    VARCHAR(50),
     page_number     INTEGER,
@@ -2278,7 +2278,7 @@ END $$;
 
 -- fn_hybrid_search 함수: RRF 기반 하이브리드 검색
 CREATE OR REPLACE FUNCTION fn_hybrid_search(
-    query_embedding     vector(1536),
+    query_embedding     vector(1024),
     query_text          TEXT,
     match_count         INT     DEFAULT 10,
     candidate_count     INT     DEFAULT 40,

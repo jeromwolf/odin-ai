@@ -215,7 +215,7 @@ class HybridSearchService:
                 """
 
                 # Build parameter list
-                embedding_str = str(query_embedding)
+                embedding_str = "[" + ",".join(f"{x:.8g}" for x in query_embedding) + "]"
                 query_params = [embedding_str]  # vector_results embedding
                 query_params.extend(params)      # vector_results filters
                 query_params.append(embedding_str)  # vector_results ORDER BY
