@@ -35,6 +35,8 @@ def _build_search_where(
     max_price: Optional[int],
     organization: Optional[str],
     status: Optional[str],
+    work_type: Optional[str] = None,
+    region: Optional[str] = None,
 ) -> tuple:
     """검색 WHERE 절과 파라미터를 구성하는 헬퍼 함수.
 
@@ -106,6 +108,32 @@ def _build_search_where(
     elif status == "closed":
         conditions.append("b.bid_end_date < NOW()")
 
+    if work_type:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM bid_extracted_info bei "
+            "WHERE bei.bid_notice_no = b.bid_notice_no "
+            "AND bei.info_category = 'work_type' "
+            "AND bei.field_value ILIKE %s)"
+        )
+        params.append(f"%{work_type}%")
+
+    if region:
+        # 약어 → 전체명 매핑 (충남 → 충청남도 등)
+        region_alias = {
+            "충남": "충청남도", "충북": "충청북도",
+            "경남": "경상남도", "경북": "경상북도",
+            "전남": "전라남도", "전북": "전북특별자치도",
+            "강원": "강원특별자치도", "제주": "제주특별자치도",
+        }
+        region_full = region_alias.get(region, region)
+        conditions.append(
+            "EXISTS (SELECT 1 FROM bid_extracted_info bei "
+            "WHERE bei.bid_notice_no = b.bid_notice_no "
+            "AND bei.info_category = 'region' "
+            "AND bei.field_value ILIKE %s)"
+        )
+        params.append(f"%{region_full}%")
+
     where_sql = " AND ".join(conditions) if conditions else "1=1"
     return where_sql, params
 
@@ -120,6 +148,8 @@ def _search_bids_from_db(
     status: Optional[str],
     page: int,
     limit: int,
+    work_type: Optional[str] = None,
+    region: Optional[str] = None,
 ) -> dict:
     """DB에서 직접 입찰 공고를 검색하는 내부 함수."""
     try:
@@ -128,7 +158,8 @@ def _search_bids_from_db(
 
             # WHERE 절 공통 구성 (데이터 쿼리와 카운트 쿼리에서 공유)
             where_sql, base_params = _build_search_where(
-                q, start_date, end_date, min_price, max_price, organization, status
+                q, start_date, end_date, min_price, max_price, organization, status,
+                work_type, region
             )
 
             # 키워드 검색 시 태그 JOIN 포함, 그 외에는 간단한 FROM
@@ -281,6 +312,8 @@ async def search_bids(
     max_price: Optional[int] = None,
     organization: Optional[str] = None,
     status: Optional[str] = None,
+    work_type: Optional[str] = Query(None, description="업종 필터 (예: 종합공사, 전문공사)"),
+    region: Optional[str] = Query(None, description="지역 필터 (예: 서울특별시, 경기도)"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100)
 ):
@@ -295,6 +328,7 @@ async def search_bids(
         "q": q, "start_date": start_date, "end_date": end_date,
         "min_price": min_price, "max_price": max_price,
         "organization": organization, "status": status,
+        "work_type": work_type, "region": region,
         "page": page, "limit": limit
     }
 
@@ -302,13 +336,13 @@ async def search_bids(
         def fetch_from_db():
             return _search_bids_from_db(
                 q, start_date, end_date, min_price, max_price,
-                organization, status, page, limit
+                organization, status, page, limit, work_type, region
             )
         return get_cached_or_fetch("search", cache_params, fetch_from_db, CACHE_TTL.get("search", 300))
 
     return _search_bids_from_db(
         q, start_date, end_date, min_price, max_price,
-        organization, status, page, limit
+        organization, status, page, limit, work_type, region
     )
 
 
