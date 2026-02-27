@@ -73,8 +73,8 @@ async def get_logs(
             where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
             # 총 개수
-            cursor.execute(f"SELECT COUNT(*) FROM batch_detail_logs WHERE {where_sql}", params)
-            total = cursor.fetchone()['count']
+            cursor.execute(f"SELECT COUNT(*) AS total FROM batch_detail_logs WHERE {where_sql}", params)
+            total = cursor.fetchone()['total']
 
             # 로그 조회
             offset = (page - 1) * limit

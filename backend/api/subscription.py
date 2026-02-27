@@ -175,13 +175,13 @@ async def create_subscription(
             # 새 구독 생성
             cursor.execute("""
                 INSERT INTO user_subscriptions (
-                    user_id, plan_id, status, payment_method,
-                    started_at, next_billing_date
+                    user_id, plan_id, status,
+                    started_at, expires_at, next_billing_date
                 ) VALUES (
-                    %s, %s, 'active', %s,
-                    NOW(), NOW() + INTERVAL '30 days'
+                    %s, %s, 'active',
+                    NOW(), NOW() + INTERVAL '30 days', NOW() + INTERVAL '30 days'
                 ) RETURNING id
-            """, (user.id, subscription.plan_id, subscription.payment_method))
+            """, (user.id, subscription.plan_id))
 
             subscription_id = cursor.fetchone()['id']
             conn.commit()

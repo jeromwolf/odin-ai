@@ -82,8 +82,7 @@ async def record_interaction(
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (user_id, bid_notice_no, interaction_type)
                 DO UPDATE SET
-                    interaction_score = user_bid_interactions.interaction_score + EXCLUDED.interaction_score,
-                    updated_at = NOW()
+                    interaction_score = user_bid_interactions.interaction_score + EXCLUDED.interaction_score
                 RETURNING id
             """, (
                 user.id, interaction.bid_notice_no, interaction.interaction_type,

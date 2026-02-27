@@ -47,7 +47,7 @@ async def get_notification_stats(current_admin: dict = Depends(get_current_admin
             cursor.execute("""
                 SELECT COUNT(*) as today_count
                 FROM notification_send_logs
-                WHERE sent_at >= CURRENT_DATE
+                WHERE created_at >= CURRENT_DATE
             """)
             today_row = cursor.fetchone()
 

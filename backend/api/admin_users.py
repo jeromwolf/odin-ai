@@ -145,10 +145,10 @@ async def get_user_detail(
             recent_activity = []
             try:
                 cursor.execute("""
-                    (SELECT '북마크 추가' as action, bid_notice_no as detail, created_at
+                    (SELECT '북마크 추가' as action, bid_id as detail, created_at
                      FROM user_bookmarks WHERE user_id = %s ORDER BY created_at DESC LIMIT 5)
                     UNION ALL
-                    (SELECT '알림 수신' as action, bid_notice_no as detail, created_at
+                    (SELECT '알림 수신' as action, title as detail, created_at
                      FROM notifications WHERE user_id = %s ORDER BY created_at DESC LIMIT 5)
                     ORDER BY created_at DESC LIMIT 10
                 """, (user_id, user_id))
