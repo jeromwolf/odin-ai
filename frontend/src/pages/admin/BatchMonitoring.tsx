@@ -40,8 +40,12 @@ import {
   Refresh,
   PlayArrow,
   Visibility,
+  Schedule,
 } from '@mui/icons-material';
 import { adminApi } from '../../services/admin/adminApi';
+import { PageHeader } from '../../components/common';
+import { useNotification } from '../../contexts/NotificationContext';
+import { formatKRDate } from '../../utils/formatters';
 
 interface BatchExecution {
   id: number;
@@ -57,6 +61,7 @@ interface BatchExecution {
 }
 
 const BatchMonitoring: React.FC = () => {
+  const { showSuccess, showError } = useNotification();
   const [loading, setLoading] = useState(false);
   const [executions, setExecutions] = useState<BatchExecution[]>([]);
   const [total, setTotal] = useState(0);
@@ -180,12 +185,14 @@ const BatchMonitoring: React.FC = () => {
         end_date: executeEndDate,
         enable_notification: enableNotification,
       });
-      alert(`배치 실행 요청 성공!\nTask ID: ${result.task_id}\n${result.message}`);
+      showSuccess(`배치 실행 요청 성공! Task ID: ${result.task_id} - ${result.message}`);
       setExecuteOpen(false);
       loadExecutions(); // 목록 새로고침
     } catch (err: any) {
       console.error('배치 수동 실행 실패:', err);
-      setError(err.response?.data?.detail || '배치 실행에 실패했습니다.');
+      const errMsg = err.response?.data?.detail || '배치 실행에 실패했습니다.';
+      showError(errMsg);
+      setError(errMsg);
     } finally {
       setExecuteLoading(false);
     }
@@ -214,49 +221,46 @@ const BatchMonitoring: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            배치 모니터링
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            배치 프로그램 실행 이력 및 상태 확인
-          </Typography>
-          {autoRefresh && (
-            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
-              🔄 자동 새로고침 활성화 • 마지막 업데이트: {lastRefreshTime.toLocaleTimeString('ko-KR')}
-            </Typography>
-          )}
-        </Box>
-        <Box>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                color="primary"
-              />
-            }
-            label="자동 새로고침 (5초)"
-            sx={{ mr: 2 }}
-          />
-          <Button
-            variant="outlined"
-            startIcon={<Refresh />}
-            onClick={loadExecutions}
-            sx={{ mr: 1 }}
-          >
-            새로고침
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<PlayArrow />}
-            onClick={() => setExecuteOpen(true)}
-          >
-            수동 실행
-          </Button>
-        </Box>
-      </Box>
+      <PageHeader
+        title="배치 모니터링"
+        subtitle="배치 프로그램 실행 이력 및 상태 확인"
+        icon={<Schedule />}
+        action={
+          <>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="자동 새로고침 (5초)"
+              sx={{ mr: 1 }}
+            />
+            <Button
+              variant="outlined"
+              startIcon={<Refresh />}
+              onClick={loadExecutions}
+              sx={{ mr: 1 }}
+            >
+              새로고침
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<PlayArrow />}
+              onClick={() => setExecuteOpen(true)}
+            >
+              수동 실행
+            </Button>
+          </>
+        }
+      />
+      {autoRefresh && (
+        <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: -2, mb: 2 }}>
+          🔄 자동 새로고침 활성화 • 마지막 업데이트: {lastRefreshTime.toLocaleTimeString('ko-KR')}
+        </Typography>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -384,7 +388,7 @@ const BatchMonitoring: React.FC = () => {
                     <TableCell>{getBatchTypeLabel(execution.batch_type)}</TableCell>
                     <TableCell>{getStatusChip(execution.status)}</TableCell>
                     <TableCell>
-                      {new Date(execution.start_time).toLocaleString('ko-KR')}
+                      {formatKRDate(execution.start_time, 'yyyy.MM.dd HH:mm')}
                     </TableCell>
                     <TableCell align="right">{execution.total_items}</TableCell>
                     <TableCell align="right">{execution.success_items}</TableCell>
@@ -499,7 +503,7 @@ const BatchMonitoring: React.FC = () => {
                         </TableCell>
                         <TableCell>{log.message}</TableCell>
                         <TableCell>
-                          {new Date(log.created_at).toLocaleString('ko-KR')}
+                          {formatKRDate(log.created_at, 'yyyy.MM.dd HH:mm')}
                         </TableCell>
                       </TableRow>
                     ))}

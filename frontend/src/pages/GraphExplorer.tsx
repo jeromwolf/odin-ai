@@ -38,6 +38,8 @@ import graphService, {
   GlobalAskResponse,
   GraphStatus,
 } from '../services/graphService';
+import { PageHeader } from '../components/common';
+import { ENTITY_TYPE_COLORS } from '../utils/colors';
 
 // ─── TabPanel ───────────────────────────────────────────────────────────────
 
@@ -57,14 +59,7 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const entityTypeColors: Record<string, string> = {
-  Organization: '#4caf50',
-  Project: '#2196f3',
-  Technology: '#ff9800',
-  Region: '#9c27b0',
-  Regulation: '#f44336',
-  Material: '#795548',
-};
+const entityTypeColors = ENTITY_TYPE_COLORS;
 
 const entityTypeIcons: Record<string, React.ReactElement> = {
   Organization: <AccountBalance fontSize="small" />,
@@ -140,15 +135,7 @@ const GraphExplorer: React.FC = () => {
   return (
     <Box>
       {/* ── Header ── */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          <Hub sx={{ mr: 1, verticalAlign: 'middle' }} />
-          지식 그래프 탐색기
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          GraphRAG 기반 커뮤니티 분석으로 입찰 데이터의 패턴과 트렌드를 발견하세요
-        </Typography>
-      </Box>
+      <PageHeader title="지식 그래프 탐색기" icon={<Hub />} />
 
       {/* ── Status Cards ── */}
       <Grid container spacing={2} sx={{ mb: 3 }}>

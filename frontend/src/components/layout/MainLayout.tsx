@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box,
   Drawer,
@@ -17,6 +18,9 @@ import {
   Menu,
   MenuItem,
   Badge,
+  Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -37,8 +41,11 @@ import {
   Assessment,
   Description,
   Hub,
+  DarkMode,
+  LightMode,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 const drawerWidth = 240;
 
@@ -89,7 +96,12 @@ const MainLayout: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
+  const { resolvedMode, toggleTheme } = useAppTheme();
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const handleDrawerToggle = () => {
     setOpen(!open);
@@ -114,7 +126,98 @@ const MainLayout: React.FC = () => {
 
   const handleNavigation = (path: string) => {
     navigate(path);
+    if (isMobile) {
+      setOpen(false);
+    }
   };
+
+  const drawerContent = (
+    <>
+      <Toolbar
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          px: [1],
+        }}
+      >
+        <IconButton onClick={handleDrawerToggle}>
+          <ChevronLeft />
+        </IconButton>
+      </Toolbar>
+      <Divider />
+      <List>
+        {menuItems.map((item) => (
+          <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+            <ListItemButton
+              sx={{
+                minHeight: 48,
+                justifyContent: open ? 'initial' : 'center',
+                px: 2.5,
+              }}
+              onClick={() => handleNavigation(item.path)}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: 0,
+                  mr: open ? 3 : 'auto',
+                  justifyContent: 'center',
+                }}
+              >
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} sx={{ opacity: open ? 1 : 0 }} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+
+      {/* 관리자 메뉴 - 관리자만 표시 */}
+      {user?.role === 'admin' && (
+        <>
+          <Divider />
+          <List>
+            <ListItem disablePadding sx={{ display: 'block' }}>
+              <ListItemText
+                primary="관리자"
+                sx={{
+                  opacity: open ? 1 : 0,
+                  px: 2.5,
+                  py: 1,
+                  color: 'text.secondary',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold'
+                }}
+              />
+            </ListItem>
+            {adminMenuItems.map((item) => (
+              <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+                <ListItemButton
+                  sx={{
+                    minHeight: 48,
+                    justifyContent: open ? 'initial' : 'center',
+                    px: 2.5,
+                  }}
+                  onClick={() => handleNavigation(item.path)}
+                >
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 0,
+                      mr: open ? 3 : 'auto',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText primary={item.text} sx={{ opacity: open ? 1 : 0 }} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </>
+      )}
+    </>
+  );
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -128,9 +231,9 @@ const MainLayout: React.FC = () => {
               duration: theme.transitions.duration.leavingScreen,
             }),
           ...(open && {
-            marginLeft: drawerWidth,
-            width: `calc(100% - ${drawerWidth}px)`,
-            transition: (theme) =>
+            marginLeft: { sm: drawerWidth },
+            width: { sm: `calc(100% - ${drawerWidth}px)` },
+            transition: (theme: any) =>
               theme.transitions.create(['width', 'margin'], {
                 easing: theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.enteringScreen,
@@ -146,7 +249,7 @@ const MainLayout: React.FC = () => {
             edge="start"
             sx={{
               marginRight: 5,
-              ...(open && { display: 'none' }),
+              ...(!isMobile && open && { display: 'none' }),
             }}
           >
             <MenuIcon />
@@ -154,6 +257,12 @@ const MainLayout: React.FC = () => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Odin-AI
           </Typography>
+
+          <Tooltip title={resolvedMode === 'dark' ? '라이트 모드' : '다크 모드'}>
+            <IconButton color="inherit" onClick={toggleTheme} sx={{ mr: 1 }}>
+              {resolvedMode === 'dark' ? <LightMode /> : <DarkMode />}
+            </IconButton>
+          </Tooltip>
 
           <IconButton color="inherit" sx={{ mr: 2 }} onClick={() => navigate('/notification-inbox')}>
             <Badge badgeContent={unreadCount} color="secondary" invisible={unreadCount === 0}>
@@ -230,10 +339,29 @@ const MainLayout: React.FC = () => {
         </Toolbar>
       </AppBar>
 
+      {/* Mobile Drawer */}
+      <Drawer
+        variant="temporary"
+        open={open}
+        onClose={handleDrawerToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: 'block', sm: 'none' },
+          '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
+            width: drawerWidth,
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+
+      {/* Desktop Drawer */}
       <Drawer
         variant="permanent"
         open={open}
         sx={{
+          display: { xs: 'none', sm: 'block' },
           width: drawerWidth,
           flexShrink: 0,
           whiteSpace: 'nowrap',
@@ -274,89 +402,7 @@ const MainLayout: React.FC = () => {
           }),
         }}
       >
-        <Toolbar
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            px: [1],
-          }}
-        >
-          <IconButton onClick={handleDrawerToggle}>
-            <ChevronLeft />
-          </IconButton>
-        </Toolbar>
-        <Divider />
-        <List>
-          {menuItems.map((item) => (
-            <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-              <ListItemButton
-                sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 2.5,
-                }}
-                onClick={() => handleNavigation(item.path)}
-              >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText primary={item.text} sx={{ opacity: open ? 1 : 0 }} />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
-
-        {/* 관리자 메뉴 - 관리자만 표시 */}
-        {user?.role === 'admin' && (
-          <>
-            <Divider />
-            <List>
-              <ListItem disablePadding sx={{ display: 'block' }}>
-                <ListItemText
-                  primary="관리자"
-                  sx={{
-                    opacity: open ? 1 : 0,
-                    px: 2.5,
-                    py: 1,
-                    color: 'text.secondary',
-                    fontSize: '0.75rem',
-                    fontWeight: 'bold'
-                  }}
-                />
-              </ListItem>
-              {adminMenuItems.map((item) => (
-                <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-                  <ListItemButton
-                    sx={{
-                      minHeight: 48,
-                      justifyContent: open ? 'initial' : 'center',
-                      px: 2.5,
-                    }}
-                    onClick={() => handleNavigation(item.path)}
-                  >
-                    <ListItemIcon
-                      sx={{
-                        minWidth: 0,
-                        mr: open ? 3 : 'auto',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {item.icon}
-                    </ListItemIcon>
-                    <ListItemText primary={item.text} sx={{ opacity: open ? 1 : 0 }} />
-                  </ListItemButton>
-                </ListItem>
-              ))}
-            </List>
-          </>
-        )}
+        {drawerContent}
       </Drawer>
 
       <Box
@@ -364,11 +410,21 @@ const MainLayout: React.FC = () => {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          width: { sm: `calc(100% - ${open ? drawerWidth : 56}px)` },
         }}
       >
         <Toolbar />
-        <Outlet />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
       </Box>
     </Box>
   );

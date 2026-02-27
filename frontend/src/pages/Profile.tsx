@@ -19,7 +19,6 @@ import {
   ListItem,
   ListItemText,
   Paper,
-  CircularProgress,
   Snackbar,
 } from '@mui/material';
 import apiClient from '../services/api';
@@ -38,6 +37,7 @@ import {
   Search,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { FullscreenLoading, PageHeader } from '../components/common';
 
 const Profile: React.FC = () => {
   useAuth();
@@ -193,19 +193,12 @@ const Profile: React.FC = () => {
 
   // Loading state
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <FullscreenLoading />;
   }
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-        <Person sx={{ mr: 1 }} />
-        프로필
-      </Typography>
+      <PageHeader title="프로필" icon={<Person />} />
 
       <Grid container spacing={3}>
         {/* 프로필 정보 */}

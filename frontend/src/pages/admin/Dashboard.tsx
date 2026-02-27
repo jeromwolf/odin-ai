@@ -9,8 +9,6 @@ import {
   Paper,
   Typography,
   Box,
-  Card,
-  CardContent,
   Table,
   TableBody,
   TableCell,
@@ -18,8 +16,8 @@ import {
   TableHead,
   TableRow,
   Chip,
-  CircularProgress,
   Alert,
+  useTheme,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -38,58 +36,12 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { adminApi } from '../../services/admin/adminApi';
-
-interface StatusCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color: string;
-  subtitle?: string;
-}
-
-const StatusCard: React.FC<StatusCardProps> = ({
-  title,
-  value,
-  icon,
-  color,
-  subtitle,
-}) => {
-  return (
-    <Card>
-      <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Box>
-            <Typography color="textSecondary" gutterBottom variant="body2">
-              {title}
-            </Typography>
-            <Typography variant="h4" component="div">
-              {value}
-            </Typography>
-            {subtitle && (
-              <Typography variant="body2" color="textSecondary">
-                {subtitle}
-              </Typography>
-            )}
-          </Box>
-          <Box
-            sx={{
-              backgroundColor: `${color}20`,
-              borderRadius: '50%',
-              p: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {icon}
-          </Box>
-        </Box>
-      </CardContent>
-    </Card>
-  );
-};
+import { StatCard, FullscreenLoading } from '../../components/common';
+import { getChartColor, STAT_CARD_COLORS } from '../../utils/colors';
+import { formatKRDate } from '../../utils/formatters';
 
 const AdminDashboard: React.FC = () => {
+  const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [systemStatus, setSystemStatus] = useState<any>(null);
@@ -159,16 +111,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   if (loading && !systemStatus) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return <FullscreenLoading />;
   }
 
   return (
@@ -189,41 +132,43 @@ const AdminDashboard: React.FC = () => {
       {/* 시스템 상태 카드 */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <StatusCard
+          <StatCard
             title="배치 실행 상태"
-            value={
-              batchExecutions.filter((b) => b.status === 'success').length
-            }
-            subtitle={`전체 ${batchExecutions.length}건`}
-            icon={<CheckCircle sx={{ fontSize: 40, color: '#4caf50' }} />}
-            color="#4caf50"
+            value={batchExecutions.filter((b) => b.status === 'success').length}
+            changeLabel={`전체 ${batchExecutions.length}건`}
+            icon={<CheckCircle />}
+            iconBg={STAT_CARD_COLORS.active.bg}
+            iconColor={STAT_CARD_COLORS.active.icon}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatusCard
+          <StatCard
             title="활성 사용자"
             value={userStats?.active_users || 0}
-            subtitle={`전체 ${userStats?.total_users || 0}명`}
-            icon={<People sx={{ fontSize: 40, color: '#2196f3' }} />}
-            color="#2196f3"
+            changeLabel={`전체 ${userStats?.total_users || 0}명`}
+            icon={<People />}
+            iconBg={STAT_CARD_COLORS.total.bg}
+            iconColor={STAT_CARD_COLORS.total.icon}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatusCard
+          <StatCard
             title="CPU 사용률"
             value={`${systemStatus?.cpu_percent || 0}%`}
-            subtitle="실시간"
-            icon={<TrendingUp sx={{ fontSize: 40, color: '#ff9800' }} />}
-            color="#ff9800"
+            changeLabel="실시간"
+            icon={<TrendingUp />}
+            iconBg={STAT_CARD_COLORS.warning.bg}
+            iconColor={STAT_CARD_COLORS.warning.icon}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatusCard
+          <StatCard
             title="DB 상태"
             value={systemStatus?.db_status === 'healthy' ? '정상' : '에러'}
-            subtitle={`연결: ${systemStatus?.db_connections || 0}개`}
-            icon={<Storage sx={{ fontSize: 40, color: '#9c27b0' }} />}
-            color="#9c27b0"
+            changeLabel={`연결: ${systemStatus?.db_connections || 0}개`}
+            icon={<Storage />}
+            iconBg={STAT_CARD_COLORS.info.bg}
+            iconColor={STAT_CARD_COLORS.info.icon}
           />
         </Grid>
       </Grid>
@@ -237,17 +182,31 @@ const AdminDashboard: React.FC = () => {
             </Typography>
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={metricsData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time" />
-                <YAxis />
-                <Tooltip />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke={theme.palette.divider}
+                />
+                <XAxis
+                  dataKey="time"
+                  tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                />
+                <YAxis
+                  tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: theme.palette.background.paper,
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 8,
+                  }}
+                />
                 <Legend />
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="#8884d8"
-                  fill="#8884d8"
-                  fillOpacity={0.6}
+                  stroke={getChartColor(0)}
+                  fill={getChartColor(0)}
+                  fillOpacity={0.2}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -328,9 +287,7 @@ const AdminDashboard: React.FC = () => {
                       <TableRow key={execution.id}>
                         <TableCell>{execution.batch_type}</TableCell>
                         <TableCell>
-                          {new Date(execution.start_time).toLocaleString(
-                            'ko-KR'
-                          )}
+                          {formatKRDate(execution.start_time, 'yyyy.MM.dd HH:mm')}
                         </TableCell>
                         <TableCell>{getStatusChip(execution.status)}</TableCell>
                         <TableCell align="right">

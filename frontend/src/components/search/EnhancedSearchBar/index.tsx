@@ -8,8 +8,7 @@ import {
   Box,
   Chip,
   Fade,
-  Stack,
-  alpha
+  Stack
 } from '@mui/material';
 import {
   Gavel as BidIcon,

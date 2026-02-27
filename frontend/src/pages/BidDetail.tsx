@@ -7,7 +7,6 @@ import {
   Divider,
   Chip,
   Button,
-  CircularProgress,
   Alert,
   Card,
   CardContent,
@@ -29,6 +28,8 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../services/api';
+import { FullscreenLoading } from '../components/common';
+import { formatKRW, formatKRDate, formatTimeRemaining } from '../utils/formatters';
 
 interface BidDetailData {
   bid_notice_no: string;
@@ -99,45 +100,9 @@ const BidDetail: React.FC = () => {
     }
   };
 
-  // 날짜 포맷 함수
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  // 금액 포맷 함수
-  const formatPrice = (price: number | null) => {
-    if (!price) return '-';
-    return `${price.toLocaleString()}원`;
-  };
-
-  // 남은 시간 계산
-  const getRemainingTime = (endDate: string) => {
-    const now = new Date();
-    const end = new Date(endDate);
-    const diff = end.getTime() - now.getTime();
-
-    if (diff < 0) return '마감';
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
-    return `${days}일 ${hours}시간 남음`;
-  };
 
   if (isLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
-    );
+    return <FullscreenLoading message="공고 정보 로딩 중..." />;
   }
 
   if (error || !data) {
@@ -198,7 +163,7 @@ const BidDetail: React.FC = () => {
         <Box display="flex" gap={1} flexWrap="wrap" mt={2} mb={3}>
           <Chip
             icon={<CalendarToday fontSize="small" />}
-            label={getRemainingTime(data.bid_end_date)}
+            label={formatTimeRemaining(data.bid_end_date)}
             color={new Date(data.bid_end_date) < new Date() ? 'default' : 'warning'}
           />
           <Chip label={data.bid_method || '입찰방식 미표시'} />
@@ -237,7 +202,7 @@ const BidDetail: React.FC = () => {
                 예정가격
               </Typography>
               <Typography variant="body1" fontWeight="medium" color="primary">
-                {formatPrice(data.estimated_price)}
+                {formatKRW(data.estimated_price)}
               </Typography>
             </Box>
           </Grid>
@@ -257,7 +222,7 @@ const BidDetail: React.FC = () => {
                 공고일
               </Typography>
               <Typography variant="body1">
-                {formatDate(data.announcement_date)}
+                {formatKRDate(data.announcement_date, 'yyyy년 MM월 dd일 HH:mm')}
               </Typography>
             </Grid>
             <Grid item xs={12} md={4}>
@@ -265,7 +230,7 @@ const BidDetail: React.FC = () => {
                 입찰시작
               </Typography>
               <Typography variant="body1">
-                {formatDate(data.bid_start_date)}
+                {formatKRDate(data.bid_start_date, 'yyyy년 MM월 dd일 HH:mm')}
               </Typography>
             </Grid>
             <Grid item xs={12} md={4}>
@@ -273,7 +238,7 @@ const BidDetail: React.FC = () => {
                 입찰마감
               </Typography>
               <Typography variant="body1" color="error">
-                {formatDate(data.bid_end_date)}
+                {formatKRDate(data.bid_end_date, 'yyyy년 MM월 dd일 HH:mm')}
               </Typography>
             </Grid>
           </Grid>
@@ -360,7 +325,7 @@ const BidDetail: React.FC = () => {
                 최종 업데이트
               </Typography>
               <Typography variant="body2">
-                {formatDate(data.updated_at)}
+                {formatKRDate(data.updated_at, 'yyyy년 MM월 dd일 HH:mm')}
               </Typography>
             </Grid>
           </Grid>

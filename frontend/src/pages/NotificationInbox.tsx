@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
-  Typography,
   Card,
   CardContent,
   Chip,
@@ -9,8 +8,7 @@ import {
   Tabs,
   Tab,
   Pagination,
-  Alert,
-  CircularProgress,
+  Typography,
   Divider,
   Collapse,
   IconButton,
@@ -23,6 +21,8 @@ import {
   Circle,
 } from '@mui/icons-material';
 import apiClient from '../services/api';
+import { FullscreenLoading, EmptyState, PageHeader } from '../components/common';
+import { getRelativeTime } from '../utils/formatters';
 
 interface NotificationItem {
   id: string;
@@ -35,17 +35,6 @@ interface NotificationItem {
   created_at: string;
   read_at: string | null;
 }
-
-const getRelativeTime = (dateStr: string): string => {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diff < 60) return '방금 전';
-  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}일 전`;
-  return date.toLocaleDateString('ko-KR');
-};
 
 const getTypeLabel = (type: string): string => {
   const map: Record<string, string> = {
@@ -142,29 +131,25 @@ const NotificationInbox: React.FC = () => {
   const unreadCount = notifications.filter((n) => n.status !== 'read').length;
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <FullscreenLoading message="알림을 불러오는 중..." />;
   }
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Notifications />
-          알림 센터
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<DoneAll />}
-          onClick={handleMarkAllRead}
-          disabled={markingAll || unreadCount === 0}
-        >
-          {markingAll ? '처리 중...' : '모두 읽음 처리'}
-        </Button>
-      </Box>
+      <PageHeader
+        title="알림 센터"
+        icon={<Notifications />}
+        action={
+          <Button
+            variant="outlined"
+            startIcon={<DoneAll />}
+            onClick={handleMarkAllRead}
+            disabled={markingAll || unreadCount === 0}
+          >
+            {markingAll ? '처리 중...' : '모두 읽음 처리'}
+          </Button>
+        }
+      />
 
       <Tabs value={tab} onChange={handleTabChange} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
         <Tab label="전체" />
@@ -173,7 +158,10 @@ const NotificationInbox: React.FC = () => {
       </Tabs>
 
       {notifications.length === 0 ? (
-        <Alert severity="info" sx={{ mt: 2 }}>알림이 없습니다.</Alert>
+        <EmptyState
+          title="알림이 없습니다"
+          description="새로운 알림이 도착하면 여기에 표시됩니다"
+        />
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {notifications.map((item) => {

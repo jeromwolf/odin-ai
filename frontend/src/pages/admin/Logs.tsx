@@ -21,7 +21,6 @@ import {
   MenuItem,
   Grid,
   Alert,
-  CircularProgress,
   IconButton,
   Tooltip,
   Tabs,
@@ -39,8 +38,12 @@ import {
   Warning as WarningIcon,
   Info as InfoIcon,
   CheckCircle,
+  Description,
 } from '@mui/icons-material';
 import { adminApi } from '../../services/admin/adminApi';
+import { FullscreenLoading, PageHeader } from '../../components/common';
+import { LOG_LEVEL_COLORS, CHART_COLORS } from '../../utils/colors';
+import { formatKRDate } from '../../utils/formatters';
 
 interface Log {
   id: number;
@@ -179,30 +182,22 @@ const Logs: React.FC = () => {
   const getLevelIcon = (level: string) => {
     switch (level.toUpperCase()) {
       case 'ERROR':
-        return <ErrorIcon sx={{ color: '#f44336' }} />;
+        return <ErrorIcon sx={{ color: CHART_COLORS[5] }} />;
       case 'WARNING':
-        return <WarningIcon sx={{ color: '#ff9800' }} />;
+        return <WarningIcon sx={{ color: CHART_COLORS[4] }} />;
       case 'INFO':
-        return <InfoIcon sx={{ color: '#2196f3' }} />;
+        return <InfoIcon sx={{ color: CHART_COLORS[0] }} />;
       case 'DEBUG':
-        return <CheckCircle sx={{ color: '#4caf50' }} />;
+        return <CheckCircle sx={{ color: CHART_COLORS[3] }} />;
       default:
         return <InfoIcon />;
     }
   };
 
   const getLevelChip = (level: string) => {
-    const configs: Record<
-      string,
-      { label: string; color: 'error' | 'warning' | 'info' | 'success' | 'default' }
-    > = {
-      ERROR: { label: 'ERROR', color: 'error' },
-      WARNING: { label: 'WARNING', color: 'warning' },
-      INFO: { label: 'INFO', color: 'info' },
-      DEBUG: { label: 'DEBUG', color: 'success' },
-    };
-    const config = configs[level.toUpperCase()] || { label: level, color: 'default' };
-    return <Chip label={config.label} color={config.color} size="small" />;
+    const upper = level.toUpperCase();
+    const color = LOG_LEVEL_COLORS[upper] || 'default';
+    return <Chip label={upper} color={color} size="small" />;
   };
 
   const getCategoryLabel = (category: string) => {
@@ -219,29 +214,26 @@ const Logs: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            로그 조회
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            시스템 및 사용자 활동 로그 조회
-          </Typography>
-        </Box>
-        <Box>
-          <Button
-            variant="outlined"
-            startIcon={<Refresh />}
-            onClick={loadLogs}
-            sx={{ mr: 1 }}
-          >
-            새로고침
-          </Button>
-          <Button variant="outlined" startIcon={<Download />} onClick={handleExportLogs}>
-            내보내기
-          </Button>
-        </Box>
-      </Box>
+      <PageHeader
+        title="로그 조회"
+        subtitle="시스템 및 사용자 활동 로그 조회"
+        icon={<Description />}
+        action={
+          <>
+            <Button
+              variant="outlined"
+              startIcon={<Refresh />}
+              onClick={loadLogs}
+              sx={{ mr: 1 }}
+            >
+              새로고침
+            </Button>
+            <Button variant="outlined" startIcon={<Download />} onClick={handleExportLogs}>
+              내보내기
+            </Button>
+          </>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -356,8 +348,8 @@ const Logs: React.FC = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      <CircularProgress />
+                    <TableCell colSpan={7} align="center" sx={{ py: 0, border: 0 }}>
+                      <FullscreenLoading />
                     </TableCell>
                   </TableRow>
                 ) : logs.length === 0 ? (
@@ -391,7 +383,7 @@ const Logs: React.FC = () => {
                       <TableCell>{log.user_id || '-'}</TableCell>
                       <TableCell>{log.ip_address || '-'}</TableCell>
                       <TableCell>
-                        {new Date(log.created_at).toLocaleString('ko-KR')}
+                        {formatKRDate(log.created_at, 'yyyy.MM.dd HH:mm:ss')}
                       </TableCell>
                       <TableCell align="center">
                         <Tooltip title="상세 보기">
@@ -467,7 +459,7 @@ const Logs: React.FC = () => {
                     발생 시간
                   </Typography>
                   <Typography variant="body1">
-                    {new Date(selectedLog.created_at).toLocaleString('ko-KR')}
+                    {formatKRDate(selectedLog.created_at, 'yyyy.MM.dd HH:mm:ss')}
                   </Typography>
                 </Grid>
               </Grid>

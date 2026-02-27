@@ -40,6 +40,9 @@ import {
   Bookmark,
 } from '@mui/icons-material';
 import apiClient from '../services/api';
+import { FullscreenLoading, PageHeader } from '../components/common';
+import { useNotification } from '../contexts/NotificationContext';
+import { formatKRW } from '../utils/formatters';
 
 interface NotificationSettings {
   email: boolean;
@@ -59,6 +62,7 @@ interface KeywordAlert {
 }
 
 const Notifications: React.FC = () => {
+  const { showSuccess, showError } = useNotification();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generalSettings, setGeneralSettings] = useState<NotificationSettings>({
@@ -158,10 +162,10 @@ const Notifications: React.FC = () => {
       };
 
       await apiClient.updateNotificationSettings(settings);
-      alert('알림 설정이 저장되었습니다.');
+      showSuccess('알림 설정이 저장되었습니다.');
     } catch (error) {
       console.error('알림 설정 저장 실패:', error);
-      alert('설정 저장에 실패했습니다.');
+      showError('설정 저장에 실패했습니다.');
     } finally {
       setSaving(false);
     }
@@ -198,7 +202,7 @@ const Notifications: React.FC = () => {
       }
     } catch (error) {
       console.error('키워드 삭제 실패:', error);
-      alert('키워드 삭제에 실패했습니다.');
+      showError('키워드 삭제에 실패했습니다.');
     }
   };
 
@@ -240,32 +244,21 @@ const Notifications: React.FC = () => {
         setKeywordAlerts(prev => [...prev, newAlert]);
         setNewKeyword({ keyword: '', category: '', minPrice: '', maxPrice: '', workTypes: '' });
         setOpenAddDialog(false);
-        alert('알림 규칙이 저장되었습니다.');
+        showSuccess('알림 규칙이 저장되었습니다.');
       } catch (error) {
         console.error('알림 규칙 생성 실패:', error);
-        alert('알림 규칙 생성에 실패했습니다.');
+        showError('알림 규칙 생성에 실패했습니다.');
       }
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('ko-KR').format(price) + '원';
-  };
-
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Typography>알림 설정을 불러오는 중...</Typography>
-      </Box>
-    );
+    return <FullscreenLoading />;
   }
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <NotificationsActive sx={{ mr: 1, color: 'primary.main' }} />
-        <Typography variant="h4">알림 설정</Typography>
-      </Box>
+      <PageHeader title="알림 설정" icon={<NotificationsActive />} />
 
       <Alert severity="info" sx={{ mb: 3 }}>
         원하는 입찰 정보를 놓치지 않도록 알림을 설정하세요. 이메일과 푸시 알림을 통해 실시간으로 정보를 받을 수 있습니다.
@@ -417,7 +410,7 @@ const Notifications: React.FC = () => {
                   secondary={
                     alert.priceRange && (
                       <Typography variant="body2" color="text.secondary">
-                        가격 범위: {formatPrice(alert.priceRange.min)} ~ {formatPrice(alert.priceRange.max)}
+                        가격 범위: {formatKRW(alert.priceRange.min)} ~ {formatKRW(alert.priceRange.max)}
                       </Typography>
                     )
                   }

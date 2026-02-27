@@ -33,11 +33,6 @@ import { SearchPaginationProps } from '../../types/search.types';
 // 페이지 크기 옵션
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100];
 
-// 모바일에서 표시할 최대 페이지 버튼 수
-const MOBILE_MAX_BUTTONS = 3;
-// 데스크톱에서 표시할 최대 페이지 버튼 수
-const DESKTOP_MAX_BUTTONS = 7;
-
 // 스타일 컴포넌트
 const PaginationContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -139,24 +134,6 @@ const SearchPagination: React.FC<SearchPaginationProps> = ({
   const handleLastPage = () => {
     if (currentPage !== totalPages && !loading) {
       onPageChange(totalPages);
-    }
-  };
-
-  /**
-   * 이전 페이지로 이동
-   */
-  const handlePreviousPage = () => {
-    if (currentPage > 1 && !loading) {
-      onPageChange(currentPage - 1);
-    }
-  };
-
-  /**
-   * 다음 페이지로 이동
-   */
-  const handleNextPage = () => {
-    if (currentPage < totalPages && !loading) {
-      onPageChange(currentPage + 1);
     }
   };
 
@@ -357,9 +334,6 @@ const SearchPagination: React.FC<SearchPaginationProps> = ({
  * 모바일이나 공간이 제한된 곳에서 사용
  */
 export const SimplePagination: React.FC<Omit<SearchPaginationProps, 'showFirstLast' | 'showPageSizeSelector' | 'showItemsInfo'>> = (props) => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
   return (
     <Box sx={{
       display: 'flex',

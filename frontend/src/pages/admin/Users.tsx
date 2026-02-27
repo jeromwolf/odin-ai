@@ -42,8 +42,12 @@ import {
   CheckCircle,
   Search,
   Refresh,
+  People,
 } from '@mui/icons-material';
 import { adminApi } from '../../services/admin/adminApi';
+import { ConfirmDialog, PageHeader } from '../../components/common';
+import { useNotification } from '../../contexts/NotificationContext';
+import { formatKRDate } from '../../utils/formatters';
 
 interface User {
   id: number;
@@ -118,6 +122,13 @@ const Users: React.FC = () => {
   // 통계
   const [userStats, setUserStats] = useState<any>(null);
 
+  // 확인 다이얼로그
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<{ userId: number; currentStatus: boolean } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
+  const { showSuccess, showError } = useNotification();
+
   useEffect(() => {
     loadUsers();
     loadUserStats();
@@ -170,22 +181,30 @@ const Users: React.FC = () => {
     }
   };
 
-  const handleToggleActive = async (userId: number, currentStatus: boolean) => {
-    const action = currentStatus ? '비활성화' : '활성화';
-    if (!window.confirm(`이 사용자를 ${action}하시겠습니까?`)) {
-      return;
-    }
+  const handleToggleActive = (userId: number, currentStatus: boolean) => {
+    setConfirmTarget({ userId, currentStatus });
+    setConfirmOpen(true);
+  };
 
+  const handleConfirmToggle = async () => {
+    if (!confirmTarget) return;
+    const { userId, currentStatus } = confirmTarget;
+    const action = currentStatus ? '비활성화' : '활성화';
+    setConfirmLoading(true);
     try {
       await adminApi.updateUser(userId, { is_active: !currentStatus });
-      alert(`사용자가 ${action}되었습니다.`);
+      showSuccess(`사용자가 ${action}되었습니다.`);
       loadUsers(); // 목록 새로고침
       if (selectedUser && selectedUser.user.id === userId) {
         setDetailOpen(false); // 상세 모달이 열려있으면 닫기
       }
     } catch (err: any) {
       console.error('사용자 상태 변경 실패:', err);
-      setError(err.response?.data?.detail || '상태 변경에 실패했습니다.');
+      showError(err.response?.data?.detail || '상태 변경에 실패했습니다.');
+    } finally {
+      setConfirmLoading(false);
+      setConfirmOpen(false);
+      setConfirmTarget(null);
     }
   };
 
@@ -210,26 +229,20 @@ const Users: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            사용자 관리
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            전체 사용자 계정 관리 및 모니터링
-          </Typography>
-        </Box>
-        <Box>
+      <PageHeader
+        title="사용자 관리"
+        subtitle="전체 사용자 계정 관리 및 모니터링"
+        icon={<People />}
+        action={
           <Button
             variant="outlined"
             startIcon={<Refresh />}
             onClick={loadUsers}
-            sx={{ mr: 1 }}
           >
             새로고침
           </Button>
-        </Box>
-      </Box>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -375,11 +388,11 @@ const Users: React.FC = () => {
                     <TableCell>{getSubscriptionChip(user.subscription_plan)}</TableCell>
                     <TableCell>{getStatusChip(user.is_active)}</TableCell>
                     <TableCell>
-                      {new Date(user.created_at).toLocaleDateString('ko-KR')}
+                      {formatKRDate(user.created_at)}
                     </TableCell>
                     <TableCell>
                       {user.last_login
-                        ? new Date(user.last_login).toLocaleString('ko-KR')
+                        ? formatKRDate(user.last_login, 'yyyy.MM.dd HH:mm')
                         : '로그인 기록 없음'}
                     </TableCell>
                     <TableCell align="center">
@@ -421,6 +434,18 @@ const Users: React.FC = () => {
           labelRowsPerPage="페이지당 행 수:"
         />
       </Paper>
+
+      {/* 활성화/비활성화 확인 다이얼로그 */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => { setConfirmOpen(false); setConfirmTarget(null); }}
+        onConfirm={handleConfirmToggle}
+        title={confirmTarget?.currentStatus ? '사용자 비활성화' : '사용자 활성화'}
+        message={`이 사용자를 ${confirmTarget?.currentStatus ? '비활성화' : '활성화'}하시겠습니까?`}
+        confirmText={confirmTarget?.currentStatus ? '비활성화' : '활성화'}
+        severity={confirmTarget?.currentStatus ? 'warning' : 'info'}
+        loading={confirmLoading}
+      />
 
       {/* 사용자 상세 정보 모달 */}
       <Dialog
@@ -491,7 +516,7 @@ const Users: React.FC = () => {
                       가입일
                     </Typography>
                     <Typography variant="body1">
-                      {new Date(selectedUser.user.created_at).toLocaleString('ko-KR')}
+                      {formatKRDate(selectedUser.user.created_at, 'yyyy.MM.dd HH:mm')}
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
@@ -500,7 +525,7 @@ const Users: React.FC = () => {
                     </Typography>
                     <Typography variant="body1">
                       {selectedUser.user.last_login
-                        ? new Date(selectedUser.user.last_login).toLocaleString('ko-KR')
+                        ? formatKRDate(selectedUser.user.last_login, 'yyyy.MM.dd HH:mm')
                         : '로그인 기록 없음'}
                     </Typography>
                   </Grid>
@@ -510,9 +535,7 @@ const Users: React.FC = () => {
                     </Typography>
                     <Typography variant="body1">
                       {selectedUser.activity_summary?.last_activity
-                        ? new Date(
-                            selectedUser.activity_summary.last_activity
-                          ).toLocaleString('ko-KR')
+                        ? formatKRDate(selectedUser.activity_summary.last_activity, 'yyyy.MM.dd HH:mm')
                         : '활동 기록 없음'}
                     </Typography>
                   </Grid>
@@ -576,7 +599,7 @@ const Users: React.FC = () => {
                       <ListItem key={index} divider>
                         <ListItemText
                           primary={activity.description}
-                          secondary={new Date(activity.created_at).toLocaleString('ko-KR')}
+                          secondary={formatKRDate(activity.created_at, 'yyyy.MM.dd HH:mm')}
                         />
                       </ListItem>
                     ))}
@@ -618,9 +641,7 @@ const Users: React.FC = () => {
                       <ListItem key={bookmark.id} divider>
                         <ListItemText
                           primary={bookmark.title || bookmark.bid_notice_no}
-                          secondary={`등록일: ${new Date(bookmark.created_at).toLocaleDateString(
-                            'ko-KR'
-                          )}`}
+                          secondary={`등록일: ${formatKRDate(bookmark.created_at)}`}
                         />
                       </ListItem>
                     ))}

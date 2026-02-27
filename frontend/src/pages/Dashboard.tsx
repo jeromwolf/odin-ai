@@ -2,24 +2,22 @@ import React, { useEffect, useState } from 'react';
 import {
   Box,
   Grid,
-  Card,
-  CardContent,
   Typography,
-  CircularProgress,
   Chip,
   List,
   ListItem,
   ListItemText,
   Paper,
   Button,
+  useTheme,
 } from '@mui/material';
 import {
   TrendingUp,
-  TrendingDown,
   AccessTime,
   Bookmark,
   ArrowForward,
   Business,
+  Dashboard as DashboardIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -38,19 +36,13 @@ import {
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import apiClient from '../services/api';
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
-
-interface StatCard {
-  title: string;
-  value: number | string;
-  trend?: number;
-  icon: React.ReactNode;
-  color: string;
-}
+import { StatCard, FullscreenLoading, SkeletonCard, PageHeader } from '../components/common';
+import { CHART_COLORS, STAT_CARD_COLORS, getChartColor } from '../utils/colors';
+// formatTimeRemaining from '../utils/formatters' takes a date string; local version handles hours number from API
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [bookmarkedBids, setBookmarkedBids] = useState<Set<string>>(new Set());
 
   // 대시보드 개요 데이터
@@ -123,96 +115,45 @@ const Dashboard: React.FC = () => {
     return `${Math.floor(hours)}시간 남음`;
   };
 
-  const statCards: StatCard[] = [
-    {
-      title: '오늘의 신규 입찰',
-      value: overview?.activeBids || 0,
-      trend: 5,
-      icon: <TrendingUp />,
-      color: '#4caf50',
-    },
-    {
-      title: '마감 임박',
-      value: deadlines?.data?.length || 0,
-      icon: <AccessTime />,
-      color: '#ff9800',
-    },
-    {
-      title: '북마크',
-      value: bookmarkedBids.size || 0,
-      icon: <Bookmark />,
-      color: '#2196f3',
-    },
-    {
-      title: 'AI 매칭',
-      value: recommendations?.data?.length || 0,
-      icon: <Business />,
-      color: '#9c27b0',
-    },
+  const statCardData = [
+    { title: '오늘의 신규 입찰', value: overview?.activeBids || 0, change: 5, changeLabel: '전일 대비', icon: <TrendingUp />, iconBg: STAT_CARD_COLORS.total.bg, iconColor: STAT_CARD_COLORS.total.color },
+    { title: '마감 임박', value: deadlines?.data?.length || 0, icon: <AccessTime />, iconBg: STAT_CARD_COLORS.warning.bg, iconColor: STAT_CARD_COLORS.warning.color },
+    { title: '북마크', value: bookmarkedBids.size || 0, icon: <Bookmark />, iconBg: STAT_CARD_COLORS.total.bg, iconColor: STAT_CARD_COLORS.total.icon },
+    { title: 'AI 매칭', value: recommendations?.data?.length || 0, icon: <Business />, iconBg: STAT_CARD_COLORS.info.bg, iconColor: STAT_CARD_COLORS.info.color },
   ];
 
   if (overviewLoading || statsLoading) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '80vh',
-        }}
-      >
-        <CircularProgress />
+      <Box>
+        <PageHeader title="대시보드" icon={<DashboardIcon />} />
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <Grid item xs={12} sm={6} md={3} key={i}>
+              <SkeletonCard variant="stat" />
+            </Grid>
+          ))}
+        </Grid>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={8}>
+            <SkeletonCard variant="content" />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <SkeletonCard variant="content" />
+          </Grid>
+        </Grid>
       </Box>
     );
   }
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 3 }}>
-        대시보드
-      </Typography>
+      <PageHeader title="대시보드" icon={<DashboardIcon />} />
 
       {/* 통계 카드 */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        {statCards.map((card, index) => (
+        {statCardData.map((card, index) => (
           <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Box
-                    sx={{
-                      p: 1,
-                      borderRadius: 1,
-                      backgroundColor: `${card.color}20`,
-                      color: card.color,
-                      mr: 2,
-                    }}
-                  >
-                    {card.icon}
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {card.title}
-                  </Typography>
-                </Box>
-                <Typography variant="h4">{card.value}</Typography>
-                {card.trend && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                    {card.trend > 0 ? (
-                      <TrendingUp color="success" fontSize="small" />
-                    ) : (
-                      <TrendingDown color="error" fontSize="small" />
-                    )}
-                    <Typography
-                      variant="body2"
-                      color={card.trend > 0 ? 'success.main' : 'error.main'}
-                      sx={{ ml: 0.5 }}
-                    >
-                      {Math.abs(card.trend)}%
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
+            <StatCard {...card} />
           </Grid>
         ))}
       </Grid>
@@ -226,19 +167,25 @@ const Dashboard: React.FC = () => {
             </Typography>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={statistics?.daily_stats || []}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                 <XAxis
                   dataKey="date"
                   tickFormatter={(value) => format(parseISO(value), 'MM/dd')}
+                  stroke={theme.palette.text.secondary}
                 />
-                <YAxis />
+                <YAxis stroke={theme.palette.text.secondary} />
                 <Tooltip
                   labelFormatter={(value) => format(parseISO(value as string), 'yyyy-MM-dd')}
+                  contentStyle={{
+                    backgroundColor: theme.palette.background.paper,
+                    border: '1px solid ' + theme.palette.divider,
+                    borderRadius: 8,
+                  }}
                 />
                 <Line
                   type="monotone"
                   dataKey="count"
-                  stroke="#8884d8"
+                  stroke={CHART_COLORS[0]}
                   strokeWidth={2}
                   name="입찰 건수"
                 />
@@ -261,7 +208,7 @@ const Dashboard: React.FC = () => {
                   cy="45%"
                   labelLine={false}
                   outerRadius={70}
-                  fill="#8884d8"
+                  fill={CHART_COLORS[0]}
                   dataKey="count"
                   label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   onClick={(data: any, index: number) => {
@@ -275,12 +222,19 @@ const Dashboard: React.FC = () => {
                   {statistics?.category_distribution?.slice(0, 5).map((entry: any, index: number) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
+                      fill={getChartColor(index)}
                       style={{ cursor: 'pointer' }}
                     />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: any, name: any, props: any) => [`${value}건`, props.payload.category]} />
+                <Tooltip
+                  formatter={(value: any, name: any, props: any) => [`${value}건`, props.payload.category]}
+                  contentStyle={{
+                    backgroundColor: theme.palette.background.paper,
+                    border: '1px solid ' + theme.palette.divider,
+                    borderRadius: 8,
+                  }}
+                />
                 <Legend
                   verticalAlign="bottom"
                   height={36}
@@ -305,7 +259,7 @@ const Dashboard: React.FC = () => {
               </Button>
             </Box>
             {deadlinesLoading ? (
-              <CircularProgress />
+              <FullscreenLoading size={24} />
             ) : (
               <List>
                 {(deadlines?.deadlines || []).slice(0, 5).map((bid: any) => (
@@ -345,7 +299,7 @@ const Dashboard: React.FC = () => {
               <Chip label="개인화 매칭" color="primary" size="small" />
             </Box>
             {recommendationsLoading ? (
-              <CircularProgress />
+              <FullscreenLoading size={24} />
             ) : (
               <List>
                 {(recommendations?.recommendations || []).map((bid: any) => (

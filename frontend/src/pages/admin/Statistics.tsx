@@ -14,7 +14,6 @@ import {
   TextField,
   MenuItem,
   Alert,
-  CircularProgress,
   Table,
   TableBody,
   TableCell,
@@ -22,6 +21,7 @@ import {
   TableHead,
   TableRow,
   Chip,
+  useTheme,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -30,6 +30,7 @@ import {
   Assignment,
   Notifications,
   AttachMoney,
+  Assessment,
 } from '@mui/icons-material';
 import {
   LineChart,
@@ -47,10 +48,11 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { adminApi } from '../../services/admin/adminApi';
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+import { FullscreenLoading, PageHeader } from '../../components/common';
+import { CHART_COLORS, getChartColor } from '../../utils/colors';
 
 const Statistics: React.FC = () => {
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>('30days');
@@ -122,44 +124,37 @@ const Statistics: React.FC = () => {
 
   const getTrendIcon = (value: number) => {
     return value >= 0 ? (
-      <TrendingUp sx={{ color: '#4caf50' }} />
+      <TrendingUp sx={{ color: CHART_COLORS[3] }} />
     ) : (
-      <TrendingDown sx={{ color: '#f44336' }} />
+      <TrendingDown sx={{ color: CHART_COLORS[5] }} />
     );
   };
 
   if (loading && !userStats) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
+    return <FullscreenLoading />;
   }
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            통계 분석
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            종합 통계 및 분석 대시보드
-          </Typography>
-        </Box>
-        <TextField
-          select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          size="small"
-          sx={{ width: 150 }}
-        >
-          <MenuItem value="7days">최근 7일</MenuItem>
-          <MenuItem value="30days">최근 30일</MenuItem>
-          <MenuItem value="90days">최근 90일</MenuItem>
-          <MenuItem value="1year">최근 1년</MenuItem>
-        </TextField>
-      </Box>
+      <PageHeader
+        title="통계 분석"
+        subtitle="종합 통계 및 분석 대시보드"
+        icon={<Assessment />}
+        action={
+          <TextField
+            select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            size="small"
+            sx={{ width: 150 }}
+          >
+            <MenuItem value="7days">최근 7일</MenuItem>
+            <MenuItem value="30days">최근 30일</MenuItem>
+            <MenuItem value="90days">최근 90일</MenuItem>
+            <MenuItem value="1year">최근 1년</MenuItem>
+          </TextField>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -186,7 +181,7 @@ const Statistics: React.FC = () => {
                     </Typography>
                   </Box>
                 </Box>
-                <People sx={{ fontSize: 48, color: '#2196f3', opacity: 0.3 }} />
+                <People sx={{ fontSize: 48, color: CHART_COLORS[0], opacity: 0.3 }} />
               </Box>
             </CardContent>
           </Card>
@@ -209,7 +204,7 @@ const Statistics: React.FC = () => {
                     </Typography>
                   </Box>
                 </Box>
-                <Assignment sx={{ fontSize: 48, color: '#4caf50', opacity: 0.3 }} />
+                <Assignment sx={{ fontSize: 48, color: CHART_COLORS[3], opacity: 0.3 }} />
               </Box>
             </CardContent>
           </Card>
@@ -232,7 +227,7 @@ const Statistics: React.FC = () => {
                     </Typography>
                   </Box>
                 </Box>
-                <Notifications sx={{ fontSize: 48, color: '#ff9800', opacity: 0.3 }} />
+                <Notifications sx={{ fontSize: 48, color: CHART_COLORS[4], opacity: 0.3 }} />
               </Box>
             </CardContent>
           </Card>
@@ -253,7 +248,7 @@ const Statistics: React.FC = () => {
                     </Typography>
                   </Box>
                 </Box>
-                <AttachMoney sx={{ fontSize: 48, color: '#9c27b0', opacity: 0.3 }} />
+                <AttachMoney sx={{ fontSize: 48, color: CHART_COLORS[1], opacity: 0.3 }} />
               </Box>
             </CardContent>
           </Card>
@@ -269,29 +264,29 @@ const Statistics: React.FC = () => {
             </Typography>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={growthData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                <XAxis dataKey="date" tick={{ fill: theme.palette.text.secondary }} />
+                <YAxis tick={{ fill: theme.palette.text.secondary }} />
                 <Tooltip />
                 <Legend />
                 <Line
                   type="monotone"
                   dataKey="users"
-                  stroke="#2196f3"
+                  stroke={CHART_COLORS[0]}
                   name="사용자"
                   strokeWidth={2}
                 />
                 <Line
                   type="monotone"
                   dataKey="bids"
-                  stroke="#4caf50"
+                  stroke={CHART_COLORS[3]}
                   name="입찰공고"
                   strokeWidth={2}
                 />
                 <Line
                   type="monotone"
                   dataKey="notifications"
-                  stroke="#ff9800"
+                  stroke={CHART_COLORS[4]}
                   name="알림 발송"
                   strokeWidth={2}
                 />
@@ -315,11 +310,11 @@ const Statistics: React.FC = () => {
                   labelLine={false}
                   label={(entry) => `${entry.name}: ${entry.value}`}
                   outerRadius={80}
-                  fill="#8884d8"
+                  fill={CHART_COLORS[0]}
                   dataKey="value"
                 >
                   {subscriptionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={getChartColor(index)} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -465,12 +460,12 @@ const Statistics: React.FC = () => {
                   { category: '기타', count: 289 },
                 ]}
               >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" />
-                <YAxis />
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                <XAxis dataKey="category" tick={{ fill: theme.palette.text.secondary }} />
+                <YAxis tick={{ fill: theme.palette.text.secondary }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="count" fill="#2196f3" name="공고 수" />
+                <Bar dataKey="count" fill={getChartColor(0)} name="공고 수" />
               </BarChart>
             </ResponsiveContainer>
           </Paper>

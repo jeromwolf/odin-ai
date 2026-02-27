@@ -13,7 +13,6 @@ import {
   Menu,
   MenuItem,
   Alert,
-  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -36,6 +35,9 @@ import {
 } from '@mui/icons-material';
 import apiClient from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { FullscreenLoading, EmptyState, ConfirmDialog, PageHeader } from '../components/common';
+import { formatKRW, formatKRDate, getDaysRemaining } from '../utils/formatters';
+import { useNotification } from '../contexts/NotificationContext';
 
 interface BookmarkItem {
   id: string;
@@ -52,6 +54,7 @@ interface BookmarkItem {
 
 const Bookmarks: React.FC = () => {
   const navigate = useNavigate();
+  const { showSuccess, showError } = useNotification();
   const [loading, setLoading] = useState(true);
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
   const [filteredBookmarks, setFilteredBookmarks] = useState<BookmarkItem[]>([]);
@@ -146,9 +149,10 @@ const Bookmarks: React.FC = () => {
       await apiClient.removeBookmark(bookmarkId);
       setBookmarks((prev) => prev.filter((item) => item.bid_notice_no !== bookmarkId));
       setSelectedBookmarks([]);
+      showSuccess('삭제되었습니다');
     } catch (error) {
       console.error('북마크 삭제 실패:', error);
-      alert('북마크 삭제에 실패했습니다.');
+      showError('북마크 삭제에 실패했습니다.');
     }
   };
 
@@ -160,9 +164,10 @@ const Bookmarks: React.FC = () => {
       setBookmarks((prev) => prev.filter((item) => !selectedBookmarks.includes(item.bid_notice_no)));
       setSelectedBookmarks([]);
       setDeleteDialogOpen(false);
+      showSuccess('삭제되었습니다');
     } catch (error) {
       console.error('북마크 삭제 실패:', error);
-      alert('북마크 삭제에 실패했습니다.');
+      showError('북마크 삭제에 실패했습니다.');
     }
   };
 
@@ -210,41 +215,14 @@ const Bookmarks: React.FC = () => {
     setNoteText('');
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR');
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('ko-KR').format(price) + '원';
-  };
-
-  const getDaysRemaining = (endDate: string) => {
-    const now = new Date();
-    const end = new Date(endDate);
-    const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diff < 0) return '마감';
-    if (diff === 0) return '오늘 마감';
-    if (diff === 1) return '1일 남음';
-    return `${diff}일 남음`;
-  };
-
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <FullscreenLoading />;
   }
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ display: 'flex', alignItems: 'center' }}>
-          <Bookmark sx={{ mr: 1 }} />
-          북마크
-        </Typography>
+        <PageHeader title="북마크" icon={<Bookmark />} />
         {selectedBookmarks.length > 0 && (
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
@@ -385,11 +363,10 @@ const Bookmarks: React.FC = () => {
 
       {/* 북마크 목록 */}
       {filteredBookmarks.length === 0 ? (
-        <Alert severity="info">
-          {searchQuery || selectedCategory !== 'all'
-            ? '검색 결과가 없습니다.'
-            : '저장된 북마크가 없습니다. 입찰 검색에서 관심 있는 공고를 북마크해보세요!'}
-        </Alert>
+        <EmptyState
+          title="북마크가 없습니다"
+          description="입찰 검색에서 관심 공고를 북마크하세요"
+        />
       ) : (
         <Grid container spacing={2}>
           {filteredBookmarks.map((bookmark) => (
@@ -435,14 +412,21 @@ const Bookmarks: React.FC = () => {
                               <Chip key={index} label={tag} size="small" variant="outlined" />
                             ))}
                             <Chip
-                              label={getDaysRemaining(bookmark.bid_end_date)}
+                              label={(() => {
+                                const d = getDaysRemaining(bookmark.bid_end_date);
+                                if (d === null || d < 0) return '마감';
+                                if (d === 0) return '오늘 마감';
+                                if (d === 1) return '1일 남음';
+                                return `${d}일 남음`;
+                              })()}
                               size="small"
-                              color={
-                                getDaysRemaining(bookmark.bid_end_date) === '마감' ? 'default' :
-                                getDaysRemaining(bookmark.bid_end_date) === '오늘 마감' ? 'error' :
-                                getDaysRemaining(bookmark.bid_end_date) === '1일 남음' ? 'warning' :
-                                'success'
-                              }
+                              color={(() => {
+                                const d = getDaysRemaining(bookmark.bid_end_date);
+                                if (d === null || d < 0) return 'default';
+                                if (d === 0) return 'error';
+                                if (d === 1) return 'warning';
+                                return 'success';
+                              })()}
                             />
                           </Box>
                         </Box>
@@ -482,7 +466,7 @@ const Bookmarks: React.FC = () => {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <CalendarToday fontSize="small" color="action" />
                             <Typography variant="body2" color="text.secondary">
-                              마감: {formatDate(bookmark.bid_end_date)}
+                              마감: {formatKRDate(bookmark.bid_end_date)}
                             </Typography>
                           </Box>
                         </Grid>
@@ -490,13 +474,13 @@ const Bookmarks: React.FC = () => {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <AttachMoney fontSize="small" color="action" />
                             <Typography variant="body2" color="text.secondary">
-                              예정가격: {formatPrice(bookmark.estimated_price)}
+                              예정가격: {formatKRW(bookmark.estimated_price)}
                             </Typography>
                           </Box>
                         </Grid>
                         <Grid item xs={12} md={3}>
                           <Typography variant="caption" color="text.secondary">
-                            저장일: {formatDate(bookmark.created_at)}
+                            저장일: {formatKRDate(bookmark.created_at)}
                           </Typography>
                         </Grid>
                       </Grid>
@@ -516,21 +500,14 @@ const Bookmarks: React.FC = () => {
       )}
 
       {/* 삭제 확인 다이얼로그 */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>북마크 삭제</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning">
-            선택한 {selectedBookmarks.length}개의 북마크를 삭제하시겠습니까?
-            <br />이 작업은 되돌릴 수 없습니다.
-          </Alert>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>취소</Button>
-          <Button onClick={handleDeleteSelected} color="error" variant="contained">
-            삭제
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeleteSelected}
+        title="북마크 삭제"
+        message="이 북마크를 삭제하시겠습니까?"
+        severity="warning"
+      />
 
       {/* 메모 추가/수정 다이얼로그 */}
       <Dialog open={noteDialogOpen} onClose={() => setNoteDialogOpen(false)} maxWidth="sm" fullWidth>

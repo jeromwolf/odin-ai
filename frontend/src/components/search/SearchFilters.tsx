@@ -7,9 +7,6 @@ import React, { useState, useCallback } from 'react';
 import {
   Box,
   Paper,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Typography,
   TextField,
   Button,
@@ -19,8 +16,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Slider,
-  FormLabel,
   IconButton,
   Divider,
   Badge

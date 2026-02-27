@@ -288,7 +288,6 @@ export const StatCard: React.FC<{
   icon?: React.ReactNode;
   color?: 'primary' | 'success' | 'warning' | 'error' | 'info';
 }> = ({ title, value, change, icon, color = 'primary' }) => {
-  const theme = useTheme();
   const isPositive = change && change > 0;
 
   return (
@@ -330,7 +329,7 @@ export const StatCard: React.FC<{
   );
 };
 
-export default {
+const charts = {
   EnhancedLineChart,
   EnhancedBarChart,
   EnhancedPieChart,
@@ -338,3 +337,5 @@ export default {
   EnhancedRadarChart,
   StatCard,
 };
+
+export default charts;

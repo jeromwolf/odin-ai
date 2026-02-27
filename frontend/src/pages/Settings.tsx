@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -14,10 +14,6 @@ import {
   InputLabel,
   Button,
   Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   List,
   ListItem,
   ListItemText,
@@ -25,7 +21,6 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  TextField,
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -43,13 +38,18 @@ import {
   Warning,
 } from '@mui/icons-material';
 import apiClient from '../services/api';
+import { FullscreenLoading, ConfirmDialog } from '../components/common';
+import { useNotification } from '../contexts/NotificationContext';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 const Settings: React.FC = () => {
+  const { showSuccess, showError } = useNotification();
+  const { mode, setTheme } = useAppTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // 앱 설정
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(mode === 'dark');
   const [language, setLanguage] = useState('ko');
   const [autoSave, setAutoSave] = useState(true);
   const [dataSync, setDataSync] = useState(true);
@@ -67,20 +67,14 @@ const Settings: React.FC = () => {
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [exportDataOpen, setExportDataOpen] = useState(false);
   const [clearDataOpen, setClearDataOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-  // 설정 불러오기
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
       const settings = await apiClient.getSettings();
       if (settings) {
         // 앱 설정
-        setDarkMode(settings.dark_mode || false);
+        setDarkMode(mode === 'dark');
         setLanguage(settings.language || 'ko');
         setAutoSave(settings.auto_save !== false);
         setDataSync(settings.data_sync !== false);
@@ -99,7 +93,12 @@ const Settings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [mode]);
+
+  // 설정 불러오기
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   // 설정 저장 (자동 저장)
   const saveSettings = async (newSettings: any) => {
@@ -108,7 +107,7 @@ const Settings: React.FC = () => {
       await apiClient.updateSettings(newSettings);
     } catch (error) {
       console.error('설정 저장 실패:', error);
-      alert('설정 저장에 실패했습니다.');
+      showError('설정 저장에 실패했습니다.');
     } finally {
       setSaving(false);
     }
@@ -117,6 +116,7 @@ const Settings: React.FC = () => {
   // 설정 변경 핸들러들 (각 변경마다 자동 저장)
   const handleDarkModeChange = (checked: boolean) => {
     setDarkMode(checked);
+    setTheme(checked ? 'dark' : 'light');
     saveSettings({ dark_mode: checked });
   };
 
@@ -174,10 +174,10 @@ const Settings: React.FC = () => {
       window.URL.revokeObjectURL(url);
 
       setExportDataOpen(false);
-      alert('데이터 내보내기가 완료되었습니다.');
+      showSuccess('데이터 내보내기가 완료되었습니다.');
     } catch (error) {
       console.error('데이터 내보내기 실패:', error);
-      alert('데이터 내보내기에 실패했습니다.');
+      showError('데이터 내보내기에 실패했습니다.');
     }
   };
 
@@ -186,38 +186,29 @@ const Settings: React.FC = () => {
       // API 호출하여 데이터 삭제 (가짜 API - 실제 구현 필요)
       // await apiClient.clearUserData();
       setClearDataOpen(false);
-      alert('검색 기록과 북마크가 삭제되었습니다.');
+      showSuccess('검색 기록과 북마크가 삭제되었습니다.');
     } catch (error) {
       console.error('데이터 삭제 실패:', error);
-      alert('데이터 삭제에 실패했습니다.');
+      showError('데이터 삭제에 실패했습니다.');
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== '계정삭제') {
-      alert('입력값이 정확하지 않습니다.');
-      return;
-    }
-
     try {
       await apiClient.deleteAccount();
       setDeleteAccountOpen(false);
-      alert('계정 삭제가 예약되었습니다. 30일 후 완전히 삭제됩니다.');
+      showSuccess('계정 삭제가 예약되었습니다. 30일 후 완전히 삭제됩니다.');
       // 로그아웃 및 홈페이지로 이동
       await apiClient.logout();
       window.location.href = '/';
     } catch (error) {
       console.error('계정 삭제 실패:', error);
-      alert('계정 삭제에 실패했습니다.');
+      showError('계정 삭제에 실패했습니다.');
     }
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Typography>설정을 불러오는 중...</Typography>
-      </Box>
-    );
+    return <FullscreenLoading />;
   }
 
   return (
@@ -481,83 +472,37 @@ const Settings: React.FC = () => {
       {/* 다이얼로그들 */}
 
       {/* 데이터 내보내기 다이얼로그 */}
-      <Dialog open={exportDataOpen} onClose={() => setExportDataOpen(false)}>
-        <DialogTitle>데이터 내보내기</DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            다음 데이터가 내보내집니다:
-          </Typography>
-          <List>
-            <ListItem>
-              <ListItemText primary="• 검색 기록" />
-            </ListItem>
-            <ListItem>
-              <ListItemText primary="• 북마크 목록" />
-            </ListItem>
-            <ListItem>
-              <ListItemText primary="• 알림 설정" />
-            </ListItem>
-            <ListItem>
-              <ListItemText primary="• 앱 설정" />
-            </ListItem>
-          </List>
-          <Alert severity="info">
-            내보낸 파일은 다른 계정으로 가져올 수 있습니다.
-          </Alert>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setExportDataOpen(false)}>취소</Button>
-          <Button onClick={handleExportData} variant="contained">
-            내보내기
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={exportDataOpen}
+        onClose={() => setExportDataOpen(false)}
+        onConfirm={handleExportData}
+        title="데이터 내보내기"
+        message="검색 기록, 북마크 목록, 알림 설정, 앱 설정이 JSON 파일로 내보내집니다. 내보낸 파일은 다른 계정으로 가져올 수 있습니다."
+        confirmText="내보내기"
+        severity="info"
+      />
 
       {/* 데이터 삭제 다이얼로그 */}
-      <Dialog open={clearDataOpen} onClose={() => setClearDataOpen(false)}>
-        <DialogTitle>데이터 삭제 확인</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            모든 검색 기록과 북마크가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
-          </Alert>
-          <Typography variant="body1">
-            정말로 삭제하시겠습니까?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setClearDataOpen(false)}>취소</Button>
-          <Button onClick={handleClearData} variant="contained" color="warning">
-            삭제
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={clearDataOpen}
+        onClose={() => setClearDataOpen(false)}
+        onConfirm={handleClearData}
+        title="데이터 삭제 확인"
+        message="모든 검색 기록과 북마크가 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+        confirmText="삭제"
+        severity="warning"
+      />
 
       {/* 계정 삭제 다이얼로그 */}
-      <Dialog open={deleteAccountOpen} onClose={() => setDeleteAccountOpen(false)}>
-        <DialogTitle>계정 삭제 확인</DialogTitle>
-        <DialogContent>
-          <Alert severity="error" sx={{ mb: 2 }}>
-            계정을 삭제하면 모든 데이터가 영구적으로 삭제됩니다.
-          </Alert>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            정말로 계정을 삭제하시겠습니까? 삭제 후 30일 동안은 복구할 수 있습니다.
-          </Typography>
-          <TextField
-            fullWidth
-            label="삭제 확인을 위해 '계정삭제'를 입력하세요"
-            variant="outlined"
-            value={deleteConfirmText}
-            onChange={(e) => setDeleteConfirmText(e.target.value)}
-            helperText="이 필드에 '계정삭제'를 정확히 입력해야 삭제가 가능합니다"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteAccountOpen(false)}>취소</Button>
-          <Button onClick={handleDeleteAccount} variant="contained" color="error">
-            삭제
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteAccountOpen}
+        onClose={() => setDeleteAccountOpen(false)}
+        onConfirm={handleDeleteAccount}
+        title="계정 삭제 확인"
+        message="계정을 삭제하면 모든 데이터가 영구적으로 삭제됩니다. 정말로 계정을 삭제하시겠습니까? 삭제 후 30일 동안은 복구할 수 있습니다."
+        confirmText="삭제"
+        severity="error"
+      />
     </Box>
   );
 };

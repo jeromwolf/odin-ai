@@ -20,7 +20,6 @@ import {
   TableRow,
   Chip,
   Alert,
-  CircularProgress,
 } from '@mui/material';
 import {
   Computer,
@@ -40,6 +39,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { adminApi } from '../../services/admin/adminApi';
+import { FullscreenLoading } from '../../components/common';
+import { CHART_COLORS } from '../../utils/colors';
 
 interface SystemStatus {
   cpu_percent: number;
@@ -114,11 +115,7 @@ const SystemMonitoring: React.FC = () => {
   };
 
   if (loading && !systemStatus) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
+    return <FullscreenLoading />;
   }
 
   return (
@@ -142,7 +139,7 @@ const SystemMonitoring: React.FC = () => {
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
-                <Computer sx={{ fontSize: 40, mr: 2, color: '#2196f3' }} />
+                <Computer sx={{ fontSize: 40, mr: 2, color: CHART_COLORS[0] }} />
                 <Box flexGrow={1}>
                   <Typography variant="body2" color="textSecondary">
                     CPU 사용률
@@ -165,7 +162,7 @@ const SystemMonitoring: React.FC = () => {
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
-                <Memory sx={{ fontSize: 40, mr: 2, color: '#4caf50' }} />
+                <Memory sx={{ fontSize: 40, mr: 2, color: CHART_COLORS[3] }} />
                 <Box flexGrow={1}>
                   <Typography variant="body2" color="textSecondary">
                     메모리 사용률
@@ -192,7 +189,7 @@ const SystemMonitoring: React.FC = () => {
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
-                <StorageIcon sx={{ fontSize: 40, mr: 2, color: '#ff9800' }} />
+                <StorageIcon sx={{ fontSize: 40, mr: 2, color: CHART_COLORS[4] }} />
                 <Box flexGrow={1}>
                   <Typography variant="body2" color="textSecondary">
                     디스크 사용률
@@ -233,21 +230,21 @@ const SystemMonitoring: React.FC = () => {
                 <Line
                   type="monotone"
                   dataKey="cpu"
-                  stroke="#2196f3"
+                  stroke={CHART_COLORS[0]}
                   name="CPU (%)"
                   dot={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="memory"
-                  stroke="#4caf50"
+                  stroke={CHART_COLORS[3]}
                   name="메모리 (%)"
                   dot={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="disk"
-                  stroke="#ff9800"
+                  stroke={CHART_COLORS[4]}
                   name="디스크 (%)"
                   dot={false}
                 />

@@ -12,11 +12,6 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Table,
   TableBody,
   TableCell,
@@ -35,6 +30,10 @@ import {
   Upgrade,
 } from '@mui/icons-material';
 import apiClient from '../services/api';
+import { FullscreenLoading, ConfirmDialog } from '../components/common';
+import { useNotification } from '../contexts/NotificationContext';
+import { SUBSCRIPTION_PLAN_COLORS } from '../utils/colors';
+import { formatKRW } from '../utils/formatters';
 
 interface PlanFeature {
   name: string;
@@ -63,6 +62,7 @@ interface BillingHistory {
 }
 
 const Subscription: React.FC = () => {
+  const { showSuccess, showError } = useNotification();
   const [loading, setLoading] = useState(true);
   const [currentPlan, setCurrentPlan] = useState('basic');
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -138,7 +138,7 @@ const Subscription: React.FC = () => {
       price: 0,
       period: '무료',
       description: '기본적인 입찰 정보 검색',
-      color: '#6c757d',
+      color: SUBSCRIPTION_PLAN_COLORS['basic'],
       features: [
         { name: '일일 검색', included: true, limit: '100회' },
         { name: '북마크', included: true, limit: '50개' },
@@ -156,7 +156,7 @@ const Subscription: React.FC = () => {
       period: '월',
       popular: true,
       description: '전문가를 위한 고급 기능',
-      color: '#007bff',
+      color: SUBSCRIPTION_PLAN_COLORS['pro'],
       features: [
         { name: '일일 검색', included: true, limit: '무제한' },
         { name: '북마크', included: true, limit: '무제한' },
@@ -175,7 +175,7 @@ const Subscription: React.FC = () => {
       price: 99000,
       period: '월',
       description: '기업용 종합 솔루션',
-      color: '#28a745',
+      color: SUBSCRIPTION_PLAN_COLORS['enterprise'],
       features: [
         { name: '모든 프로 기능', included: true },
         { name: 'API 접근', included: true, limit: '무제한' },
@@ -205,13 +205,13 @@ const Subscription: React.FC = () => {
         await apiClient.updateSubscription(selectedPlan);
         setCurrentPlan(selectedPlan);
         setUpgradeDialogOpen(false);
-        alert(`${plans.find(p => p.id === selectedPlan)?.name} 플랜으로 업그레이드되었습니다.`);
+        showSuccess(`${plans.find(p => p.id === selectedPlan)?.name} 플랜으로 업그레이드되었습니다.`);
 
         // 새로고침하여 새 데이터 불러오기
         await loadSubscriptionData();
       } catch (error) {
         console.error('업그레이드 실패:', error);
-        alert('업그레이드에 실패했습니다.');
+        showError('업그레이드에 실패했습니다.');
       }
     }
   };
@@ -220,13 +220,13 @@ const Subscription: React.FC = () => {
     try {
       await apiClient.cancelSubscription();
       setCancelDialogOpen(false);
-      alert('구독이 취소되었습니다. 현재 결제 기간이 끝날 때까지 서비스를 이용할 수 있습니다.');
+      showSuccess('구독이 취소되었습니다. 현재 결제 기간이 끝날 때까지 서비스를 이용할 수 있습니다.');
 
       // 새로고침하여 새 데이터 불러오기
       await loadSubscriptionData();
     } catch (error) {
       console.error('구독 취소 실패:', error);
-      alert('구독 취소에 실패했습니다.');
+      showError('구독 취소에 실패했습니다.');
     }
   };
 
@@ -242,11 +242,7 @@ const Subscription: React.FC = () => {
   const getUsagePercentage = (current: number, limit: number) => (current / limit) * 100;
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Typography>구독 정보를 불러오는 중...</Typography>
-      </Box>
-    );
+    return <FullscreenLoading message="구독 정보를 불러오는 중..." />;
   }
 
   return (
@@ -278,7 +274,7 @@ const Subscription: React.FC = () => {
               </Typography>
               {currentPlanInfo && currentPlanInfo.price > 0 && (
                 <Typography variant="h6" sx={{ mt: 2 }}>
-                  월 {currentPlanInfo.price.toLocaleString()}원
+                  월 {formatKRW(currentPlanInfo.price)}
                 </Typography>
               )}
             </Grid>
@@ -496,54 +492,32 @@ const Subscription: React.FC = () => {
       </Card>
 
       {/* 업그레이드 확인 다이얼로그 */}
-      <Dialog open={upgradeDialogOpen} onClose={() => setUpgradeDialogOpen(false)}>
-        <DialogTitle>플랜 업그레이드</DialogTitle>
-        <DialogContent>
-          {selectedPlan && (
-            <Box>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                <Typography variant="body2">
-                  {plans.find(p => p.id === selectedPlan)?.name} 플랜으로 업그레이드하시겠습니까?
-                </Typography>
-              </Alert>
-              <Typography variant="body1">
-                • 즉시 모든 기능에 액세스할 수 있습니다
-              </Typography>
-              <Typography variant="body1">
-                • 다음 결제일부터 새로운 요금이 적용됩니다
-              </Typography>
-              <Typography variant="body1">
-                • 언제든지 플랜을 변경하거나 취소할 수 있습니다
-              </Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setUpgradeDialogOpen(false)}>취소</Button>
-          <Button onClick={confirmUpgrade} variant="contained">
-            업그레이드
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={upgradeDialogOpen}
+        onClose={() => setUpgradeDialogOpen(false)}
+        onConfirm={confirmUpgrade}
+        title="플랜 업그레이드"
+        message={
+          selectedPlan
+            ? `${plans.find(p => p.id === selectedPlan)?.name} 플랜으로 업그레이드하시겠습니까? 즉시 모든 기능에 액세스할 수 있으며, 다음 결제일부터 새로운 요금이 적용됩니다.`
+            : '선택한 플랜으로 업그레이드하시겠습니까?'
+        }
+        confirmText="업그레이드"
+        cancelText="취소"
+        severity="info"
+      />
 
       {/* 구독 취소 확인 다이얼로그 */}
-      <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)}>
-        <DialogTitle>구독 취소</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            구독을 취소하면 현재 결제 기간이 끝날 때까지만 프리미엄 기능을 사용할 수 있습니다.
-          </Alert>
-          <Typography variant="body1">
-            정말로 구독을 취소하시겠습니까?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCancelDialogOpen(false)}>유지</Button>
-          <Button onClick={handleCancelSubscription} color="error" variant="contained">
-            취소
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={cancelDialogOpen}
+        onClose={() => setCancelDialogOpen(false)}
+        onConfirm={handleCancelSubscription}
+        title="구독 취소"
+        message="구독을 취소하면 현재 결제 기간이 끝날 때까지만 프리미엄 기능을 사용할 수 있습니다. 정말로 구독을 취소하시겠습니까?"
+        confirmText="구독 취소"
+        cancelText="유지"
+        severity="warning"
+      />
     </Box>
   );
 };

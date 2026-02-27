@@ -17,10 +17,7 @@ import {
   Skeleton,
   Alert,
   AlertTitle,
-  Divider,
-  Grid,
-  Tooltip,
-  Link
+  Grid
 } from '@mui/material';
 import {
   Description as DocumentIcon,
@@ -56,13 +53,6 @@ const ResultCard = styled(Card)(({ theme }) => ({
     boxShadow: theme.shadows[4],
     transform: 'translateY(-2px)'
   }
-}));
-
-const HighlightText = styled('span')(({ theme }) => ({
-  backgroundColor: theme.palette.warning.light,
-  padding: '0 4px',
-  borderRadius: '2px',
-  fontWeight: 600
 }));
 
 const StatusChip = styled(Chip)(({ theme }) => ({

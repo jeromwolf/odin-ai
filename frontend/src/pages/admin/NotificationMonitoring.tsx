@@ -19,16 +19,17 @@ import {
   TableRow,
   Chip,
   Alert,
-  CircularProgress,
   Pagination,
   TextField,
   MenuItem,
 } from '@mui/material';
+import { FullscreenLoading, PageHeader } from '../../components/common';
 import {
   Mail,
   Error as ErrorIcon,
   CheckCircle,
   Warning as WarningIcon,
+  Notifications,
 } from '@mui/icons-material';
 import {
   LineChart,
@@ -41,6 +42,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { adminApi } from '../../services/admin/adminApi';
+import { formatKRDate, formatKRW } from '../../utils/formatters';
+import { CHART_COLORS } from '../../utils/colors';
 
 interface NotificationStats {
   total_notifications: number;
@@ -104,7 +107,7 @@ const NotificationMonitoring: React.FC = () => {
       if (chartData && Array.isArray(chartData)) {
         setChartData(
           chartData.map((item: any) => ({
-            date: new Date(item.date || item.timestamp).toLocaleDateString('ko-KR'),
+            date: formatKRDate(item.date || item.timestamp),
             notifications: item.total || 0,
             sent: item.sent || 0,
             failed: item.failed || 0,
@@ -157,18 +160,12 @@ const NotificationMonitoring: React.FC = () => {
   };
 
   if (loading && !stats) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
+    return <FullscreenLoading />;
   }
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom fontWeight="bold">
-        알림 모니터링
-      </Typography>
+      <PageHeader title="알림 모니터링" icon={<Notifications />} />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -256,9 +253,9 @@ const NotificationMonitoring: React.FC = () => {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="notifications" stroke="#8884d8" name="생성된 알림" />
-              <Line type="monotone" dataKey="sent" stroke="#82ca9d" name="발송완료" />
-              <Line type="monotone" dataKey="failed" stroke="#ffc658" name="발송실패" />
+              <Line type="monotone" dataKey="notifications" stroke={CHART_COLORS[0]} name="생성된 알림" />
+              <Line type="monotone" dataKey="sent" stroke={CHART_COLORS[3]} name="발송완료" />
+              <Line type="monotone" dataKey="failed" stroke={CHART_COLORS[4]} name="발송실패" />
             </LineChart>
           </ResponsiveContainer>
         </Paper>
@@ -308,7 +305,7 @@ const NotificationMonitoring: React.FC = () => {
                     <TableCell>{log.notification_count}</TableCell>
                     <TableCell>{getStatusChip(log.status)}</TableCell>
                     <TableCell>
-                      {new Date(log.sent_at).toLocaleString('ko-KR')}
+                      {formatKRDate(log.sent_at, 'yyyy.MM.dd HH:mm')}
                     </TableCell>
                     <TableCell>
                       {log.error_message ? (
@@ -369,10 +366,10 @@ const NotificationMonitoring: React.FC = () => {
                       {notif.title}
                     </TableCell>
                     <TableCell>
-                      {notif.price ? `${notif.price.toLocaleString()}원` : '-'}
+                      {notif.price ? formatKRW(notif.price) : '-'}
                     </TableCell>
                     <TableCell>
-                      {new Date(notif.created_at).toLocaleString('ko-KR')}
+                      {formatKRDate(notif.created_at, 'yyyy.MM.dd HH:mm')}
                     </TableCell>
                   </TableRow>
                 ))

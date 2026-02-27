@@ -9,7 +9,6 @@ import {
   CardContent,
   Grid,
   Chip,
-  CircularProgress,
   Alert,
   InputAdornment,
   IconButton,
@@ -18,6 +17,8 @@ import { Search as SearchIcon, Bookmark, BookmarkBorder } from '@mui/icons-mater
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../services/api';
+import { FullscreenLoading, EmptyState } from '../components/common';
+import { formatKRW, formatKRDate } from '../utils/formatters';
 
 interface SearchResult {
   bid_notice_no: string;
@@ -154,17 +155,6 @@ const Search: React.FC = () => {
     }
   };
 
-  const formatPrice = (price?: number) => {
-    if (!price) return '가격 정보 없음';
-    return `₩${price.toLocaleString('ko-KR')}`;
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR');
-  };
-
   return (
     <Container maxWidth="lg">
       <Box sx={{ py: 4 }}>
@@ -231,11 +221,7 @@ const Search: React.FC = () => {
         </Box>
 
         {/* 검색 결과 */}
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-            <CircularProgress />
-          </Box>
-        )}
+        {loading && <FullscreenLoading />}
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -346,13 +332,13 @@ const Search: React.FC = () => {
                     <Grid container spacing={2} sx={{ mt: 1 }}>
                       <Grid item xs={12} md={6}>
                         <Typography variant="body2">
-                          <strong>예정가격:</strong> {formatPrice(result.estimated_price)}
+                          <strong>예정가격:</strong> {formatKRW(result.estimated_price)}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} md={6}>
                         {result.bid_end_date && (
                           <Typography variant="body2">
-                            <strong>마감일:</strong> {formatDate(result.bid_end_date)}
+                            <strong>마감일:</strong> {formatKRDate(result.bid_end_date)}
                           </Typography>
                         )}
                       </Grid>
@@ -386,9 +372,10 @@ const Search: React.FC = () => {
         )}
 
         {!loading && searchQuery && results.length === 0 && (
-          <Alert severity="info">
-            검색 결과가 없습니다. 다른 검색어를 시도해보세요.
-          </Alert>
+          <EmptyState
+            title="검색 결과가 없습니다"
+            description="다른 검색어를 시도해보세요"
+          />
         )}
       </Box>
     </Container>

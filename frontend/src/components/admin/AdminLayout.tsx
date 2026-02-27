@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box,
   Drawer,
@@ -21,6 +22,7 @@ import {
   Menu,
   MenuItem,
   Chip,
+  Tooltip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -37,8 +39,11 @@ import {
   Bookmark,
   Notifications,
   Person,
+  DarkMode,
+  LightMode,
 } from '@mui/icons-material';
 import { adminApi } from '../../services/admin/adminApi';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 const DRAWER_WIDTH = 240;
 
@@ -51,6 +56,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const { resolvedMode, toggleTheme } = useAppTheme();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -176,6 +182,13 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             관리자 대시보드
           </Typography>
 
+          {/* 다크 모드 토글 */}
+          <Tooltip title={resolvedMode === 'dark' ? '라이트 모드' : '다크 모드'}>
+            <IconButton color="inherit" onClick={toggleTheme} sx={{ mr: 1 }}>
+              {resolvedMode === 'dark' ? <LightMode /> : <DarkMode />}
+            </IconButton>
+          </Tooltip>
+
           {/* 시스템 상태 표시 */}
           <Chip
             label="시스템 정상"
@@ -278,7 +291,17 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         }}
       >
         <Toolbar /> {/* AppBar 높이만큼 여백 */}
-        {children || <Outlet />}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+          >
+            {children || <Outlet />}
+          </motion.div>
+        </AnimatePresence>
       </Box>
     </Box>
   );
