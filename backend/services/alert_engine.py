@@ -332,20 +332,26 @@ class AlertEngine:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-            query = """
-                INSERT INTO alert_notifications (
-                    alert_rule_id, user_id, bid_notice_no, channel,
-                    status, subject, content
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """
-
             subject = f"[ODIN-AI] 새로운 입찰 공고: {bid.title}"
             content = f"{bid.organization_name} - {bid.title}"
 
+            query = """
+                INSERT INTO notifications (
+                    user_id, alert_rule_id, title, message,
+                    type, status, metadata
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
+                RETURNING id
+            """
+
+            import json
+            metadata = json.dumps({
+                "bid_notice_no": bid.bid_notice_no,
+                "channel": channel
+            })
+
             cursor.execute(query, (
-                rule.id, rule.user_id, bid.bid_notice_no, channel,
-                status, subject, content
+                rule.user_id, rule.id, subject, content,
+                'alert', status, metadata
             ))
 
             notification_id = cursor.fetchone()['id']
@@ -386,8 +392,7 @@ class AlertEngine:
 
             query = """
                 UPDATE alert_rules
-                SET trigger_count = trigger_count + 1,
-                    last_triggered = CURRENT_TIMESTAMP
+                SET updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
             """
             cursor.execute(query, (rule_id,))
@@ -411,14 +416,14 @@ class AlertEngine:
 
             # 어제부터 오늘까지의 pending 알림들을 사용자별로 그룹화
             query = """
-                SELECT user_id, COUNT(*) as count,
-                       ARRAY_AGG(DISTINCT bid_notice_no) as bid_notices
-                FROM alert_notifications an
-                JOIN alert_rules ar ON an.alert_rule_id = ar.id
-                WHERE an.status = 'pending'
+                SELECT n.user_id, COUNT(*) as count,
+                       ARRAY_AGG(DISTINCT (n.metadata->>'bid_notice_no')) as bid_notices
+                FROM notifications n
+                JOIN alert_rules ar ON n.alert_rule_id = ar.id
+                WHERE n.status = 'unread'
                   AND ar.notification_timing = 'daily'
-                  AND an.created_at >= CURRENT_DATE - INTERVAL '1 day'
-                GROUP BY user_id
+                  AND n.created_at >= CURRENT_DATE - INTERVAL '1 day'
+                GROUP BY n.user_id
             """
 
             cursor.execute(query)

@@ -122,18 +122,18 @@ class NotificationService:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
-                "SELECT sms_phone_number FROM user_notification_settings WHERE user_id = %s",
+                "SELECT phone_number FROM users WHERE id = %s",
                 (user_id,)
             )
             result = cursor.fetchone()
-            return result['sms_phone_number'] if result else None
+            return result['phone_number'] if result else None
 
     def _get_email_template(self, template_name: str) -> Optional[Dict[str, str]]:
         """이메일 템플릿 조회"""
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
-                "SELECT subject_template, content_template FROM notification_templates "
+                "SELECT subject_template, content_template FROM alert_templates "
                 "WHERE template_name = %s AND channel = 'email' AND is_active = true",
                 (template_name,)
             )
@@ -150,7 +150,7 @@ class NotificationService:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute(
-                "SELECT subject_template, content_template FROM notification_templates "
+                "SELECT subject_template, content_template FROM alert_templates "
                 "WHERE template_name = %s AND channel = 'web' AND is_active = true",
                 (template_name,)
             )
