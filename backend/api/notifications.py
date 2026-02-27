@@ -773,3 +773,91 @@ async def send_email_notification(to_email: str, subject: str, content: str, htm
     except Exception as e:
         logger.error(f"이메일 발송 실패: {e}")
         return False
+
+
+# ============================================
+# 필터 옵션 조회 API
+# ============================================
+
+@router.get("/filter-options/work-types")
+async def get_work_type_options():
+    """알림 규칙 설정용 업종 목록 조회"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT field_value as work_type, COUNT(*) as count
+                FROM bid_extracted_info
+                WHERE info_category = 'work_type' AND field_value IS NOT NULL
+                GROUP BY field_value
+                ORDER BY count DESC
+                LIMIT 30
+            """)
+            rows = cursor.fetchall()
+            return {
+                "success": True,
+                "work_types": [
+                    {"label": row["work_type"], "count": row["count"]}
+                    for row in rows
+                ]
+            }
+    except Exception as e:
+        logger.error(f"업종 목록 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail="업종 목록 조회에 실패했습니다")
+
+
+@router.get("/filter-options/regions")
+async def get_region_options():
+    """알림 규칙 설정용 지역 목록 조회"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT field_value as region, COUNT(*) as count
+                FROM bid_extracted_info
+                WHERE info_category = 'region'
+                    AND field_name = 'region_restriction'
+                    AND field_value IS NOT NULL
+                    AND field_value != ''
+                GROUP BY field_value
+                ORDER BY count DESC
+                LIMIT 30
+            """)
+            rows = cursor.fetchall()
+            return {
+                "success": True,
+                "regions": [
+                    {"label": row["region"], "count": row["count"]}
+                    for row in rows
+                ]
+            }
+    except Exception as e:
+        logger.error(f"지역 목록 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail="지역 목록 조회에 실패했습니다")
+
+
+@router.get("/filter-options/organizations")
+async def get_organization_options():
+    """알림 규칙 설정용 발주기관 목록 조회"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT organization_name as organization, COUNT(*) as count
+                FROM bid_announcements
+                WHERE organization_name IS NOT NULL
+                GROUP BY organization_name
+                ORDER BY count DESC
+                LIMIT 50
+            """)
+            rows = cursor.fetchall()
+            return {
+                "success": True,
+                "organizations": [
+                    {"label": row["organization"], "count": row["count"]}
+                    for row in rows
+                ]
+            }
+    except Exception as e:
+        logger.error(f"발주기관 목록 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail="발주기관 목록 조회에 실패했습니다")
