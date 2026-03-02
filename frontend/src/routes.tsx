@@ -22,6 +22,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const NotificationInbox = lazy(() => import('./pages/NotificationInbox'));
 const GraphExplorer = lazy(() => import('./pages/GraphExplorer'));
+const TrendAnalysis = lazy(() => import('./pages/TrendAnalysis'));
 
 // Admin pages
 const AdminLogin = lazy(() => import('./pages/admin/Login'));
@@ -87,6 +88,7 @@ const AppRoutes = () => {
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/graph" element={<GraphExplorer />} />
+            <Route path="/trends" element={<TrendAnalysis />} />
           </Route>
         </Route>
 

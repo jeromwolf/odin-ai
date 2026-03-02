@@ -64,6 +64,11 @@ from batch.modules.processor import DocumentProcessorModule
 from batch.modules.notification_matcher import NotificationMatcher
 from batch.modules.email_reporter import EmailReporter
 try:
+    from batch.modules.award_collector import AwardCollector
+    AWARD_AVAILABLE = True
+except ImportError:
+    AWARD_AVAILABLE = False
+try:
     from batch.modules.embedding_generator import EmbeddingGenerator
     EMBEDDING_AVAILABLE = True
 except ImportError:
@@ -98,7 +103,8 @@ class ProductionBatch:
             'attachments': 0,
             'notifications_created': 0,
             'emails_sent': 0,
-            'embeddings_generated': 0
+            'embeddings_generated': 0,
+            'awards_updated': 0
         }
 
         # 새로 수집된 공고 ID 저장
@@ -107,6 +113,7 @@ class ProductionBatch:
         # 알림 실행 여부 (환경변수로 제어)
         self.enable_notification = os.getenv('ENABLE_NOTIFICATION', 'true').lower() == 'true'
         self.enable_embedding = os.getenv('ENABLE_EMBEDDING', 'false').lower() == 'true'
+        self.enable_award = os.getenv('ENABLE_AWARD_COLLECTION', 'false').lower() == 'true'
 
     def run(self):
         """배치 실행 메인 함수"""
@@ -144,6 +151,17 @@ class ProductionBatch:
                 logger.info("📡 Phase 1: API 데이터 수집")
                 logger.info("="*40)
                 self._run_collector()
+
+                # 1.5. 낙찰정보 수집 (ENABLE_AWARD_COLLECTION=true인 경우만)
+                if self.enable_award and AWARD_AVAILABLE:
+                    logger.info("\n" + "="*40)
+                    logger.info("🏆 Phase 1.5: 낙찰정보 수집")
+                    logger.info("="*40)
+                    self._run_award_collector()
+                elif self.enable_award and not AWARD_AVAILABLE:
+                    logger.warning("⚠️ Phase 1.5: 낙찰정보 모듈 로드 실패 - 건너뜀")
+                else:
+                    logger.info("\n⏭️ Phase 1.5: 낙찰정보 수집 건너뜀 (ENABLE_AWARD_COLLECTION=false)")
 
                 # 3. 파일 다운로드
                 logger.info("\n" + "="*40)
@@ -373,6 +391,43 @@ class ProductionBatch:
                         shutil.rmtree(dir_path)
                         dir_path.mkdir(parents=True, exist_ok=True)
                         logger.info(f"  ✅ {dir_path} 디렉토리 초기화")
+
+    def _run_award_collector(self):
+        """낙찰정보 수집 실행"""
+        try:
+            award_collector = AwardCollector(self.db_url)
+
+            from datetime import datetime, timezone
+            start_str = os.getenv('BATCH_START_DATE')
+            end_str = os.getenv('BATCH_END_DATE')
+
+            if start_str:
+                start_date = datetime.strptime(start_str, '%Y-%m-%d')
+            else:
+                start_date = datetime.now(timezone.utc) - timedelta(days=30)
+
+            if end_str:
+                end_date = datetime.strptime(end_str, '%Y-%m-%d')
+            else:
+                end_date = datetime.now(timezone.utc)
+
+            logger.info(f"🏆 낙찰정보 수집 기간: {start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
+
+            result = award_collector.collect_awards(
+                start_date=start_date,
+                end_date=end_date,
+                num_of_rows=100,
+                max_pages=2 if self.test_mode else None
+            )
+
+            if result['status'] == 'success':
+                self.stats['awards_updated'] = result.get('updated', 0)
+                logger.info(f"✅ 낙찰정보 수집 완료: {self.stats['awards_updated']}건 업데이트")
+            else:
+                logger.error(f"❌ 낙찰정보 수집 실패: {result.get('message')}")
+
+        except Exception as e:
+            logger.error(f"❌ 낙찰정보 수집 오류: {e}")
 
     def _run_collector(self):
         """API 수집 실행"""

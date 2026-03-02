@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -34,6 +34,7 @@ import {
   Category,
   Send,
 } from '@mui/icons-material';
+import ForceGraph2D from 'react-force-graph-2d';
 import graphService, {
   GlobalAskResponse,
   GraphStatus,
@@ -78,6 +79,113 @@ const quickSearches = [
   { label: '도로공사', icon: <Category fontSize="small" /> },
 ];
 
+// ─── Graph helpers ────────────────────────────────────────────────────────────
+
+const NODE_COLORS: Record<string, string> = {
+  query: '#EF4444',
+  community: '#3B82F6',
+  organization: '#8B5CF6',
+  project: '#10B981',
+  technology: '#06B6D4',
+  region: '#F59E0B',
+  regulation: '#EC4899',
+  material: '#6366F1',
+  default: '#64748B',
+};
+
+const getNodeColor = (type: string): string =>
+  NODE_COLORS[type?.toLowerCase()] || NODE_COLORS.default;
+
+interface GraphNodeData {
+  id: string;
+  label: string;
+  type: string;
+  val: number;
+  x?: number;
+  y?: number;
+}
+
+interface GraphLinkData {
+  source: string;
+  target: string;
+}
+
+interface ForceGraphData {
+  nodes: GraphNodeData[];
+  links: GraphLinkData[];
+}
+
+const buildGraphFromResults = (result: GlobalAskResponse): ForceGraphData => {
+  const nodes: GraphNodeData[] = [];
+  const links: GraphLinkData[] = [];
+  const nodeSet = new Set<string>();
+
+  // Center node: the query itself
+  nodes.push({ id: 'query', label: result.query, type: 'query', val: 20 });
+  nodeSet.add('query');
+
+  // Community nodes + their entity findings
+  result.communities?.forEach((comm) => {
+    const id = `comm-${comm.community_id}`;
+    if (!nodeSet.has(id)) {
+      nodes.push({
+        id,
+        label: comm.title?.slice(0, 30) || `커뮤니티 ${comm.community_id}`,
+        type: 'community',
+        val: 8 + (comm.entity_count || 0),
+      });
+      nodeSet.add(id);
+      links.push({ source: 'query', target: id });
+    }
+
+    comm.findings?.slice(0, 5).forEach((f) => {
+      const eid = `entity-${f.entity}`;
+      if (!nodeSet.has(eid)) {
+        nodes.push({
+          id: eid,
+          label: f.entity,
+          type: f.type?.toLowerCase() || 'default',
+          val: 5,
+        });
+        nodeSet.add(eid);
+      }
+      links.push({ source: id, target: eid });
+    });
+  });
+
+  // Related entity nodes
+  result.related_entities?.forEach((entity) => {
+    const eid = `entity-${entity.name}`;
+    if (!nodeSet.has(eid)) {
+      nodes.push({
+        id: eid,
+        label: entity.name,
+        type: entity.type?.toLowerCase() || 'default',
+        val: 5,
+      });
+      nodeSet.add(eid);
+    }
+    const commId = `comm-${entity.community_id}`;
+    if (nodeSet.has(commId)) {
+      links.push({ source: commId, target: eid });
+    } else {
+      links.push({ source: 'query', target: eid });
+    }
+  });
+
+  return { nodes, links };
+};
+
+// Legend items shown below the graph
+const LEGEND_ITEMS = [
+  { type: 'query', label: '검색어' },
+  { type: 'community', label: '커뮤니티' },
+  { type: 'organization', label: '기관' },
+  { type: 'project', label: '프로젝트' },
+  { type: 'region', label: '지역' },
+  { type: 'default', label: '기타' },
+];
+
 // ─── GraphExplorer Component ─────────────────────────────────────────────────
 
 const GraphExplorer: React.FC = () => {
@@ -89,9 +197,26 @@ const GraphExplorer: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [statusLoaded, setStatusLoaded] = useState(false);
+  const [graphData, setGraphData] = useState<ForceGraphData>({ nodes: [], links: [] });
+
+  // Ref for measuring the side panel Paper width
+  const graphContainerRef = useRef<HTMLDivElement>(null);
+  const [graphWidth, setGraphWidth] = useState(400);
+
+  // Measure container width on mount and resize
+  useEffect(() => {
+    const measure = () => {
+      if (graphContainerRef.current) {
+        setGraphWidth(graphContainerRef.current.clientWidth || 400);
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [result]); // re-measure when result appears (panel mounts)
 
   // Load status on first render
-  React.useEffect(() => {
+  useEffect(() => {
     if (!statusLoaded) {
       loadStatus();
       setStatusLoaded(true);
@@ -111,14 +236,16 @@ const GraphExplorer: React.FC = () => {
     }
   };
 
-  const handleSearch = useCallback(async () => {
-    if (!query.trim()) return;
+  const handleSearch = useCallback(async (overrideQuery?: string) => {
+    const q = (overrideQuery ?? query).trim();
+    if (!q) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await graphService.globalAsk(query.trim(), 5);
+      const data = await graphService.globalAsk(q, 5);
       setResult(data);
-      setTabValue(0);
+      setGraphData(buildGraphFromResults(data));
+      setTabValue(0); // default to Communities tab
     } catch (e: any) {
       setError(
         e?.response?.data?.detail || '질의 처리 중 오류가 발생했습니다'
@@ -131,6 +258,11 @@ const GraphExplorer: React.FC = () => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSearch();
   };
+
+  const handleQuickSearch = useCallback((label: string) => {
+    setQuery(label);
+    handleSearch(label);
+  }, [handleSearch]);
 
   return (
     <Box>
@@ -244,7 +376,7 @@ const GraphExplorer: React.FC = () => {
             endAdornment: (
               <InputAdornment position="end">
                 <IconButton
-                  onClick={handleSearch}
+                  onClick={() => handleSearch()}
                   disabled={loading || !query.trim()}
                   color="primary"
                 >
@@ -276,7 +408,7 @@ const GraphExplorer: React.FC = () => {
               size="small"
               variant="outlined"
               clickable
-              onClick={() => setQuery(qs.label)}
+              onClick={() => handleQuickSearch(qs.label)}
             />
           ))}
         </Box>
@@ -291,187 +423,301 @@ const GraphExplorer: React.FC = () => {
 
       {/* ── Results ── */}
       {result && (
-        <Grid container spacing={2}>
-          {/* AI Answer */}
-          <Grid item xs={12} md={7}>
-            <Paper sx={{ p: 3, minHeight: 400 }}>
-              <Typography variant="h6" gutterBottom>
-                <Lightbulb
-                  sx={{
-                    mr: 1,
-                    verticalAlign: 'middle',
-                    color: '#ff9800',
+        <>
+          {/* ── Full-width Graph ── */}
+          <Paper sx={{ mb: 2, overflow: 'hidden' }}>
+            <Box
+              ref={graphContainerRef}
+              sx={{
+                height: 600,
+                position: 'relative',
+                bgcolor: '#fafafa',
+              }}
+            >
+              {graphData.nodes.length > 0 ? (
+                <ForceGraph2D
+                  graphData={graphData}
+                  width={graphWidth}
+                  height={600}
+                  nodeLabel={(node: any) => node.label}
+                  nodeColor={(node: any) => getNodeColor(node.type)}
+                  nodeVal={(node: any) => node.val || 5}
+                  linkColor={() => '#ddd'}
+                  linkWidth={1}
+                  nodeCanvasObject={(
+                    node: any,
+                    ctx: CanvasRenderingContext2D,
+                    globalScale: number
+                  ) => {
+                    const r = Math.sqrt(node.val || 5) * 2.5;
+                    ctx.beginPath();
+                    ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI);
+                    ctx.fillStyle = getNodeColor(node.type);
+                    ctx.fill();
+
+                    // Always show labels (scale threshold removed for full-width view)
+                    const label: string = node.label || '';
+                    const fontSize = Math.max(12 / globalScale, 3);
+                    ctx.font = `${fontSize}px Sans-Serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#333';
+                    const displayLabel =
+                      label.length > 20
+                        ? label.slice(0, 20) + '…'
+                        : label;
+                    ctx.fillText(displayLabel, node.x!, node.y! + r + fontSize);
                   }}
+                  onNodeClick={(node: any) => {
+                    if (node.type !== 'query') {
+                      setQuery(node.label);
+                    }
+                  }}
+                  cooldownTicks={100}
+                  d3AlphaDecay={0.04}
                 />
-                AI 분석 결과
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Typography
-                variant="body1"
-                sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}
-              >
-                {result.answer}
-              </Typography>
-              {!result.has_llm_answer && (
-                <Alert severity="info" sx={{ mt: 2 }}>
-                  LLM이 비활성화되어 커뮤니티 요약만 표시됩니다.
-                </Alert>
+              ) : (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                  }}
+                >
+                  <Typography variant="body2" color="text.disabled">
+                    그래프 데이터가 없습니다
+                  </Typography>
+                </Box>
               )}
-            </Paper>
-          </Grid>
+            </Box>
 
-          {/* Side Panel */}
-          <Grid item xs={12} md={5}>
-            <Paper sx={{ minHeight: 400 }}>
-              <Tabs
-                value={tabValue}
-                onChange={(_, v) => setTabValue(v)}
-                variant="fullWidth"
-                sx={{ borderBottom: 1, borderColor: 'divider' }}
+            {/* Legend bar */}
+            <Box
+              sx={{
+                px: 2,
+                py: 1,
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 2,
+                alignItems: 'center',
+                borderTop: '1px solid',
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+              }}
+            >
+              {LEGEND_ITEMS.map((item) => (
+                <Box
+                  key={item.type}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      bgcolor: getNodeColor(item.type),
+                      flexShrink: 0,
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {item.label}
+                  </Typography>
+                </Box>
+              ))}
+              <Typography
+                variant="caption"
+                color="text.disabled"
+                sx={{ ml: 'auto' }}
               >
-                <Tab
-                  label={`커뮤니티 (${result.communities?.length ?? 0})`}
-                />
-                <Tab
-                  label={`엔티티 (${result.related_entities?.length ?? 0})`}
-                />
-              </Tabs>
+                노드 클릭 시 해당 키워드로 검색 / 스크롤로 확대
+              </Typography>
+            </Box>
+          </Paper>
 
-              {/* Communities Tab */}
-              <TabPanel value={tabValue} index={0}>
-                <Box
-                  sx={{
-                    px: 2,
-                    pb: 2,
-                    maxHeight: 500,
-                    overflow: 'auto',
-                  }}
+          {/* ── AI Answer + Communities/Entities below ── */}
+          <Grid container spacing={2}>
+            {/* AI Answer */}
+            <Grid item xs={12} md={7}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  <Lightbulb
+                    sx={{
+                      mr: 1,
+                      verticalAlign: 'middle',
+                      color: '#ff9800',
+                    }}
+                  />
+                  AI 분석 결과
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Typography
+                  variant="body1"
+                  sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}
                 >
-                  {result.communities?.length > 0 ? (
-                    result.communities.map((comm) => (
-                      <Card
-                        key={comm.community_id}
-                        variant="outlined"
-                        sx={{ mb: 1.5 }}
-                      >
-                        <CardContent
-                          sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}
+                  {result.answer}
+                </Typography>
+                {!result.has_llm_answer && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    LLM이 비활성화되어 커뮤니티 요약만 표시됩니다.
+                  </Alert>
+                )}
+              </Paper>
+            </Grid>
+
+            {/* Communities / Entities tabs */}
+            <Grid item xs={12} md={5}>
+              <Paper>
+                <Tabs
+                  value={tabValue}
+                  onChange={(_, v) => setTabValue(v)}
+                  variant="fullWidth"
+                  sx={{ borderBottom: 1, borderColor: 'divider' }}
+                >
+                  <Tab label={`커뮤니티 (${result.communities?.length ?? 0})`} />
+                  <Tab label={`엔티티 (${result.related_entities?.length ?? 0})`} />
+                </Tabs>
+
+                {/* ── Tab 0: Communities ── */}
+                <TabPanel value={tabValue} index={0}>
+                  <Box
+                    sx={{
+                      px: 2,
+                      pb: 2,
+                      maxHeight: 500,
+                      overflow: 'auto',
+                    }}
+                  >
+                    {result.communities?.length > 0 ? (
+                      result.communities.map((comm) => (
+                        <Card
+                          key={comm.community_id}
+                          variant="outlined"
+                          sx={{ mb: 1.5 }}
                         >
-                          <Typography
-                            variant="subtitle2"
-                            fontWeight="bold"
-                            gutterBottom
+                          <CardContent
+                            sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}
                           >
-                            #{comm.community_id}{' '}
-                            {comm.title?.length > 60
-                              ? `${comm.title.slice(0, 60)}...`
-                              : comm.title}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ mb: 1 }}
-                          >
-                            {comm.summary?.length > 120
-                              ? `${comm.summary.slice(0, 120)}...`
-                              : comm.summary}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Chip
-                              size="small"
-                              label={`엔티티 ${comm.entity_count}`}
-                              color="primary"
-                              variant="outlined"
-                            />
-                            <Chip
-                              size="small"
-                              label={`입찰 ${comm.bid_count}건`}
-                              color="secondary"
-                              variant="outlined"
-                            />
-                          </Box>
-                          {comm.findings?.length > 0 && (
-                            <Box
-                              sx={{
-                                mt: 1,
-                                display: 'flex',
-                                gap: 0.5,
-                                flexWrap: 'wrap',
-                              }}
+                            <Typography
+                              variant="subtitle2"
+                              fontWeight="bold"
+                              gutterBottom
                             >
-                              {comm.findings.slice(0, 5).map((f, fi) => (
-                                <Chip
-                                  key={fi}
-                                  size="small"
-                                  label={
-                                    f.entity?.length > 20
-                                      ? `${f.entity.slice(0, 20)}...`
-                                      : f.entity
-                                  }
-                                  sx={{
-                                    bgcolor:
-                                      entityTypeColors[f.type] || '#757575',
-                                    color: 'white',
-                                    fontSize: '0.7rem',
-                                  }}
-                                />
-                              ))}
+                              #{comm.community_id}{' '}
+                              {comm.title?.length > 60
+                                ? `${comm.title.slice(0, 60)}...`
+                                : comm.title}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ mb: 1 }}
+                            >
+                              {comm.summary?.length > 120
+                                ? `${comm.summary.slice(0, 120)}...`
+                                : comm.summary}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Chip
+                                size="small"
+                                label={`엔티티 ${comm.entity_count}`}
+                                color="primary"
+                                variant="outlined"
+                              />
+                              <Chip
+                                size="small"
+                                label={`입찰 ${comm.bid_count}건`}
+                                color="secondary"
+                                variant="outlined"
+                              />
                             </Box>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))
-                  ) : (
-                    <Alert severity="info">커뮤니티 데이터가 없습니다</Alert>
-                  )}
-                </Box>
-              </TabPanel>
+                            {comm.findings?.length > 0 && (
+                              <Box
+                                sx={{
+                                  mt: 1,
+                                  display: 'flex',
+                                  gap: 0.5,
+                                  flexWrap: 'wrap',
+                                }}
+                              >
+                                {comm.findings.slice(0, 5).map((f, fi) => (
+                                  <Chip
+                                    key={fi}
+                                    size="small"
+                                    label={
+                                      f.entity?.length > 20
+                                        ? `${f.entity.slice(0, 20)}...`
+                                        : f.entity
+                                    }
+                                    sx={{
+                                      bgcolor:
+                                        entityTypeColors[f.type] || '#757575',
+                                      color: 'white',
+                                      fontSize: '0.7rem',
+                                    }}
+                                  />
+                                ))}
+                              </Box>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))
+                    ) : (
+                      <Alert severity="info">커뮤니티 데이터가 없습니다</Alert>
+                    )}
+                  </Box>
+                </TabPanel>
 
-              {/* Entities Tab */}
-              <TabPanel value={tabValue} index={1}>
-                <Box
-                  sx={{
-                    px: 2,
-                    pb: 2,
-                    maxHeight: 500,
-                    overflow: 'auto',
-                  }}
-                >
-                  {result.related_entities?.length > 0 ? (
-                    <List dense>
-                      {result.related_entities.map((entity, i) => (
-                        <ListItem key={i} sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}>
-                            <Tooltip title={entity.type}>
-                              {entityTypeIcons[entity.type] ?? (
-                                <Hub fontSize="small" />
-                              )}
-                            </Tooltip>
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={entity.name}
-                            secondary={
-                              entity.description?.length > 80
-                                ? `${entity.description.slice(0, 80)}...`
-                                : entity.description || entity.type
-                            }
-                            primaryTypographyProps={{
-                              variant: 'body2',
-                              fontWeight: 'medium',
-                            }}
-                            secondaryTypographyProps={{ variant: 'caption' }}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Alert severity="info">관련 엔티티가 없습니다</Alert>
-                  )}
-                </Box>
-              </TabPanel>
-            </Paper>
+                {/* ── Tab 1: Entities ── */}
+                <TabPanel value={tabValue} index={1}>
+                  <Box
+                    sx={{
+                      px: 2,
+                      pb: 2,
+                      maxHeight: 500,
+                      overflow: 'auto',
+                    }}
+                  >
+                    {result.related_entities?.length > 0 ? (
+                      <List dense>
+                        {result.related_entities.map((entity, i) => (
+                          <ListItem key={i} sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}>
+                              <Tooltip title={entity.type}>
+                                {entityTypeIcons[entity.type] ?? (
+                                  <Hub fontSize="small" />
+                                )}
+                              </Tooltip>
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={entity.name}
+                              secondary={
+                                entity.description?.length > 80
+                                  ? `${entity.description.slice(0, 80)}...`
+                                  : entity.description || entity.type
+                              }
+                              primaryTypographyProps={{
+                                variant: 'body2',
+                                fontWeight: 'medium',
+                              }}
+                              secondaryTypographyProps={{ variant: 'caption' }}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    ) : (
+                      <Alert severity="info">관련 엔티티가 없습니다</Alert>
+                    )}
+                  </Box>
+                </TabPanel>
+              </Paper>
+            </Grid>
           </Grid>
-        </Grid>
+        </>
       )}
 
       {/* ── Empty State ── */}

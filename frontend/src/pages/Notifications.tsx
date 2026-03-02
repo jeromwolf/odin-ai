@@ -101,42 +101,48 @@ const Notifications: React.FC = () => {
   const loadNotificationSettings = async () => {
     try {
       setLoading(true);
-      const settings = await apiClient.getNotificationSettings();
-      if (settings) {
-        // 일반 설정
-        if (settings.general) {
-          setGeneralSettings({
-            email: settings.general.email !== false,
-            push: settings.general.push !== false,
-          });
-        }
-        // 입찰 알림
-        if (settings.bid_alerts) {
-          setBidAlerts({
-            email: settings.bid_alerts.email !== false,
-            push: settings.bid_alerts.push !== false,
-          });
-        }
-        // 마감 알림
-        if (settings.deadline_alerts) {
-          setDeadlineAlerts({
-            email: settings.deadline_alerts.email !== false,
-            push: settings.deadline_alerts.push !== false,
-          });
-        }
-        // 키워드 알림
-        if (settings.keyword_alerts) {
-          setKeywordAlerts(settings.keyword_alerts.map((alert: any) => ({
-            id: alert.id,
-            keyword: alert.keyword,
-            category: alert.category || '기타',
-            priceRange: alert.min_price && alert.max_price ? {
-              min: alert.min_price,
-              max: alert.max_price
-            } : undefined,
-            enabled: alert.is_active !== false,
-          })));
-        }
+
+      // Load settings and rules in parallel
+      const [settingsResponse, rulesResponse] = await Promise.all([
+        apiClient.getNotificationSettings().catch(() => null),
+        apiClient.getNotificationRules().catch(() => null),
+      ]);
+
+      // Map backend settings to frontend state
+      if (settingsResponse) {
+        // channels → general settings
+        const channels = settingsResponse.channels || {};
+        setGeneralSettings({
+          email: channels.email !== false,
+          push: channels.push !== false,
+        });
+
+        // types → bid/deadline alerts
+        const types = settingsResponse.types || {};
+        setBidAlerts({
+          email: types.alert_match !== false,
+          push: types.alert_match !== false,
+        });
+        setDeadlineAlerts({
+          email: types.deadline_reminder !== false,
+          push: types.deadline_reminder !== false,
+        });
+      }
+
+      // Map rules to keyword alerts
+      if (rulesResponse?.data) {
+        const rules = Array.isArray(rulesResponse.data) ? rulesResponse.data : [];
+        setKeywordAlerts(rules.map((rule: any) => ({
+          id: rule.id,
+          keyword: rule.conditions?.keywords?.[0] || rule.rule_name || '',
+          category: rule.conditions?.category || '기타',
+          priceRange: (rule.conditions?.min_price || rule.conditions?.max_price) ? {
+            min: rule.conditions.min_price || 0,
+            max: rule.conditions.max_price || 0,
+          } : undefined,
+          workTypes: rule.conditions?.work_types?.join(', ') || '',
+          enabled: rule.is_active !== false,
+        })));
       }
     } catch (error) {
       console.error('알림 설정 로드 실패:', error);
@@ -148,17 +154,13 @@ const Notifications: React.FC = () => {
   const saveNotificationSettings = async () => {
     try {
       setSaving(true);
+      // Map frontend state to backend expected flat field names
       const settings = {
-        general: generalSettings,
-        bid_alerts: bidAlerts,
-        deadline_alerts: deadlineAlerts,
-        keyword_alerts: keywordAlerts.map(alert => ({
-          keyword: alert.keyword,
-          category: alert.category,
-          min_price: alert.priceRange?.min,
-          max_price: alert.priceRange?.max,
-          is_active: alert.enabled,
-        })),
+        email_enabled: generalSettings.email,
+        push_enabled: generalSettings.push,
+        web_enabled: true,
+        alert_match_enabled: bidAlerts.email,
+        deadline_reminder_enabled: deadlineAlerts.email,
       };
 
       await apiClient.updateNotificationSettings(settings);
@@ -224,11 +226,13 @@ const Notifications: React.FC = () => {
           notification_timing: "immediate"
         };
 
-        const createdRule = await apiClient.addNotificationRule(ruleData);
+        const response = await apiClient.addNotificationRule(ruleData);
+        // Backend may wrap the result in a data field
+        const createdRule = response?.data || response;
 
         // 생성된 규칙을 로컬 상태에 추가
         const newAlert: KeywordAlert = {
-          id: createdRule.id,
+          id: createdRule.id || Date.now(),
           keyword: newKeyword.keyword,
           category: newKeyword.category,
           enabled: true,

@@ -340,7 +340,12 @@ async def get_recommendations(
                         CASE
                             WHEN ub.id IS NOT NULL THEN true
                             ELSE false
-                        END as is_bookmarked
+                        END as is_bookmarked,
+                        (
+                            70
+                            + GREATEST(0, 20 - EXTRACT(DAY FROM NOW() - b.created_at)::int)
+                            + CASE WHEN b.estimated_price IS NOT NULL THEN 10 ELSE 0 END
+                        ) as score
                     FROM bid_announcements b
                     LEFT JOIN user_bookmarks ub ON
                         b.bid_notice_no = ub.bid_id AND ub.user_id = %s
@@ -358,8 +363,8 @@ async def get_recommendations(
                         "organization": row['organization_name'],
                         "price": float(row['estimated_price']) if row['estimated_price'] else None,
                         "deadline": row['bid_end_date'].isoformat() if row['bid_end_date'] else None,
-                        "score": 85,  # 더미 점수
-                        "reason": f"{row['organization_name']}의 다른 입찰",
+                        "score": row['score'],
+                        "reason": f"관심 기관 ({row['organization_name']}) 공고",
                         "is_bookmarked": row['is_bookmarked']
                     })
 
@@ -375,7 +380,12 @@ async def get_recommendations(
                         CASE
                             WHEN ub.id IS NOT NULL THEN true
                             ELSE false
-                        END as is_bookmarked
+                        END as is_bookmarked,
+                        (
+                            40
+                            + GREATEST(0, 20 - EXTRACT(DAY FROM NOW() - b.created_at)::int)
+                            + CASE WHEN b.estimated_price IS NOT NULL THEN 10 ELSE 0 END
+                        ) as score
                     FROM bid_announcements b
                     LEFT JOIN user_bookmarks ub ON
                         b.bid_notice_no = ub.bid_id AND ub.user_id = %s
@@ -391,8 +401,8 @@ async def get_recommendations(
                         "organization": row['organization_name'],
                         "price": float(row['estimated_price']) if row['estimated_price'] else None,
                         "deadline": row['bid_end_date'].isoformat() if row['bid_end_date'] else None,
-                        "score": 70,
-                        "reason": "최신 입찰",
+                        "score": row['score'],
+                        "reason": "최신 마감 예정 공고",
                         "is_bookmarked": row['is_bookmarked']
                     })
 

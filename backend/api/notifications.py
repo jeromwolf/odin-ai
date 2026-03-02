@@ -122,6 +122,63 @@ async def get_notifications(
         raise HTTPException(status_code=500, detail="알림 목록 조회 실패")
 
 
+@router.put("/{notification_id}/read")
+async def mark_notification_as_read(
+    notification_id: int,
+    user: User = Depends(get_current_user)
+):
+    """알림 읽음 처리"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                UPDATE notifications
+                SET status = 'read', read_at = NOW()
+                WHERE id = %s AND user_id = %s AND status = 'unread'
+                RETURNING id
+            """, (notification_id, user.id))
+            result = cursor.fetchone()
+            conn.commit()
+
+            if not result:
+                raise HTTPException(status_code=404, detail="알림을 찾을 수 없거나 이미 읽음 처리됨")
+
+            return {"success": True, "message": "알림이 읽음 처리되었습니다"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"알림 읽음 처리 실패: {e}")
+        raise HTTPException(status_code=500, detail="알림 읽음 처리 실패")
+
+
+@router.put("/read-all")
+async def mark_all_notifications_as_read(
+    user: User = Depends(get_current_user)
+):
+    """모든 알림 읽음 처리"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE notifications
+                SET status = 'read', read_at = NOW()
+                WHERE user_id = %s AND status = 'unread'
+            """, (user.id,))
+            updated_count = cursor.rowcount
+            conn.commit()
+
+            return {
+                "success": True,
+                "message": f"{updated_count}개 알림이 읽음 처리되었습니다",
+                "updated_count": updated_count
+            }
+
+    except Exception as e:
+        logger.error(f"전체 알림 읽음 처리 실패: {e}")
+        raise HTTPException(status_code=500, detail="전체 알림 읽음 처리 실패")
+
+
 @router.get("/rules")
 async def get_alert_rules(
     user: User = Depends(get_current_user),

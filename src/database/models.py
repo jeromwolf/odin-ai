@@ -67,6 +67,15 @@ class BidAnnouncement(Base):
     qualification_summary = Column(Text)  # 자격요건 요약
     special_conditions = Column(Text)  # 특수조건
 
+    # 낙찰 정보 (낙찰정보서비스 API)
+    winning_company = Column(String(200))  # 낙찰업체명
+    winning_bizno = Column(String(20))  # 낙찰업체 사업자등록번호
+    winning_price = Column(BigInteger)  # 낙찰금액
+    winning_rate = Column(Float)  # 낙찰률(%)
+    bid_participant_count = Column(Integer)  # 입찰 참여업체 수
+    award_date = Column(DateTime)  # 낙찰일
+    award_status = Column(String(20), default='pending')  # pending/awarded
+
     # 메타데이터
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)

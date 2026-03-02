@@ -46,6 +46,7 @@ import { adminApi } from '../../services/admin/adminApi';
 import { PageHeader } from '../../components/common';
 import { useNotification } from '../../contexts/NotificationContext';
 import { formatKRDate } from '../../utils/formatters';
+import BatchSchedulePanel from './BatchSchedulePanel';
 
 interface BatchExecution {
   id: number;
@@ -267,6 +268,9 @@ const BatchMonitoring: React.FC = () => {
           {error}
         </Alert>
       )}
+
+      {/* 배치 스케줄 관리 패널 */}
+      <BatchSchedulePanel />
 
       {/* 필터 */}
       <Paper sx={{ p: 2, mb: 2 }}>

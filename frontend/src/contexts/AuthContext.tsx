@@ -41,6 +41,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     checkAuth();
+
+    // 토큰 만료 시 인터셉터가 보내는 이벤트 수신
+    const handleSessionExpired = () => {
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsLoading(false);
+    };
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
   }, []);
 
   const checkAuth = async () => {
@@ -96,7 +105,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // 토큰들 수동 제거
       localStorage.removeItem('odin_ai_token');
       localStorage.removeItem('odin_ai_refresh_token');
-      window.location.href = '/login';
+      // React Router의 Navigate가 /login으로 리다이렉트 처리
     }
   };
 

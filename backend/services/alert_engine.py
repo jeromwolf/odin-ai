@@ -41,7 +41,6 @@ class AlertRule:
     user_id: int
     rule_name: str
     conditions: Dict[str, Any]
-    match_type: str
     notification_channels: List[str]
     notification_timing: str
     is_active: bool
@@ -101,7 +100,7 @@ class AlertEngine:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             query = """
-                SELECT id, user_id, rule_name, conditions, match_type,
+                SELECT id, user_id, rule_name, conditions,
                        notification_channels, notification_timing, is_active
                 FROM alert_rules
                 WHERE is_active = true
@@ -117,7 +116,6 @@ class AlertEngine:
                     user_id=row['user_id'],
                     rule_name=row['rule_name'],
                     conditions=json.loads(row['conditions']) if isinstance(row['conditions'], str) else row['conditions'],
-                    match_type=row['match_type'],
                     notification_channels=row['notification_channels'],
                     notification_timing=row['notification_timing'],
                     is_active=row['is_active']
@@ -228,7 +226,9 @@ class AlertEngine:
                 match_details['failed_conditions'].append('categories')
 
         # 매칭 타입에 따른 최종 결과
-        if rule.match_type == 'ALL':
+        # Default: match if ANY condition matches (match_type stored in conditions JSON if needed)
+        match_type = conditions.get('match_type', 'ANY')
+        if match_type == 'ALL':
             match_details['matched'] = all(results) if results else False
         else:  # 'ANY'
             match_details['matched'] = any(results) if results else False
@@ -369,19 +369,28 @@ class AlertEngine:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             if status == 'sent':
+                # Mark as 'read' since it was successfully sent
                 query = """
-                    UPDATE alert_notifications
-                    SET status = %s, sent_at = CURRENT_TIMESTAMP
+                    UPDATE notifications
+                    SET status = 'read', read_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """
+                cursor.execute(query, (notification_id,))
+            elif status == 'failed':
+                # Store error in metadata
+                query = """
+                    UPDATE notifications
+                    SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('error', %s)
+                    WHERE id = %s
+                """
+                cursor.execute(query, (error_message or 'unknown', notification_id))
+            else:
+                query = """
+                    UPDATE notifications
+                    SET status = %s
                     WHERE id = %s
                 """
                 cursor.execute(query, (status, notification_id))
-            else:
-                query = """
-                    UPDATE alert_notifications
-                    SET status = %s, error_message = %s
-                    WHERE id = %s
-                """
-                cursor.execute(query, (status, error_message, notification_id))
 
             conn.commit()
 

@@ -126,7 +126,7 @@ class ApiClient {
           } catch (refreshError) {
             this.isRefreshing = false;
             this.clearTokens();
-            window.location.href = '/login';
+            window.dispatchEvent(new CustomEvent('auth:session-expired'));
             return Promise.reject(refreshError);
           }
         }
@@ -211,9 +211,23 @@ class ApiClient {
     return response.data;
   }
 
+  async getSimilarAwards(bidNoticeNo: string, limit: number = 10) {
+    const response = await this.client.get(`/bids/${bidNoticeNo}/similar-awards`, {
+      params: { limit },
+    });
+    return response.data;
+  }
+
   async searchBids(query: string, filters?: SearchFilters) {
     const response = await this.client.get('/search', {
       params: { q: query, ...filters },
+    });
+    return response.data;
+  }
+
+  async ragSearchBids(query: string, limit: number = 20) {
+    const response = await this.client.get('/rag/search', {
+      params: { q: query, limit },
     });
     return response.data;
   }
@@ -258,6 +272,13 @@ class ApiClient {
   async getBidStatistics(period: string = '7d') {
     const response = await this.client.get('/dashboard/statistics', {
       params: { days: period === '7d' ? 7 : 30 },
+    });
+    return response.data;
+  }
+
+  async getBidTrends(period: string = 'week') {
+    const response = await this.client.get('/dashboard/trends', {
+      params: { period },
     });
     return response.data;
   }
@@ -376,6 +397,11 @@ class ApiClient {
 
   async addNotificationRule(rule: NotificationRuleData) {
     const response = await this.client.post('/notifications/rules', rule);
+    return response.data;
+  }
+
+  async getNotificationRules() {
+    const response = await this.client.get('/notifications/rules');
     return response.data;
   }
 

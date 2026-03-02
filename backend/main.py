@@ -3,6 +3,15 @@ ODIN-AI Backend API
 간단한 검색 API 백엔드
 """
 
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# .env 파일 로드 (프로젝트 루트)
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +21,6 @@ from middleware.logging_middleware import RequestLoggingMiddleware
 from datetime import datetime, timezone
 import logging
 import sys
-import os
 from database import close_pool, get_db_connection
 
 # 구조화된 로깅 설정
@@ -36,8 +44,21 @@ except ImportError:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    try:
+        from services.batch_scheduler import batch_scheduler
+        await batch_scheduler.start()
+        logger.info("배치 스케줄러 시작됨")
+    except Exception as e:
+        logger.warning(f"배치 스케줄러 시작 실패: {e}")
+
     yield
+
     # Shutdown
+    try:
+        from services.batch_scheduler import batch_scheduler
+        await batch_scheduler.shutdown()
+    except Exception:
+        pass
     close_pool()
 
 app = FastAPI(title="ODIN-AI Search API", version="1.0.0", lifespan=lifespan)
@@ -47,7 +68,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS 설정 - 환경변수에서 읽거나 개발 기본값 사용
-_default_origins = "http://localhost:3000,http://localhost:9000"
+_default_origins = "http://localhost:3000,http://localhost:3001,http://localhost:3333,http://localhost:9000,http://localhost:9999"
 CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ORIGINS", _default_origins).split(",")
@@ -160,6 +181,14 @@ try:
     logger.info("관리자 배치 모니터링 API 라우터 등록됨")
 except ImportError as e:
     logger.warning(f"관리자 배치 모니터링 API 라우터 로드 실패: {e}")
+
+# 관리자 배치 스케줄 관리 라우터 추가
+try:
+    from api.admin_batch_schedule import router as admin_batch_schedule_router
+    app.include_router(admin_batch_schedule_router)
+    logger.info("배치 스케줄 API 라우터 등록됨")
+except ImportError as e:
+    logger.warning(f"배치 스케줄 API 라우터 로드 실패: {e}")
 
 # 관리자 시스템 모니터링 라우터 추가
 try:

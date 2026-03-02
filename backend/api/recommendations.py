@@ -168,32 +168,71 @@ async def get_content_based_recommendations(
                 # 선호도가 없으면 빈 목록 반환
                 return []
 
-            # 선호 카테고리와 조직 기반 추천
+            # If preferences exist but are empty, still return recency-based results
+            preferred_cats = preferences.get("preferred_categories") or {}
+            preferred_orgs = preferences.get("preferred_organizations") or []
+
+            # Build scoring query using preferences
             cursor.execute("""
-                SELECT
-                    bid_notice_no,
-                    title,
-                    organization_name,
-                    estimated_price,
-                    bid_end_date,
-                    1.0 as score
-                FROM bid_announcements
-                WHERE bid_end_date >= NOW()
-                ORDER BY created_at DESC
+                WITH scored AS (
+                    SELECT
+                        ba.bid_notice_no,
+                        ba.title,
+                        ba.organization_name,
+                        ba.estimated_price,
+                        ba.bid_end_date,
+                        (
+                            -- Organization match: +40 points
+                            CASE WHEN ba.organization_name = ANY(%s) THEN 40 ELSE 0 END
+                            +
+                            -- Category/tag match: +30 points
+                            COALESCE((
+                                SELECT 30
+                                FROM bid_tag_relations btr
+                                JOIN bid_tags bt ON bt.tag_id = btr.tag_id
+                                WHERE btr.bid_notice_no = ba.bid_notice_no
+                                  AND bt.tag_name = ANY(%s)
+                                LIMIT 1
+                            ), 0)
+                            +
+                            -- Recency: up to +20 points (newer = higher)
+                            GREATEST(0, 20 - EXTRACT(DAY FROM NOW() - ba.created_at)::int)
+                            +
+                            -- Has price: +10 points
+                            CASE WHEN ba.estimated_price IS NOT NULL THEN 10 ELSE 0 END
+                        ) as score
+                    FROM bid_announcements ba
+                    WHERE ba.bid_end_date >= NOW()
+                )
+                SELECT * FROM scored
+                WHERE score > 0
+                ORDER BY score DESC, bid_end_date ASC
                 LIMIT %s
-            """, (limit,))
+            """, (
+                preferred_orgs if preferred_orgs else ['__none__'],
+                list(preferred_cats.keys()) if preferred_cats else ['__none__'],
+                limit
+            ))
 
             recommendations = []
             for row in cursor.fetchall():
+                reasons = {}
+                score = row["score"]
+                if preferred_orgs and row["organization_name"] in preferred_orgs:
+                    reasons["organization_match"] = True
+                if score >= 30:
+                    reasons["category_match"] = True
+                reasons["method"] = "content_based"
+
                 recommendations.append(RecommendationResponse(
                     bid_notice_no=row["bid_notice_no"],
                     title=row["title"],
-                    organization=row["organization_name"],
+                    organization=row["organization_name"] or "",
                     estimated_price=row["estimated_price"],
                     bid_end_date=row["bid_end_date"],
-                    recommendation_score=row["score"],
+                    recommendation_score=min(row["score"], 100),
                     recommendation_type="content_based",
-                    recommendation_reasons={"method": "content_based"}
+                    recommendation_reasons=reasons
                 ))
 
             return recommendations

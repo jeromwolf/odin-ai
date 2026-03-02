@@ -34,6 +34,7 @@ import {
   NotificationsActive,
   Logout,
   ChevronLeft,
+  ChevronRight,
   AdminPanelSettings,
   Schedule,
   Computer,
@@ -43,6 +44,8 @@ import {
   Hub,
   DarkMode,
   LightMode,
+  Security,
+  TrendingUp,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAppTheme } from '../../contexts/ThemeContext';
@@ -55,6 +58,7 @@ const menuItems = [
   { text: '북마크', icon: <Bookmark />, path: '/bookmarks' },
   { text: '알림 설정', icon: <NotificationsActive />, path: '/notifications' },
   { text: '지식 그래프', icon: <Hub />, path: '/graph' },
+  { text: '트렌드 분석', icon: <TrendingUp />, path: '/trends' },
   { text: '프로필', icon: <Person />, path: '/profile' },
   { text: '설정', icon: <Settings />, path: '/settings' },
 ];
@@ -133,86 +137,238 @@ const MainLayout: React.FC = () => {
 
   const drawerContent = (
     <>
-      <Toolbar
+      {/* Sidebar header */}
+      <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
-          px: [1],
+          justifyContent: open ? 'space-between' : 'center',
+          px: open ? 2 : 0,
+          height: 64, // matches AppBar Toolbar height
+          flexShrink: 0,
         }}
       >
-        <IconButton onClick={handleDrawerToggle}>
-          <ChevronLeft />
-        </IconButton>
-      </Toolbar>
-      <Divider />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-            <ListItemButton
+        {open && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
               sx={{
-                minHeight: 48,
-                justifyContent: open ? 'initial' : 'center',
-                px: 2.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 32,
+                height: 32,
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
+                flexShrink: 0,
               }}
-              onClick={() => handleNavigation(item.path)}
             >
-              <ListItemIcon
+              <Security sx={{ fontSize: 18, color: '#fff' }} />
+            </Box>
+            <Box>
+              <Typography
                 sx={{
-                  minWidth: 0,
-                  mr: open ? 3 : 'auto',
-                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '0.9375rem',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.1,
+                  color: 'text.primary',
                 }}
               >
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.text} sx={{ opacity: open ? 1 : 0 }} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+                ODIN
+                <Box
+                  component="span"
+                  sx={{ fontWeight: 400, color: 'text.secondary' }}
+                >
+                  -AI
+                </Box>
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: '0.6875rem',
+                  color: 'text.secondary',
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  lineHeight: 1,
+                }}
+              >
+                입찰 인텔리전스
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
+        {!open && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: '8px',
+              background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
+            }}
+          >
+            <Security sx={{ fontSize: 18, color: '#fff' }} />
+          </Box>
+        )}
+
+        <Tooltip title={open ? '사이드바 닫기' : '사이드바 열기'} placement="right">
+          <IconButton
+            onClick={handleDrawerToggle}
+            size="small"
+            sx={{
+              ml: open ? 0 : 'auto',
+              color: 'text.secondary',
+              '&:hover': { color: 'text.primary' },
+            }}
+          >
+            {open ? <ChevronLeft fontSize="small" /> : <ChevronRight fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      <Divider />
+
+      <List sx={{ px: 1, py: 1 }}>
+        {menuItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <ListItem key={item.text} disablePadding sx={{ display: 'block', mb: 0.5 }}>
+              <Tooltip title={!open ? item.text : ''} placement="right">
+                <ListItemButton
+                  selected={isActive}
+                  onClick={() => handleNavigation(item.path)}
+                  sx={{
+                    minHeight: 40,
+                    justifyContent: open ? 'initial' : 'center',
+                    px: open ? 1.5 : 1,
+                    borderRadius: '8px',
+                    position: 'relative',
+                    // Left accent bar for active item
+                    '&.Mui-selected::before': {
+                      content: '""',
+                      position: 'absolute',
+                      left: 0,
+                      top: '20%',
+                      height: '60%',
+                      width: 3,
+                      borderRadius: '0 3px 3px 0',
+                      backgroundColor: 'primary.main',
+                    },
+                    '&.Mui-selected .MuiListItemIcon-root': {
+                      color: 'primary.main',
+                    },
+                    '&.Mui-selected .MuiListItemText-primary': {
+                      fontWeight: 600,
+                      color: 'primary.main',
+                    },
+                  }}
+                >
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 0,
+                      mr: open ? 1.5 : 'auto',
+                      justifyContent: 'center',
+                      fontSize: 20,
+                      color: isActive ? 'primary.main' : 'text.secondary',
+                      transition: 'color 150ms',
+                    }}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.text}
+                    sx={{ opacity: open ? 1 : 0 }}
+                    primaryTypographyProps={{
+                      fontSize: '0.875rem',
+                      fontWeight: isActive ? 600 : 400,
+                      color: isActive ? 'primary.main' : 'text.primary',
+                    }}
+                  />
+                </ListItemButton>
+              </Tooltip>
+            </ListItem>
+          );
+        })}
       </List>
 
       {/* 관리자 메뉴 - 관리자만 표시 */}
       {user?.role === 'admin' && (
         <>
-          <Divider />
-          <List>
-            <ListItem disablePadding sx={{ display: 'block' }}>
-              <ListItemText
-                primary="관리자"
-                sx={{
-                  opacity: open ? 1 : 0,
-                  px: 2.5,
-                  py: 1,
-                  color: 'text.secondary',
-                  fontSize: '0.75rem',
-                  fontWeight: 'bold'
-                }}
-              />
-            </ListItem>
-            {adminMenuItems.map((item) => (
-              <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-                <ListItemButton
+          <Divider sx={{ mx: 1 }} />
+          <List sx={{ px: 1, py: 1 }}>
+            {open && (
+              <ListItem disablePadding sx={{ display: 'block', mb: 0.5 }}>
+                <Typography
                   sx={{
-                    minHeight: 48,
-                    justifyContent: open ? 'initial' : 'center',
-                    px: 2.5,
+                    px: 1.5,
+                    py: 0.5,
+                    fontSize: '0.6875rem',
+                    fontWeight: 600,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'text.secondary',
                   }}
-                  onClick={() => handleNavigation(item.path)}
                 >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: 0,
-                      mr: open ? 3 : 'auto',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText primary={item.text} sx={{ opacity: open ? 1 : 0 }} />
-                </ListItemButton>
+                  관리자
+                </Typography>
               </ListItem>
-            ))}
+            )}
+            {adminMenuItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <ListItem key={item.text} disablePadding sx={{ display: 'block', mb: 0.5 }}>
+                  <Tooltip title={!open ? item.text : ''} placement="right">
+                    <ListItemButton
+                      selected={isActive}
+                      onClick={() => handleNavigation(item.path)}
+                      sx={{
+                        minHeight: 40,
+                        justifyContent: open ? 'initial' : 'center',
+                        px: open ? 1.5 : 1,
+                        borderRadius: '8px',
+                        position: 'relative',
+                        '&.Mui-selected::before': {
+                          content: '""',
+                          position: 'absolute',
+                          left: 0,
+                          top: '20%',
+                          height: '60%',
+                          width: 3,
+                          borderRadius: '0 3px 3px 0',
+                          backgroundColor: 'primary.main',
+                        },
+                        '&.Mui-selected .MuiListItemIcon-root': {
+                          color: 'primary.main',
+                        },
+                      }}
+                    >
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 0,
+                          mr: open ? 1.5 : 'auto',
+                          justifyContent: 'center',
+                          color: isActive ? 'primary.main' : 'text.secondary',
+                          transition: 'color 150ms',
+                        }}
+                      >
+                        {item.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={item.text}
+                        sx={{ opacity: open ? 1 : 0 }}
+                        primaryTypographyProps={{
+                          fontSize: '0.875rem',
+                          fontWeight: isActive ? 600 : 400,
+                          color: isActive ? 'primary.main' : 'text.primary',
+                        }}
+                      />
+                    </ListItemButton>
+                  </Tooltip>
+                </ListItem>
+              );
+            })}
           </List>
         </>
       )}
@@ -220,7 +376,7 @@ const MainLayout: React.FC = () => {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <AppBar
         position="fixed"
         sx={{
@@ -254,9 +410,54 @@ const MainLayout: React.FC = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Odin-AI
-          </Typography>
+          {/* Brand mark — only visible when sidebar is collapsed */}
+          <Box
+            sx={{
+              flexGrow: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              // hide when drawer is open on desktop (sidebar already shows brand)
+              ...(!isMobile && open && { visibility: 'hidden', width: 0, overflow: 'hidden', flexGrow: 0 }),
+            }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 28,
+                height: 28,
+                borderRadius: '7px',
+                background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
+                flexShrink: 0,
+              }}
+            >
+              <Security sx={{ fontSize: 16, color: '#fff' }} />
+            </Box>
+            <Typography
+              noWrap
+              component="div"
+              sx={{
+                fontWeight: 700,
+                fontSize: '0.9375rem',
+                letterSpacing: '-0.02em',
+                color: 'text.primary',
+                lineHeight: 1,
+              }}
+            >
+              ODIN
+              <Box
+                component="span"
+                sx={{ fontWeight: 400, color: 'text.secondary' }}
+              >
+                -AI
+              </Box>
+            </Typography>
+          </Box>
+
+          {/* Spacer when drawer is open on desktop */}
+          {!isMobile && open && <Box sx={{ flexGrow: 1 }} />}
 
           <Tooltip title={resolvedMode === 'dark' ? '라이트 모드' : '다크 모드'}>
             <IconButton color="inherit" onClick={toggleTheme} sx={{ mr: 1 }}>
@@ -411,6 +612,8 @@ const MainLayout: React.FC = () => {
           flexGrow: 1,
           p: 3,
           width: { sm: `calc(100% - ${open ? drawerWidth : 56}px)` },
+          height: '100vh',
+          overflow: 'auto',
         }}
       >
         <Toolbar />

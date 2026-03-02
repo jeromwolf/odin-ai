@@ -201,6 +201,11 @@ def _search_bids_from_db(
                         b.contract_method,
                         b.region_restriction,
                         b.created_at,
+                        b.award_status,
+                        b.winning_company,
+                        b.winning_price,
+                        b.winning_rate,
+                        b.bid_participant_count,
                         CASE WHEN b.bid_end_date >= NOW() THEN EXTRACT(DAY FROM b.bid_end_date - NOW())::int ELSE NULL END as remaining_days,
                         CASE WHEN b.bid_end_date >= NOW() THEN 'active' ELSE 'closed' END as computed_status
                         {rank_select}
@@ -267,6 +272,11 @@ def _search_bids_from_db(
                     "contract_method": row['contract_method'],
                     "region_restriction": row['region_restriction'],
                     "remaining_days": row['remaining_days'],
+                    "award_status": row['award_status'],
+                    "winning_company": row['winning_company'],
+                    "winning_price": row['winning_price'],
+                    "winning_rate": row['winning_rate'],
+                    "participant_count": row['bid_participant_count'],
                     "tags": tags_map.get(bid_notice_no, []),
                     "extracted_info": extracted_map.get(bid_notice_no, {})
                 })
@@ -439,7 +449,14 @@ async def get_bid_detail(bid_notice_no: str):
                     officer_email,
                     detail_page_url,
                     created_at,
-                    updated_at
+                    updated_at,
+                    winning_company,
+                    winning_bizno,
+                    winning_price,
+                    winning_rate,
+                    bid_participant_count,
+                    award_date,
+                    award_status
                 FROM bid_announcements
                 WHERE bid_notice_no = %s
             """, (bid_notice_no,))
@@ -447,6 +464,49 @@ async def get_bid_detail(bid_notice_no: str):
             row = cursor.fetchone()
             if not row:
                 raise ApiError(404, ErrorCode.RESOURCE_NOT_FOUND, "입찰 공고를 찾을 수 없습니다")
+
+            # Fetch extracted info grouped by category
+            cursor.execute("""
+                SELECT info_category, field_name, field_value, confidence_score
+                FROM bid_extracted_info
+                WHERE bid_notice_no = %s
+                ORDER BY info_category, field_name
+            """, (bid_notice_no,))
+            extracted_rows = cursor.fetchall()
+
+            extracted_info = {}
+            for erow in extracted_rows:
+                cat = erow['info_category']
+                if cat not in extracted_info:
+                    extracted_info[cat] = {}
+                extracted_info[cat][erow['field_name']] = erow['field_value']
+
+            # Fetch tags
+            cursor.execute("""
+                SELECT t.tag_name
+                FROM bid_tags t
+                JOIN bid_tag_relations btr ON t.tag_id = btr.tag_id
+                WHERE btr.bid_notice_no = %s
+            """, (bid_notice_no,))
+            tags = [tag_row['tag_name'] for tag_row in cursor.fetchall()]
+
+            # Fetch documents
+            cursor.execute("""
+                SELECT document_id, document_type, file_name, file_size,
+                       download_status, processing_status
+                FROM bid_documents
+                WHERE bid_notice_no = %s
+            """, (bid_notice_no,))
+            documents = []
+            for doc in cursor.fetchall():
+                documents.append({
+                    "document_id": doc['document_id'],
+                    "document_type": doc['document_type'],
+                    "file_name": doc['file_name'],
+                    "file_size": doc['file_size'],
+                    "download_status": doc['download_status'],
+                    "processing_status": doc['processing_status'],
+                })
 
             return {
                 "success": True,
@@ -466,7 +526,19 @@ async def get_bid_detail(bid_notice_no: str):
                     "officer_email": row['officer_email'],
                     "detail_page_url": row['detail_page_url'],
                     "created_at": row['created_at'].isoformat() if row['created_at'] else None,
-                    "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None
+                    "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None,
+                    "extracted_info": extracted_info,
+                    "tags": tags,
+                    "documents": documents,
+                    "award_info": {
+                        "winning_company": row['winning_company'],
+                        "winning_bizno": row['winning_bizno'],
+                        "winning_price": row['winning_price'],
+                        "winning_rate": row['winning_rate'],
+                        "participant_count": row['bid_participant_count'],
+                        "award_date": str(row['award_date']) if row['award_date'] else None,
+                        "status": row['award_status'],
+                    },
                 }
             }
 
@@ -475,3 +547,121 @@ async def get_bid_detail(bid_notice_no: str):
     except Exception as e:
         logger.error(f"상세 조회 실패: {e}")
         raise ApiError(500, ErrorCode.SERVER_ERROR, "상세 조회 중 오류가 발생했습니다")
+
+
+@router.get("/bids/{bid_notice_no}/similar-awards")
+async def get_similar_bid_awards(bid_notice_no: str, limit: int = 10):
+    """유사 입찰의 과거 낙찰 히스토리 조회"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+            # 1. 현재 입찰 정보 조회
+            cursor.execute("""
+                SELECT title, organization_name, category
+                FROM bid_announcements
+                WHERE bid_notice_no = %s
+            """, (bid_notice_no,))
+            current_bid = cursor.fetchone()
+
+            if not current_bid:
+                return {"success": True, "data": [], "total": 0}
+
+            # 2. 제목에서 핵심 키워드 추출 (한글 2글자 이상 단어)
+            import re
+            title = current_bid['title']
+            # 연도, 숫자, 특수문자 제거 후 핵심 키워드 추출
+            clean_title = re.sub(r'20\d{2}(년(도)?)?', '', title)
+            clean_title = re.sub(r'\d+(구역|차|단계|호|차분|기)', '', clean_title)
+            keywords = [w for w in re.findall(r'[가-힣]{2,}', clean_title)
+                        if w not in ('주식회사', '유한회사', '합자회사')]
+
+            # 키워드 LIKE 조건 생성 (핵심 키워드 2개 이상 매칭)
+            keyword_conditions = []
+            keyword_params = []
+            for kw in keywords[:6]:  # 최대 6개 키워드
+                keyword_conditions.append("ba.title LIKE %s")
+                keyword_params.append(f"%{kw}%")
+
+            if not keyword_conditions:
+                return {"success": True, "data": [], "total": 0}
+
+            # 키워드 매칭 수 계산 SQL
+            keyword_match_sql = " + ".join(
+                [f"CASE WHEN ba.title LIKE %s THEN 1 ELSE 0 END" for _ in keywords[:6]]
+            )
+
+            # 3. 유사 입찰 낙찰 히스토리 검색
+            # 동일 기관 우선 + 키워드 매칭 기반
+            query = f"""
+                SELECT
+                    ba.bid_notice_no,
+                    ba.title,
+                    ba.organization_name,
+                    ba.category,
+                    ba.estimated_price,
+                    ba.winning_company,
+                    ba.winning_bizno,
+                    ba.winning_price,
+                    ba.winning_rate,
+                    ba.bid_participant_count,
+                    ba.award_date,
+                    ba.announcement_date,
+                    ({keyword_match_sql}) as keyword_matches
+                FROM bid_announcements ba
+                WHERE ba.award_status = 'awarded'
+                  AND ba.winning_company IS NOT NULL
+                  AND ba.bid_notice_no != %s
+                  AND (
+                      ba.organization_name = %s
+                      OR ({keyword_match_sql}) >= 2
+                  )
+                ORDER BY
+                    CASE WHEN ba.organization_name = %s THEN 0 ELSE 1 END,
+                    ({keyword_match_sql}) DESC,
+                    ba.award_date DESC
+                LIMIT %s
+            """
+
+            # 파라미터: keyword_match_sql(SELECT) + bid_notice_no + org + keyword_match_sql(WHERE) + org + keyword_match_sql(ORDER) + limit
+            params = (
+                *[f"%{kw}%" for kw in keywords[:6]],  # SELECT 내 keyword_matches
+                bid_notice_no,
+                current_bid['organization_name'],
+                *[f"%{kw}%" for kw in keywords[:6]],  # WHERE 내 keyword_matches
+                current_bid['organization_name'],
+                *[f"%{kw}%" for kw in keywords[:6]],  # ORDER BY 내 keyword_matches
+                limit
+            )
+
+            cursor.execute(query, params)
+
+            similar_awards = []
+            for row in cursor.fetchall():
+                similar_awards.append({
+                    "bid_notice_no": row['bid_notice_no'],
+                    "title": row['title'],
+                    "organization_name": row['organization_name'],
+                    "category": row['category'],
+                    "estimated_price": row['estimated_price'],
+                    "winning_company": row['winning_company'],
+                    "winning_bizno": row['winning_bizno'],
+                    "winning_price": row['winning_price'],
+                    "winning_rate": row['winning_rate'],
+                    "participant_count": row['bid_participant_count'],
+                    "award_date": str(row['award_date']) if row['award_date'] else None,
+                    "announcement_date": str(row['announcement_date']) if row['announcement_date'] else None,
+                    "title_similarity": round(float(row['keyword_matches']) / len(keywords[:6]) * 100, 1) if row['keyword_matches'] else 0,
+                })
+
+            return {
+                "success": True,
+                "data": similar_awards,
+                "total": len(similar_awards),
+                "current_title": current_bid['title'],
+                "current_organization": current_bid['organization_name'],
+            }
+
+    except Exception as e:
+        logger.error(f"유사 낙찰 히스토리 조회 실패: {e}")
+        return {"success": False, "error": str(e), "data": [], "total": 0}

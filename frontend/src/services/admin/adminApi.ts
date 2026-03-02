@@ -149,6 +149,53 @@ class AdminApiClient {
   }
 
   // ============================================
+  // 배치 스케줄 API
+  // ============================================
+
+  async getBatchSchedules() {
+    const response = await this.client.get('/api/admin/batch/schedules');
+    return response.data;
+  }
+
+  async createBatchSchedule(data: {
+    label: string;
+    schedule_hour: number;
+    schedule_minute: number;
+    days_of_week?: string | null;
+    is_active?: boolean;
+    options?: Record<string, boolean>;
+  }) {
+    const response = await this.client.post('/api/admin/batch/schedules', data);
+    return response.data;
+  }
+
+  async updateBatchSchedule(id: number, data: {
+    label?: string;
+    schedule_hour?: number;
+    schedule_minute?: number;
+    days_of_week?: string | null;
+    options?: Record<string, boolean>;
+  }) {
+    const response = await this.client.put(`/api/admin/batch/schedules/${id}`, data);
+    return response.data;
+  }
+
+  async deleteBatchSchedule(id: number) {
+    const response = await this.client.delete(`/api/admin/batch/schedules/${id}`);
+    return response.data;
+  }
+
+  async toggleBatchSchedule(id: number) {
+    const response = await this.client.patch(`/api/admin/batch/schedules/${id}/toggle`);
+    return response.data;
+  }
+
+  async getSchedulerStatus() {
+    const response = await this.client.get('/api/admin/batch/scheduler/status');
+    return response.data;
+  }
+
+  // ============================================
   // 시스템 모니터링 API
   // ============================================
 

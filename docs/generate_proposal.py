@@ -337,7 +337,7 @@ add_spacer(20)
 
 p_date = doc.add_paragraph()
 p_date.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run_date = p_date.add_run('2026년 2월')
+run_date = p_date.add_run('2026년 3월')
 run_date.font.size = Pt(14)
 run_date.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 run_date.font.name = 'Malgun Gothic'
