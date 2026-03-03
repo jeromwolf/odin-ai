@@ -1,500 +1,131 @@
-# 🏛️ ODIN-AI: 공공입찰 정보 분석 플랫폼
+# ODIN-AI: 공공입찰 정보 분석 플랫폼
 
-<div align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-blue.svg" />
-  <img src="https://img.shields.io/badge/python-3.11+-green.svg" />
-  <img src="https://img.shields.io/badge/react-18.0-61dafb.svg" />
-  <img src="https://img.shields.io/badge/postgresql-15.0-336791.svg" />
-  <img src="https://img.shields.io/badge/status-production-success.svg" />
-</div>
+나라장터(g2b.go.kr) 입찰정보를 자동 수집/분석하여 기업에게 맞춤형 알림을 제공하는 B2B SaaS 플랫폼
 
-## 📋 프로젝트 개요
+## 핵심 기능
 
-ODIN-AI는 나라장터(g2b.go.kr) 입찰정보를 AI로 분석하여 기업에게 맞춤형 프로젝트를 추천하는 B2B SaaS 플랫폼입니다.
+- **자동 수집**: 공공데이터포털 API로 입찰공고 자동 수집 (~19,000건)
+- **문서 분석**: HWP/PDF/XLSX 자동 파싱, 정보 추출 (93.9% 성공률)
+- **맞춤 알림**: 키워드/가격/지역 기반 사용자별 이메일 알림
+- **하이브리드 검색**: 키워드 + RAG 벡터 + 그래프 검색
+- **관리자 대시보드**: 배치 모니터링, 사용자 관리, 통계 분석
 
-**프로젝트 상태**: ✅ Phase 1 완료 + E2E 테스트 59건 통과 + 2026년 실시간 데이터 (2026-02-22)
+## 기술 스택
 
-### ✨ 핵심 기능
-- 🔍 **고도화된 검색**: 태그 기반 통합검색, URL 파라미터 지원 ✅
-- 📊 **인터랙티브 대시보드**: 클릭 가능한 차트, 실시간 드릴다운 ✅
-- 🎯 **스마트 네비게이션**: 차트→검색 원클릭 이동 ✅
-- 🔐 **완전한 인증 시스템**: 회원가입/로그인/로그아웃 + JWT 토큰 기반 보안 ✅
-- 🔔 **알림 설정**: 키워드 및 가격대별 맞춤 알림 (이메일/푸시) ✅
-- 🤖 **문서 처리**: HWP/PDF/XLSX 자동 파싱 및 정보 추출 ✅
-- 🏷️ **스마트 태그**: 자동 카테고리 분류 및 품질 검증 ✅
-- 📄 **표 파싱**: 입찰 정보 테이블 100% 추출 성공 ✅
-- 🎨 **모던 UI**: React + TypeScript + Material-UI 반응형 디자인 ✅
-- 👤 **프로필 관리**: 사용자 정보 편집 및 활동 통계 ✅
-- ⚙️ **환경 설정**: 테마, 언어, 데이터 관리 기능 ✅
-- 💳 **구독 관리**: 3단계 요금제 (베이직/프로/엔터프라이즈) ✅
-- 🔄 **배치 시스템**: 자동화된 수집-처리-분석 파이프라인 ✅
-- 📧 **이메일 리포트**: HTML/JSON 형식 자동 보고서 ✅
-- 🧪 **E2E 테스트**: Playwright 기반 59개 테스트 100% 통과 ✅
-- 🛡️ **관리자 JWT 인증**: 토큰 기반 관리자 API 완전 보안 ✅
-- 📸 **자동 스크린샷**: 38개 페이지 스크린샷 자동 생성 ✅
+| 영역 | 기술 |
+|------|------|
+| Backend | FastAPI (Python 3.11+) |
+| Database | PostgreSQL 15 + pgvector + Neo4j 5.15 |
+| Frontend | React 18 + TypeScript + Material-UI 5 |
+| AI/ML | sentence-transformers (KURE-v1), Ollama (exaone3.5) |
+| Infra | Docker Compose, Redis, Nginx |
+| Test | Playwright E2E (59건), pytest |
 
-## 🚀 빠른 시작
+## 빠른 시작
 
 ```bash
-# 1. 저장소 클론
+# 1. 클론 및 환경 설정
 git clone https://github.com/yourusername/odin-ai.git
 cd odin-ai
+cp .env.example .env   # 환경변수 편집
 
-# 2. 가장 간단한 실행
-./start-simple.sh
+# 2. Docker로 실행
+docker-compose -f frontend/docker-compose.yml up -d
 
-# 또는 새 터미널로 실행
-./quick-start.sh
+# 또는 로컬 실행
+source venv/bin/activate
+cd backend && DATABASE_URL="postgresql://user@localhost:5432/odin_db" \
+  python -m uvicorn main:app --reload --port 9000
+cd frontend && npm start
 ```
 
 ### 접속 URL
-- 🌐 **프론트엔드**: http://localhost:5173
-- 🔧 **백엔드 API**: http://localhost:9000
-- 📚 **API 문서**: http://localhost:9000/docs
-- 👨‍💼 **관리자 웹**: http://localhost:3000/admin/dashboard
 
-### 🎯 테스트 계정 정보
+| 서비스 | URL |
+|--------|-----|
+| 프론트엔드 | http://localhost:3000 |
+| 백엔드 API | http://localhost:9000 |
+| API 문서 (Swagger) | http://localhost:9000/docs |
+| 관리자 패널 | http://localhost:3000/admin |
 
-**일반 사용자**:
-- **이메일**: demo@odin-ai.com
-- **비밀번호**: demo123456
-- **사용자명**: demo_user
-
-**관리자**:
-- **이메일**: admin@odin.ai
-- **비밀번호**: admin123
-- **사용자명**: admin
-- **접속**: http://localhost:3000/admin/login
-
-## 📊 최신 성능 지표 (2026-02-22)
-
-### 시스템 현황
-- **DB 저장 공고**: 476개 (2025: 467건 + 2026: 9건)
-- **활성 입찰**: 410개
-- **총 예정가격**: 1,250억원
-- **문서 처리 성공률**: 100% (392/392)
-- **정보 추출 성공률**: 100% (2,294개 항목 추출)
-- **검색 응답 시간**: ~100ms (Redis 캐시)
-- **등록 사용자**: 112명 (전원 활성)
-- **E2E 테스트**: 59/59 통과 (100%)
-- **스크린샷**: 38개 (관리자 10 + 사용자 28)
-
-### 정보 추출 현황
-- **총 추출 항목**: 2,294개 (기존 419개 대비 **+447% 증가**)
-- **문서당 평균**: 5.9개 (기존 1.1개 대비 **+436% 증가**)
-- **추출 카테고리**: 11개 (contact, special_conditions, requirements, duration, project_info, region, site_explanation, prices, work_type, contract_details, schedule)
-- **주요 커버리지**: 연락처 121%, 특수조건 94%, 자격요건 94%, 공사기간 69%, 프로젝트정보 68%
-
-## 🆕 최근 업데이트 (2026-02-22)
-
-### ✅ 2026년 실시간 데이터 수집 성공
-- **공공데이터포털 API 키 갱신**: 새 인증키로 2026년 입찰공고 수집 ✅
-- **9건 신규 공고 수집**: 충남 공주시, 보령시, 전북 군산시, 경기 이천시 등 ✅
-- **문서 처리 100%**: PDF 8건 + HWP 1건 전량 다운로드 및 파싱 완료 ✅
-
-### ✅ 관리자 JWT 인증 버그 수정
-- **문제**: 관리자 토큰의 `sub` 클레임이 정수형으로 저장되어 모든 관리자 API 호출 실패
-- **원인**: `python-jose` JWT 라이브러리가 `sub` 클레임을 문자열로 요구
-- **수정**: `admin_auth.py`에서 `str(user_id)` 변환 및 역변환 로직 추가 ✅
-
-### ✅ Playwright E2E 테스트 59건 전체 통과
-- **관리자 페이지** (14건): 대시보드, 배치, 시스템, 사용자, 로그, 알림, 통계 ✅
-- **사용자 페이지** (28건): 대시보드, 검색, 북마크, 알림, 프로필, 설정, 구독 ✅
-- **인증 플로우** (10건): 로그인, 로그아웃, 회원가입 ✅
-- **API 테스트** (7건): 헬스체크, 검색, RAG ✅
-- **38개 스크린샷 자동 촬영**: 모든 주요 화면 최신 데이터로 갱신 ✅
-
-### 🏆 이전 업데이트: 통합 테스트 Phase 0 + Phase 2 (2025-11-10)
-
-### ✅ 통합 테스트 Phase 0 + Phase 2 완료 (78점/100점)
-- **총 86개 테스트 실행**: 67개 통과 (77.9% 성공률), 실패 0개 ✅
-- **완벽 통과 시스템**: 북마크 관리(100%), 관리자 관리(100%), 이메일 발송(100%) ✅
-- **발견 및 수정한 버그**: 5개 (알림 가격 필터, TypeScript 타입, 관리자 통계 API 등) ✅
-- **미테스트 항목**: 19개 (JWT 인증 9개, 보안 테스트 2개, 성능 테스트 3개 등)
-- **프로덕션 준비**: 핵심 기능 검증 완료, 배포 가능 수준 달성 🚀
-
-### 🎯 Phase 1: RFP 정보 추출 패턴 대폭 확장 완료
-- **10개 신규 카테고리 추가**: duration, work_type, region, contact, schedule, special_conditions, site_explanation, project_info 등 ✅
-- **추출 성과**: 419개 → 2,294개 항목 (**+447% 증가**), 문서당 평균 1.1개 → 5.9개 ✅
-- **패턴 개선**: 공사기간, 업종, 지역제한, 연락처, 특수조건 등 다양한 형식 지원 ✅
-- **전체 재처리**: 392개 문서 재처리 완료, 100% 성공률 달성 ✅
-
-### 📊 주요 추출 카테고리 커버리지
-- **연락처** (contact): 475개, 121.2% - 담당자 전화번호 완전 추출
-- **특수조건** (special_conditions): 370개, 94.4% - 청렴서약제, 노무비구분관리 등 9개 키워드 매칭
-- **자격요건** (requirements): 367개, 93.6% - 참가자격 전체 텍스트 추출
-- **공사기간** (duration): 271개, 69.1% - 착공일, 완료일 등 다양한 형식 지원
-- **프로젝트정보** (project_info): 268개, 68.4% - 공사명, 개요 추출
-- **지역제한** (region): 180개, 45.9% - 알림 매칭에 활용 가능
-- **업종** (work_type): 86개, 21.9% - 종합공사, 전문공사 등 추출 완료
-
-### 🔔 알림 매칭 시스템 현황
-- **작동 중인 조건** (2개): 지역 제한 (45.9%), 금액 규모 (100%)
-- **추출 완료, 연결 대기** (1개): 업종 요건 (21.9%, 알림 로직 추가 필요)
-- **향후 개발 필요** (1개): 유사 경험 보유 (사용자 히스토리 시스템 필요)
-
-### 📝 문서화 완료
-- **CLAUDE.md**: 3개 향후 작업 항목 상세 가이드 추가 (RFP 다중 파일, 업종 매칭, 사용자 히스토리)
-- **TODO_FUTURE_TASKS.md**: 우선순위별 태스크 관리 파일 신규 생성
-- **RFP_EXTRACTION_STRATEGY.md**: Phase 1-3 전략 문서 (기존 유지)
-
----
-
-## 🏆 이전 주요 업데이트
-
-### 2025-10-30: 알림 모니터링 시스템
-- 관리자 대시보드, 알림 통계, 사용자별 조회, 이메일 발송 로그 ✅
-
-### 2025-10-29: 알림 이메일 발송 시스템
-- 4명 사용자, 350개 알림, 4개 이메일 발송 100% 성공 ✅
-- SMTP 인증, End-to-End 테스트 완료 ✅
-
-## 📝 이전 업데이트 (2025-10-20)
-
-### 👨‍💼 관리자 웹 배치 모니터링 시스템 구축
-- **수동 배치 실행**: 관리자 화면에서 날짜 범위/알림 옵션 선택하여 배치 즉시 실행 ✅
-- **실행 이력 조회**: 배치별 상세 정보, 성공/실패 건수, 실행 시간 확인 ✅
-- **백엔드 API 안정화**: Port 9000으로 이전, 모든 의존성 완비 ✅
-- **프론트엔드 UI 개선**: Material-UI 기반 날짜 선택기, 알림 토글, 배치 타입 드롭다운 ✅
-- **배치 프로그램 검증**: 143개 신규 공고 수집, 118개 문서 다운로드 성공 확인 ✅
-
-### 🔧 시스템 개선사항
-- **Port 마이그레이션**: 8000 → 9000 포트 충돌 해결 ✅
-- **의존성 통합**: venv_test 가상환경에 모든 패키지 설치 ✅
-- **데이터베이스 스키마 수정**: `notification_rules` → `alert_rules` 테이블명 정정 ✅
-- **TypeScript 타입 안정성**: adminApi.ts 인터페이스 정의 완료 ✅
-
-## 📝 이전 업데이트 (2025-09-29)
-
-### 🔖 북마크 시스템 아키텍처 개선
-- **대시보드 최적화**: 북마크 토글 기능 제거하여 UI 복잡도 감소, 통계 표시에 집중 ✅
-- **검색 페이지 강화**: 완전한 북마크 CRUD 기능 구현으로 직관적인 북마크 관리 환경 제공 ✅
-- **상태 관리 개선**: React Query 기반 실시간 북마크 상태 동기화 및 캐시 최적화 ✅
-- **사용자 경험 향상**: 책임 분리로 각 페이지별 명확한 역할 정의 ✅
-  - 대시보드: 북마크 통계 및 현황 표시 (읽기 전용)
-  - 검색 페이지: 북마크 추가/삭제 관리 (쓰기 가능)
-  - 북마크 페이지: 북마크된 항목 상세 관리
-
-### 🔧 이전 버그 수정 및 개선
-- **대시보드 시간 표시 수정**: "NaN시간 남음" → 정상 시간 표시 ✅
-- **파이차트 퍼센트 수정**: "undefined%" → 정상 퍼센트 표시 ✅
-- **통계 API 구현**: `/api/dashboard/statistics` 엔드포인트 추가 ✅
-- **데이터베이스 연동 개선**: RealDictCursor 사용으로 인한 KeyError 해결 ✅
-
-## 📝 이전 업데이트 (2025-09-26)
-
-### ✨ Phase 3 - 전체 사용자 인터페이스 완성
-
-#### 🔔 **알림 설정 페이지 (NEW)**
-- **키워드 알림**: 관심 키워드별 알림 설정 및 가격 범위 지정
-- **채널 선택**: 이메일/푸시 알림 개별 설정
-- **비용 최적화**: SMS 알림 제외 (비용 절감)
-- **일일 다이제스트**: 매일 오전 9시 주요 입찰 요약 전송
-
-#### 👤 **프로필 관리 (NEW)**
-- **정보 편집**: 개인정보, 회사 정보, 연락처 수정
-- **활동 통계**: 총 검색 횟수, 북마크 수, 최근 활동 현황
-- **비밀번호 변경**: 안전한 비밀번호 변경 기능
-- **프로필 사진**: 아바타 업로드 및 관리
-
-#### ⚙️ **설정 페이지 (NEW)**
-- **앱 설정**: 다크모드, 언어 선택 (한/영/일/중), 자동 저장
-- **알림 설정**: 이메일/푸시/소리 개별 설정
-- **개인정보**: 프로필 공개 여부, 통계 수집 동의
-- **데이터 관리**: 데이터 내보내기/가져오기, 계정 삭제
-
-#### 💳 **구독 관리 (NEW)**
-- **3단계 요금제**: 베이직(무료), 프로(29,000원/월), 엔터프라이즈(99,000원/월)
-- **사용량 모니터링**: 실시간 사용량 표시 (검색, 북마크, 알림)
-- **결제 내역**: 상세 결제 이력 및 영수증 다운로드
-- **플랜 비교**: 기능별 상세 비교표 제공
-
-#### 🎯 **UX/UI 개선**
-- **메뉴 구조 최적화**: 입찰목록 제거, 알림설정 추가
-- **드롭다운 메뉴 개선**: 선택 후 자동 닫힘 구현
-- **일관된 디자인**: Material-UI 컴포넌트 통일
-- **반응형 레이아웃**: 모든 페이지 모바일 최적화
-
-### ✨ 오전 작업 (대시보드 & 검색)
-
-#### 📊 **인터랙티브 대시보드**
-- **클릭 가능한 차트**: 카테고리별 분포 차트에서 특정 카테고리 클릭 시 해당 검색 결과로 자동 이동
-- **스마트 네비게이션**: 대시보드 → 검색 페이지 원클릭 탐색
-- **실시간 데이터**: 주간 트렌드 및 카테고리 분포에 실제 데이터베이스 연동
-
-#### 🔍 **고도화된 검색 시스템**
-- **태그 기반 통합검색**: 제목, 기관명, 자동생성 태그를 모두 포함한 포괄적 검색
-- **URL 파라미터 지원**: 검색 결과 URL 공유 및 뒤로가기 지원
-- **데이터 품질 개선**: 잘못 분류된 태그 20개 자동 정리
-
-### 🔄 사용자 플로우 예시
-```
-대시보드 방문 → "물품(27건)" 차트 클릭 →
-자동으로 /search?q=물품 이동 → 물품 관련 입찰 27건 즉시 표시
-```
-
-## 🔍 검색 기능
-
-### API 엔드포인트
-```http
-GET /api/search?q=검색어&min_price=100000000&organization=서울
-```
-
-### 지원 필터
-| 파라미터 | 설명 | 예시 |
-|---------|------|------|
-| `q` | 검색어 | 건설, 소프트웨어 |
-| `start_date` | 시작일 | 2025-09-01 |
-| `end_date` | 종료일 | 2025-09-30 |
-| `min_price` | 최소 가격 | 100000000 |
-| `max_price` | 최대 가격 | 1000000000 |
-| `organization` | 기관명 | 서울, 경기 |
-| `sort` | 정렬 | price_desc, date_asc |
-
-## 🏗️ 프로젝트 구조
+## 프로젝트 구조
 
 ```
 odin-ai/
-├── 📦 batch/              # 배치 처리 시스템
-│   └── modules/          # 수집/다운로드/처리/보고
-├── 🚀 backend/            # FastAPI 백엔드 (DB 연동)
-├── 💻 frontend/           # React 프론트엔드
-│   └── src/
-│       ├── pages/        # Dashboard, Search, Profile, Settings, Subscription, Notifications
-│       └── components/   # 검색바, 필터, 레이아웃
-├── 📊 src/                # 핵심 비즈니스 로직
-└── 🛠️ tools/              # HWP/PDF 처리 도구
+├── backend/                  # FastAPI 백엔드
+│   ├── api/                  # API 라우터 (20개)
+│   ├── services/             # 비즈니스 로직 (11개)
+│   └── tests/                # pytest
+├── batch/                    # 배치 처리 시스템
+│   ├── modules/              # 수집/다운로드/처리/알림 (10개 모듈)
+│   └── production_batch.py   # 오케스트레이터
+├── frontend/                 # React 프론트엔드
+│   ├── src/pages/            # 사용자 16 + 관리자 9 페이지
+│   ├── e2e/                  # Playwright E2E 테스트
+│   └── docker-compose.yml    # 전체 스택 Docker
+├── sql/                      # DB 스키마 (16개 SQL)
+└── storage/                  # 문서 저장소
 ```
 
-## 🛠 기술 스택
-
-### Backend
-- **Framework**: FastAPI (Python 3.11+)
-- **Database**: PostgreSQL 15 + SQLAlchemy
-- **Cache**: Redis (예정)
-- **문서 처리**: hwp5txt, PDFPlumber
-
-### Frontend
-- **Framework**: React 18 + TypeScript
-- **UI**: Material-UI v5
-- **상태관리**: React Query v5 + Redux
-- **스타일**: Styled Components
-
-### Infrastructure
-- **Container**: Docker + Kubernetes
-- **Cloud**: AWS
-- **Monitoring**: Grafana + Prometheus
-
-## 📁 프로젝트 구조
+## 배치 파이프라인
 
 ```
-odin-ai/
-├── batch/                    # 배치 시스템 (모듈화)
-│   ├── modules/             # 개별 모듈
-│   │   ├── collector.py     # API 수집
-│   │   ├── downloader.py    # 파일 다운로드
-│   │   ├── processor.py     # 문서 처리
-│   │   └── email_reporter.py # 보고서 발송
-│   └── production_batch.py  # 메인 오케스트레이터
-├── backend/                 # FastAPI 백엔드
-│   ├── api/                # API 엔드포인트
-│   ├── services/           # 비즈니스 로직
-│   └── database/           # DB 모델
-├── src/                     # 핵심 모듈
-│   ├── collector/          # 데이터 수집
-│   ├── services/           # 문서 처리
-│   ├── database/           # DB 모델 (확장)
-│   └── core/               # 설정 관리
-├── storage/                 # 파일 저장소
-│   ├── documents/          # 다운로드 문서
-│   └── markdown/           # 변환된 MD
-├── testing/                 # 테스트 스크립트
-│   ├── test_scripts/       # 기능 테스트
-│   ├── integration/        # 통합 테스트
-│   └── reports/            # 테스트 보고서
-└── docs/                   # 프로젝트 문서
-    ├── BATCH_PRODUCTION_REQUIREMENTS.md  # 배치 요구사항
-    ├── BATCH_IMPROVEMENTS.md             # 개선사항
-    └── FULL_TEST_TASKS_V4.md            # 테스트 태스크
+Phase 1:   API 수집 (collector.py)
+Phase 1.5: 낙찰정보 수집 (award_collector.py)
+Phase 2:   파일 다운로드 (downloader.py)
+Phase 3:   문서 처리 (processor.py)
+Phase 3.5: 임베딩 생성 (embedding_generator.py)
+Phase 3.6: Neo4j 동기화 (neo4j_syncer.py)
+Phase 3.7: GraphRAG 인덱싱 (graphrag_indexer.py)
+Phase 4:   알림 매칭 (notification_matcher.py)
+Phase 5:   이메일 보고서 (email_reporter.py)
 ```
-
-## 🚀 시작하기
-
-### 사전 요구사항
-- Python 3.11+
-- PostgreSQL 14+
-- Redis 6+
-- Docker & Docker Compose
-
-### 설치 방법
-
-1. **저장소 클론**
-```bash
-git clone https://github.com/yourusername/odin-ai.git
-cd odin-ai
-```
-
-2. **가상환경 설정**
-```bash
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-```
-
-3. **의존성 설치**
-```bash
-pip install -r requirements.txt
-```
-
-4. **환경변수 설정**
-```bash
-cp .env.example .env
-# .env 파일 수정
-```
-
-5. **데이터베이스 설정**
-```bash
-export DATABASE_URL="postgresql://username@localhost:5432/odin_db"
-python setup_database.py --create
-```
-
-6. **개발 서버 실행**
-```bash
-uvicorn backend.main:app --reload --port 8000
-```
-
-### Docker 실행
 
 ```bash
-docker-compose up -d
-```
+# 배치 실행 (증분)
+source venv/bin/activate
+DATABASE_URL="postgresql://user@localhost:5432/odin_db" \
+  python batch/production_batch.py
 
-## 📊 API 문서
-
-서버 실행 후 접속:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## 🧪 테스트
-
-### 배치 시스템 실행
-```bash
-# 프로덕션 모드 (일일 배치)
-python batch/production_batch.py
-
-# 테스트 모드 (DB 초기화 포함)
-TEST_MODE=true python batch/production_batch.py
-
-# 완전 초기화 모드 (DB DROP + 파일 삭제)
+# 배치 실행 (전체 초기화)
 DB_FILE_INIT=true python batch/production_batch.py
 ```
 
-### 단위 테스트
-```bash
-# 단위 테스트
-pytest tests/unit
+## 검색 API
 
-# 통합 테스트
-pytest tests/integration
-
-# 커버리지 확인
-pytest --cov=backend tests/
+```http
+GET /api/search?q=도로공사&min_price=100000000&organization=서울
 ```
 
-### E2E 테스트
+| 파라미터 | 설명 | 예시 |
+|---------|------|------|
+| `q` | 검색어 | 건설, 소프트웨어 |
+| `start_date` / `end_date` | 기간 | 2025-09-01 |
+| `min_price` / `max_price` | 가격 범위 | 100000000 |
+| `organization` | 기관명 | 서울, 경기 |
+| `sort` | 정렬 | price_desc, date_asc |
+
+## 테스트
+
 ```bash
-# Playwright E2E 테스트 실행
+# Backend 단위 테스트
+cd backend && pytest tests/
+
+# Frontend E2E 테스트
 cd frontend && npx playwright test
 
-# 특정 테스트만 실행
+# 특정 테스트만
 npx playwright test e2e/admin/
-
-# 스크린샷 포함 실행
-npx playwright test --reporter=list
 ```
 
-## 📈 개선 계획
+## 주요 문서
 
-### 🔴 즉시 개선 필요
-1. **중복 체크 로직**: 업데이트된 공고 반영
-2. **정보 추출 패턴**: 다양한 표현 방식 지원
+| 문서 | 설명 |
+|------|------|
+| [CLAUDE.md](CLAUDE.md) | 개발 가이드 및 프로젝트 컨텍스트 |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | 변경 이력 및 버그 수정 기록 |
+| [TODO_FUTURE_TASKS.md](TODO_FUTURE_TASKS.md) | 향후 작업 계획 |
 
-### 🟡 중요 개선사항
-1. **트랜잭션 관리**: 데이터 일관성 보장
-2. **에러 핸들링**: 원인별 재시도 전략
-3. **HWPX 처리**: 실패 원인 분석 및 개선
+## 라이선스
 
-### 🟢 향후 개선사항
-1. **ZIP 파일 처리**: 압축 파일 내부 문서 처리
-2. **실시간 모니터링**: 진행률 및 성능 메트릭
-3. **AI 분석**: GPT-4 통합 및 RAG 시스템
-
-상세 내용: [`docs/BATCH_IMPROVEMENTS.md`](docs/BATCH_IMPROVEMENTS.md)
-
-## 📈 최신 성과 (2025-09-29)
-
-### ✅ 인증 시스템 완전 구현
-- **회원가입/로그인**: JWT 토큰 기반 인증 시스템 ✅
-- **로그아웃**: 세션 무효화 + 자동 로그인 화면 리다이렉트 ✅
-- **보안**: XSS 방어, 토큰 자동 갱신, 인증 가드 ✅
-- **사용자 관리**: 다중 사용자 격리 및 개별 데이터 관리 ✅
-
-### ✅ 알림 설정 시스템 구현
-- **버그 수정**: "알림 설정을 불러오는 중..." 무한 로딩 해결 ✅
-- **개발 환경 개선**: 미인증 상태에서도 테스트 가능 ✅
-- **API 안정화**: Optional 인증으로 프론트엔드 연동 완료 ✅
-
-### Phase 3 MVP 완료 (2025-09-26)
-- ✅ **API 연동**: 469개 입찰공고 수집 (93.9% 처리 성공률)
-- ✅ **표 파싱**: 100% 성공률
-- ✅ **프론트엔드**: 모든 핵심 페이지 구현 완료
-- ✅ **DB 확장**: 사용자별 데이터 격리 및 세션 관리
-- ✅ **배치 시스템**: 모듈화된 자동화 파이프라인
-
-### 주요 성능 지표
-- 문서 처리 성공률: 93.9% (355/380)
-- 표 파싱 정확도: 100%
-- 테스트 자동화: 98.6% (212/215 통과)
-- 인증 시스템: 완전 구현 및 검증 완료
-- 정보 추출 카테고리: prices, schedule, qualifications, duration, region, subcontract
-- 신뢰도 점수: 평균 0.85 이상
-
-## 📚 프로젝트 문서
-
-### 핵심 문서
-- **[PRD.md](PRD.md)** - 제품 요구사항 문서 (Product Requirements Document)
-  - 비즈니스 목표, 사용자 스토리, 기능 명세
-- **[TECHNICAL_SPEC.md](TECHNICAL_SPEC.md)** - 기술 명세서
-  - 시스템 아키텍처, 데이터 수집 전략, 기술 스택
-- **[CLAUDE.md](CLAUDE.md)** - 개발 가이드 및 프로젝트 컨텍스트
-  - 최신 진행 상황, 주의사항, 트러블슈팅
-
-### 분석 문서  
-- **[competitor_analysis.md](competitor_analysis.md)** - 경쟁사 분석
-  - 케이비드, 인포21C 등 벤치마킹
-
-## 🤝 기여하기
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 라이선스
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 문의
-
-- Email: contact@odin-ai.kr
-- Website: https://odin-ai.kr
-
-## 🙏 감사의 글
-
-- 나라장터 공공데이터
-- OpenAI GPT-4
-- FastAPI Community
-
----
-
-**Odin-AI** - 공공조달의 미래를 AI와 함께 🚀
+MIT License
