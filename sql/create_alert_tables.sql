@@ -24,15 +24,15 @@ CREATE TABLE IF NOT EXISTS alert_rules (
 -- 2. 알림 매칭 결과 테이블
 CREATE TABLE IF NOT EXISTS alert_matches (
     id SERIAL PRIMARY KEY,
-    rule_id INTEGER REFERENCES alert_rules(id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL,
-    bid_id VARCHAR(100) NOT NULL,
-    match_score DECIMAL(3, 2) DEFAULT 0.00,
-    matched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    match_date DATE DEFAULT CURRENT_DATE, -- 매칭 날짜 (중복 체크용)
-    is_sent BOOLEAN DEFAULT false,
-    sent_at TIMESTAMP,
-    UNIQUE(rule_id, bid_id) -- 같은 규칙, 같은 공고는 한 번만
+    rule_id INTEGER NOT NULL REFERENCES alert_rules(id) ON DELETE CASCADE,
+    bid_notice_no VARCHAR(20) NOT NULL,
+    match_score DOUBLE PRECISION DEFAULT 0,
+    match_details JSONB,
+    is_notified BOOLEAN DEFAULT false,
+    notified_at TIMESTAMP,
+    notification_id INTEGER,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(rule_id, bid_notice_no)
 );
 
 -- 3. 알림 발송 큐 테이블
@@ -53,11 +53,12 @@ CREATE TABLE IF NOT EXISTS alert_queue (
     sent_at TIMESTAMP,
     queue_date DATE DEFAULT CURRENT_DATE, -- 큐 생성 날짜 (중복 체크용)
     error_message TEXT,
-    retry_count INTEGER DEFAULT 0,
-    INDEX idx_queue_status (status),
-    INDEX idx_queue_date (queue_date),
-    INDEX idx_user_bid (user_id, bid_id, channel, queue_date) -- 중복 체크용 복합 인덱스
+    retry_count INTEGER DEFAULT 0
 );
+
+CREATE INDEX IF NOT EXISTS idx_queue_status ON alert_queue(status);
+CREATE INDEX IF NOT EXISTS idx_queue_date ON alert_queue(queue_date);
+CREATE INDEX IF NOT EXISTS idx_user_bid ON alert_queue(user_id, bid_id, channel, queue_date);
 
 -- 4. 알림 템플릿 테이블
 CREATE TABLE IF NOT EXISTS alert_templates (
@@ -83,10 +84,11 @@ CREATE TABLE IF NOT EXISTS alert_logs (
     status VARCHAR(20) NOT NULL,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     response_code VARCHAR(10),
-    response_message TEXT,
-    INDEX idx_log_date (sent_at),
-    INDEX idx_log_user (user_id)
+    response_message TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_log_date ON alert_logs(sent_at);
+CREATE INDEX IF NOT EXISTS idx_log_user ON alert_logs(user_id);
 
 -- 6. 사용자 알림 설정 테이블
 CREATE TABLE IF NOT EXISTS user_notification_settings (
@@ -106,8 +108,9 @@ CREATE TABLE IF NOT EXISTS user_notification_settings (
 
 -- 인덱스 추가
 CREATE INDEX IF NOT EXISTS idx_alert_rules_user ON alert_rules(user_id);
-CREATE INDEX IF NOT EXISTS idx_alert_matches_date ON alert_matches(match_date);
-CREATE INDEX IF NOT EXISTS idx_alert_matches_sent ON alert_matches(is_sent);
+CREATE INDEX IF NOT EXISTS idx_alert_matches_bid_notice_no ON alert_matches(bid_notice_no);
+CREATE INDEX IF NOT EXISTS idx_alert_matches_is_notified ON alert_matches(is_notified);
+CREATE INDEX IF NOT EXISTS idx_alert_matches_rule_id ON alert_matches(rule_id);
 CREATE INDEX IF NOT EXISTS idx_alert_queue_processing ON alert_queue(status, scheduled_at);
 
 -- 기본 템플릿 데이터 삽입
@@ -132,14 +135,15 @@ ON CONFLICT (template_name) DO NOTHING;
 -- 뷰 생성: 오늘의 알림 현황
 CREATE OR REPLACE VIEW v_today_alerts AS
 SELECT
-    am.user_id,
-    COUNT(DISTINCT am.bid_id) as matched_bids,
-    COUNT(DISTINCT CASE WHEN am.is_sent THEN am.bid_id END) as sent_alerts,
-    COUNT(DISTINCT CASE WHEN NOT am.is_sent THEN am.bid_id END) as pending_alerts,
-    MAX(am.matched_at) as last_match_time
+    ar.user_id,
+    COUNT(DISTINCT am.bid_notice_no) as matched_bids,
+    COUNT(DISTINCT CASE WHEN am.is_notified THEN am.bid_notice_no END) as sent_alerts,
+    COUNT(DISTINCT CASE WHEN NOT am.is_notified THEN am.bid_notice_no END) as pending_alerts,
+    MAX(am.created_at) as last_match_time
 FROM alert_matches am
-WHERE am.match_date = CURRENT_DATE
-GROUP BY am.user_id;
+JOIN alert_rules ar ON am.rule_id = ar.id
+WHERE am.created_at >= CURRENT_DATE
+GROUP BY ar.user_id;
 
 -- 뷰 생성: 큐 상태 모니터링
 CREATE OR REPLACE VIEW v_queue_status AS

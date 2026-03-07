@@ -290,7 +290,7 @@ class DocumentProcessor:
                 )
 
                 # DB 업데이트
-                document.extracted_text = text_content[:10000]  # 처음 10000자만 저장
+                document.extracted_text = text_content[:10000].replace('\x00', '')  # NUL 제거 후 처음 10000자만 저장
                 document.text_length = len(text_content)
                 document.extraction_method = extraction_method
                 document.markdown_path = str(md_file_path)

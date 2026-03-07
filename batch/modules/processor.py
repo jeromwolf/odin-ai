@@ -125,9 +125,13 @@ class DocumentProcessorModule:
             except Exception as e:
                 stats['failed'] += 1
                 logger.error(f"  ❌ 오류: {e}")
-                doc.processing_status = 'failed'
-                doc.error_message = str(e)[:500]
-                self.session.commit()
+                try:
+                    self.session.rollback()
+                    doc.processing_status = 'failed'
+                    doc.error_message = str(e)[:500]
+                    self.session.commit()
+                except Exception:
+                    self.session.rollback()
 
         loop.close()
 
