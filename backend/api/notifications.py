@@ -795,11 +795,11 @@ async def get_notification_queue(
 async def send_email_notification(to_email: str, subject: str, content: str, html_content: Optional[str] = None):
     """이메일 알림 발송"""
     try:
-        # SMTP 설정 (환경변수로 관리)
-        smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        smtp_user = os.getenv("SMTP_USER", "")
-        smtp_password = os.getenv("SMTP_PASSWORD", "")
+        # SMTP 설정 (환경변수로 관리, 두 가지 형식 모두 지원)
+        smtp_host = os.getenv("SMTP_HOST") or os.getenv("EMAIL_HOST", "smtp.gmail.com")
+        smtp_port = int(os.getenv("SMTP_PORT") or os.getenv("EMAIL_PORT", "587"))
+        smtp_user = os.getenv("SMTP_USER") or os.getenv("EMAIL_USERNAME", "")
+        smtp_password = os.getenv("SMTP_PASSWORD") or os.getenv("EMAIL_PASSWORD", "")
 
         if not smtp_user or not smtp_password:
             logger.warning("SMTP 설정이 없어 이메일 발송을 건너뜁니다")

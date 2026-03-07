@@ -23,10 +23,10 @@ class NotificationService:
 
     def __init__(self):
         # 이메일 설정 (환경변수에서 가져와야 함)
-        self.smtp_server = "smtp.gmail.com"
-        self.smtp_port = 587
-        self.email_user = os.getenv("SMTP_USER", "")
-        self.email_password = os.getenv("SMTP_PASSWORD", "")
+        self.smtp_server = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+        self.smtp_port = int(os.getenv("EMAIL_PORT", "587"))
+        self.email_user = os.getenv("SMTP_USER") or os.getenv("EMAIL_USERNAME", "")
+        self.email_password = os.getenv("SMTP_PASSWORD") or os.getenv("EMAIL_PASSWORD", "")
 
     async def send_email_notification(
         self,
@@ -203,12 +203,12 @@ class NotificationService:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # 웹 알림용 별도 테이블이 있다면 저장
-            # 여기서는 간단히 alert_notifications 테이블에 저장
+            # notifications 테이블에 저장
             cursor.execute("""
-                INSERT INTO alert_notifications (
-                    user_id, bid_notice_no, channel, status,
-                    subject, content, created_at
-                ) VALUES (%s, 'WEB_NOTIFICATION', 'web', 'sent', %s, %s, %s)
+                INSERT INTO notifications (
+                    user_id, bid_notice_no, title, message,
+                    type, is_read, created_at
+                ) VALUES (%s, 'WEB_NOTIFICATION', %s, %s, 'web', false, %s)
             """, (user_id, title, message, datetime.now(timezone.utc)))
 
             conn.commit()
@@ -246,15 +246,15 @@ class NotificationService:
             # 최근 30일 알림 통계
             cursor.execute("""
                 SELECT
-                    channel,
+                    COALESCE(type, 'email') as channel,
                     COUNT(*) as total_count,
-                    COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent_count,
-                    COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count,
-                    COUNT(CASE WHEN read_at IS NOT NULL THEN 1 END) as read_count
-                FROM alert_notifications
+                    COUNT(*) as sent_count,
+                    0 as failed_count,
+                    COUNT(CASE WHEN is_read = true THEN 1 END) as read_count
+                FROM notifications
                 WHERE user_id = %s
                   AND created_at >= CURRENT_DATE - INTERVAL '30 days'
-                GROUP BY channel
+                GROUP BY COALESCE(type, 'email')
             """, (user_id,))
 
             stats = {}
