@@ -23,6 +23,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const NotificationInbox = lazy(() => import('./pages/NotificationInbox'));
 const GraphExplorer = lazy(() => import('./pages/GraphExplorer'));
 const TrendAnalysis = lazy(() => import('./pages/TrendAnalysis'));
+const Analytics = lazy(() => import('./pages/Analytics'));
 
 // Admin pages
 const AdminLogin = lazy(() => import('./pages/admin/Login'));
@@ -89,6 +90,7 @@ const AppRoutes = () => {
             <Route path="/settings" element={<Settings />} />
             <Route path="/graph" element={<GraphExplorer />} />
             <Route path="/trends" element={<TrendAnalysis />} />
+            <Route path="/analytics" element={<Analytics />} />
           </Route>
         </Route>
 

@@ -59,6 +59,7 @@ const menuItems = [
   { text: '알림 설정', icon: <NotificationsActive />, path: '/notifications' },
   { text: '지식 그래프', icon: <Hub />, path: '/graph' },
   { text: '트렌드 분석', icon: <TrendingUp />, path: '/trends' },
+  { text: '분석 리포트', icon: <Assessment />, path: '/analytics' },
   { text: '프로필', icon: <Person />, path: '/profile' },
   { text: '설정', icon: <Settings />, path: '/settings' },
 ];

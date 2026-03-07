@@ -180,8 +180,8 @@ const Analytics: React.FC = () => {
   const isLoading = overviewLoading || statsLoading;
 
   // Derived data with safe fallbacks
-  const dailyStats: any[] = statistics?.daily_stats || [];
-  const categoryData: any[] = statistics?.category_distribution || [];
+  const dailyStats: any[] = React.useMemo(() => statistics?.daily_stats || [], [statistics]);
+  const categoryData: any[] = React.useMemo(() => statistics?.category_distribution || [], [statistics]);
   const totalBids: number = overview?.totalBids ?? 0;
   const activeBids: number = overview?.activeBids ?? 0;
   const avgPrice: number = overview?.avgPrice ?? 0;
