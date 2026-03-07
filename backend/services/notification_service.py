@@ -22,11 +22,7 @@ class NotificationService:
     """통합 알림 서비스"""
 
     def __init__(self):
-        # 이메일 설정 (환경변수에서 가져와야 함)
-        self.smtp_server = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-        self.smtp_port = int(os.getenv("EMAIL_PORT", "587"))
-        self.email_user = os.getenv("SMTP_USER") or os.getenv("EMAIL_USERNAME", "")
-        self.email_password = os.getenv("SMTP_PASSWORD") or os.getenv("EMAIL_PASSWORD", "")
+        pass
 
     async def send_email_notification(
         self,
@@ -170,32 +166,29 @@ class NotificationService:
             result = result.replace(placeholder, str(value))
         return result
 
-    def _send_email(self, to_email: str, subject: str, content: str) -> bool:
-        """실제 이메일 발송"""
+    def _send_email(
+        self,
+        to_email: str,
+        subject: str,
+        content: str,
+        html_content: Optional[str] = None
+    ) -> bool:
+        """이메일 발송 (email_service.send_email 위임)"""
         try:
-            # MIME 메시지 생성
-            msg = MIMEMultipart('alternative')
-            msg['From'] = self.email_user
-            msg['To'] = to_email
-            msg['Subject'] = subject
-
-            # HTML 콘텐츠 추가
-            html_part = MIMEText(content, 'html', 'utf-8')
-            msg.attach(html_part)
-
-            # SMTP 서버 연결 및 발송
-            server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-            server.starttls()
-            server.login(self.email_user, self.email_password)
-            server.send_message(msg)
-            server.quit()
-
-            logger.info(f"이메일 발송 성공: {to_email}")
-            return True
-
-        except Exception as e:
-            logger.error(f"이메일 발송 실패: {e}")
-            return False
+            from backend.services.email_service import send_email
+            return send_email(
+                to_email=to_email,
+                subject=subject,
+                html_content=html_content or content,
+                text_content=content
+            )
+        except ImportError:
+            try:
+                from services.email_service import send_email
+                return send_email(to_email=to_email, subject=subject, html_content=html_content or content, text_content=content)
+            except ImportError:
+                logger.error("email_service 모듈을 찾을 수 없습니다")
+                return False
 
     def _store_web_notification(self, user_id: int, title: str, message: str):
         """웹 알림 저장"""

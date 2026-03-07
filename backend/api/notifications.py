@@ -11,9 +11,6 @@ from pydantic import BaseModel
 from psycopg2.extras import RealDictCursor
 import logging
 import json
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import os
 
 logger = logging.getLogger(__name__)
@@ -793,40 +790,26 @@ async def get_notification_queue(
 
 # 이메일 발송 함수 (실제 구현시 Celery 등으로 비동기 처리)
 async def send_email_notification(to_email: str, subject: str, content: str, html_content: Optional[str] = None):
-    """이메일 알림 발송"""
+    """이메일 알림 발송 (email_service.send_email 위임)"""
     try:
-        # SMTP 설정 (환경변수로 관리, 두 가지 형식 모두 지원)
-        smtp_host = os.getenv("SMTP_HOST") or os.getenv("EMAIL_HOST", "smtp.gmail.com")
-        smtp_port = int(os.getenv("SMTP_PORT") or os.getenv("EMAIL_PORT", "587"))
-        smtp_user = os.getenv("SMTP_USER") or os.getenv("EMAIL_USERNAME", "")
-        smtp_password = os.getenv("SMTP_PASSWORD") or os.getenv("EMAIL_PASSWORD", "")
-
-        if not smtp_user or not smtp_password:
-            logger.warning("SMTP 설정이 없어 이메일 발송을 건너뜁니다")
+        from backend.services.email_service import send_email
+        result = send_email(
+            to_email=to_email,
+            subject=subject,
+            html_content=html_content or content,
+            text_content=content
+        )
+        if result:
+            logger.info(f"이메일 발송 성공: {to_email}")
+        return result
+    except ImportError:
+        # fallback: import path may differ
+        try:
+            from services.email_service import send_email
+            return send_email(to_email=to_email, subject=subject, html_content=html_content or content, text_content=content)
+        except ImportError:
+            logger.error("email_service 모듈을 찾을 수 없습니다")
             return False
-
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = smtp_user
-        msg['To'] = to_email
-
-        # 텍스트 파트
-        text_part = MIMEText(content, 'plain', 'utf-8')
-        msg.attach(text_part)
-
-        # HTML 파트
-        if html_content:
-            html_part = MIMEText(html_content, 'html', 'utf-8')
-            msg.attach(html_part)
-
-        # 이메일 발송
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.send_message(msg)
-
-        return True
-
     except Exception as e:
         logger.error(f"이메일 발송 실패: {e}")
         return False

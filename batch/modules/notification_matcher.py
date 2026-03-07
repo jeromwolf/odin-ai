@@ -10,9 +10,6 @@ from psycopg2 import pool
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from loguru import logger
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import os
 
 try:
@@ -383,33 +380,18 @@ class NotificationMatcher:
             logger.warning(f"⚠️ 사용자 이메일 없음 (Rule ID: {rule['id']})")
             return 0
 
-        # SMTP 설정 (SMTP_* 또는 EMAIL_* 환경변수 모두 지원)
-        smtp_host = os.getenv("SMTP_HOST") or os.getenv("EMAIL_HOST", "smtp.gmail.com")
-        smtp_port = int(os.getenv("SMTP_PORT") or os.getenv("EMAIL_PORT", "587"))
-        smtp_user = os.getenv("SMTP_USER") or os.getenv("EMAIL_USERNAME", "")
-        smtp_password = os.getenv("SMTP_PASSWORD") or os.getenv("EMAIL_PASSWORD", "")
-
-        if not smtp_user or not smtp_password:
-            logger.warning("⚠️ SMTP 설정이 없습니다")
-            return 0
-
         try:
             # 이메일 내용 생성
             html_content = self._generate_batch_email_html(rule, bids)
             bid_count = len(bids)
+            subject = f"🎯 ODIN-AI 입찰 알림 - {bid_count}건의 새로운 공고"
 
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = f"🎯 ODIN-AI 입찰 알림 - {bid_count}건의 새로운 공고"
-            msg['From'] = smtp_user
-            msg['To'] = user_email
-
-            msg.attach(MIMEText(html_content, 'html', 'utf-8'))
-
-            # SMTP 발송
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
+            # 중앙 이메일 서비스로 발송
+            from backend.services.email_service import send_email
+            result = send_email(to_email=user_email, subject=subject, html_content=html_content)
+            if not result:
+                logger.warning(f"⚠️ 이메일 발송 실패 또는 비활성화: {user_email}")
+                return 0
 
             logger.info(f"✅ 배치 이메일 발송 성공: {user_email} ({bid_count}건)")
 
@@ -653,33 +635,16 @@ class NotificationMatcher:
             return
 
         try:
-            # SMTP_* 또는 EMAIL_* 환경변수 모두 지원
-            smtp_host = os.getenv("SMTP_HOST") or os.getenv("EMAIL_HOST", "smtp.gmail.com")
-            smtp_port = int(os.getenv("SMTP_PORT") or os.getenv("EMAIL_PORT", "587"))
-            smtp_user = os.getenv("SMTP_USER") or os.getenv("EMAIL_USERNAME", "")
-            smtp_password = os.getenv("SMTP_PASSWORD") or os.getenv("EMAIL_PASSWORD", "")
-
-            if not smtp_user or not smtp_password:
-                logger.warning("⚠️ SMTP 설정이 없어 이메일 발송을 건너뜁니다")
-                return
-
             # 이메일 내용 생성
             subject = f"🎯 ODIN-AI 알림: {bid['title'][:50]}..."
             html_content = self._generate_email_html(rule, bid)
 
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = subject
-            msg['From'] = smtp_user
-            msg['To'] = rule['email']
-
-            html_part = MIMEText(html_content, 'html', 'utf-8')
-            msg.attach(html_part)
-
-            # 이메일 발송
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
+            # 중앙 이메일 서비스로 발송
+            from backend.services.email_service import send_email
+            result = send_email(to_email=rule['email'], subject=subject, html_content=html_content)
+            if not result:
+                logger.warning(f"⚠️ 이메일 발송 실패: {rule['email']}")
+                return
 
             # 발송 기록 업데이트
             conn = self._get_conn()

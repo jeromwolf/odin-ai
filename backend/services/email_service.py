@@ -26,6 +26,55 @@ def _get_smtp_config() -> dict:
     }
 
 
+def send_email(to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
+    """범용 이메일 발송 함수 (모든 이메일 발송의 단일 진입점)
+
+    Args:
+        to_email: 수신자 이메일
+        subject: 이메일 제목
+        html_content: HTML 본문
+        text_content: 텍스트 본문 (선택, 없으면 HTML만 발송)
+
+    Returns:
+        bool: 발송 성공 여부
+    """
+    config = _get_smtp_config()
+
+    if not config["enabled"]:
+        logger.info(f"이메일 발송 비활성화 상태 (수신: {to_email})")
+        return False
+
+    if not config["username"] or not config["password"]:
+        logger.warning("SMTP 계정 정보 미설정, 이메일 발송 건너뜀")
+        return False
+
+    from_email = config["from_email"] or config["username"]
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = from_email
+        msg["To"] = to_email
+        msg["Date"] = formatdate(localtime=True)
+
+        if text_content:
+            msg.attach(MIMEText(text_content, "plain", "utf-8"))
+        msg.attach(MIMEText(html_content, "html", "utf-8"))
+
+        with smtplib.SMTP(config["host"], config["port"]) as server:
+            if config["use_tls"]:
+                server.starttls()
+            server.login(config["username"], config["password"])
+            server.send_message(msg)
+
+        logger.info(f"이메일 발송 성공: {to_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"이메일 발송 실패 ({to_email}): {e}")
+        return False
+
+
 def send_verification_email(to_email: str, token: str, username: str) -> bool:
     """이메일 인증 메일 발송
 
@@ -101,23 +150,15 @@ def send_verification_email(to_email: str, token: str, username: str) -> bool:
     )
 
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "[ODIN-AI] 이메일 인증을 완료해 주세요"
-        msg["From"] = from_email
-        msg["To"] = to_email
-        msg["Date"] = formatdate(localtime=True)
-
-        msg.attach(MIMEText(text_content, "plain", "utf-8"))
-        msg.attach(MIMEText(html_content, "html", "utf-8"))
-
-        with smtplib.SMTP(config["host"], config["port"]) as server:
-            if config["use_tls"]:
-                server.starttls()
-            server.login(config["username"], config["password"])
-            server.send_message(msg)
-
-        logger.info(f"이메일 인증 메일 발송 완료: {to_email}")
-        return True
+        result = send_email(
+            to_email=to_email,
+            subject="[ODIN-AI] 이메일 인증을 완료해 주세요",
+            html_content=html_content,
+            text_content=text_content
+        )
+        if result:
+            logger.info(f"이메일 인증 메일 발송 완료: {to_email}")
+        return result
 
     except Exception as e:
         logger.error(f"이메일 인증 메일 발송 실패 ({to_email}): {e}")
