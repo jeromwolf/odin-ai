@@ -145,15 +145,15 @@ CREATE TABLE IF NOT EXISTS alert_rules (
 -- 2. 알림 매칭 결과 테이블
 CREATE TABLE IF NOT EXISTS alert_matches (
     id SERIAL PRIMARY KEY,
-    rule_id INTEGER REFERENCES alert_rules(id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL,
-    bid_id VARCHAR(100) NOT NULL,
-    match_score DECIMAL(3, 2) DEFAULT 0.00,
-    matched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    match_date DATE DEFAULT CURRENT_DATE,
-    is_sent BOOLEAN DEFAULT false,
-    sent_at TIMESTAMP,
-    UNIQUE(rule_id, bid_id)
+    rule_id INTEGER NOT NULL REFERENCES alert_rules(id) ON DELETE CASCADE,
+    bid_notice_no VARCHAR(20) NOT NULL,
+    match_score DOUBLE PRECISION DEFAULT 0,
+    match_details JSONB,
+    is_notified BOOLEAN DEFAULT false,
+    notified_at TIMESTAMP,
+    notification_id INTEGER,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(rule_id, bid_notice_no)
 );
 
 -- 3. 알림 발송 큐 테이블
@@ -222,8 +222,9 @@ CREATE TABLE IF NOT EXISTS user_notification_settings (
 
 -- 인덱스 추가
 CREATE INDEX IF NOT EXISTS idx_alert_rules_user ON alert_rules(user_id);
-CREATE INDEX IF NOT EXISTS idx_alert_matches_date ON alert_matches(match_date);
-CREATE INDEX IF NOT EXISTS idx_alert_matches_sent ON alert_matches(is_sent);
+CREATE INDEX IF NOT EXISTS idx_alert_matches_bid_notice_no ON alert_matches(bid_notice_no);
+CREATE INDEX IF NOT EXISTS idx_alert_matches_is_notified ON alert_matches(is_notified);
+CREATE INDEX IF NOT EXISTS idx_alert_matches_rule_id ON alert_matches(rule_id);
 CREATE INDEX IF NOT EXISTS idx_alert_queue_processing ON alert_queue(status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_alert_queue_status ON alert_queue(status);
 CREATE INDEX IF NOT EXISTS idx_alert_queue_date ON alert_queue(queue_date);
@@ -253,14 +254,15 @@ ON CONFLICT (template_name) DO NOTHING;
 -- 뷰 생성: 오늘의 알림 현황
 CREATE OR REPLACE VIEW v_today_alerts AS
 SELECT
-    am.user_id,
-    COUNT(DISTINCT am.bid_id) as matched_bids,
-    COUNT(DISTINCT CASE WHEN am.is_sent THEN am.bid_id END) as sent_alerts,
-    COUNT(DISTINCT CASE WHEN NOT am.is_sent THEN am.bid_id END) as pending_alerts,
-    MAX(am.matched_at) as last_match_time
+    ar.user_id,
+    COUNT(DISTINCT am.bid_notice_no) as matched_bids,
+    COUNT(DISTINCT CASE WHEN am.is_notified THEN am.bid_notice_no END) as sent_alerts,
+    COUNT(DISTINCT CASE WHEN NOT am.is_notified THEN am.bid_notice_no END) as pending_alerts,
+    MAX(am.created_at) as last_match_time
 FROM alert_matches am
-WHERE am.match_date = CURRENT_DATE
-GROUP BY am.user_id;
+JOIN alert_rules ar ON am.rule_id = ar.id
+WHERE am.created_at >= CURRENT_DATE
+GROUP BY ar.user_id;
 
 -- 뷰 생성: 큐 상태 모니터링
 CREATE OR REPLACE VIEW v_queue_status AS
